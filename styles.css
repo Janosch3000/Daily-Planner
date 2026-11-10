@@ -12,11 +12,11 @@
 .tp-tabs .tp-tab { box-shadow: none; background: transparent; border: 1px solid transparent; color: var(--text-muted); border-radius: 8px; padding: 7px 14px; }
 .tp-tabs .tp-tab.is-active { color: var(--text-normal); background: var(--background-secondary); border-color: var(--background-modifier-border); font-weight: 600; }
 .tp-body { flex: 1; min-height: 0; overflow: auto; padding: 2px 2px 14px; }
-.tp-board { display: grid; grid-template-columns: repeat(5,minmax(260px,1fr)); gap: 14px; min-height: 100%; align-items: start; }
+.tp-board { display: grid; grid-template-columns: repeat(4,minmax(260px,1fr)); gap: 14px; min-height: 100%; align-items: start; }
 .tp-progress { --tp-tone: var(--tp-blue); --tp-wash: rgba(100,137,178,.085); }
 .tp-open { --tp-tone: var(--tp-neutral); --tp-wash: rgba(138,143,158,.055); }
 .tp-waiting { --tp-tone: var(--tp-amber); --tp-wash: rgba(174,148,98,.08); }
-.tp-delayed { --tp-tone: var(--tp-rose); --tp-wash: rgba(176,121,131,.08); }
+.tp-risk { --tp-tone: var(--tp-rose); --tp-wash: rgba(176,121,131,.08); }
 .tp-done { --tp-tone: var(--tp-green); --tp-wash: rgba(105,153,129,.08); }
 .tp-lane { border: 1px solid var(--background-modifier-border); border-top: 3px solid var(--tp-tone); background: var(--tp-wash); border-radius: 12px; padding: 12px; min-height: 260px; transition: background .15s,border-color .15s; }
 .tp-lane.tp-over { border-color: var(--tp-tone); background: var(--background-modifier-hover); }
@@ -100,7 +100,7 @@
 .tp-inline-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 22px; }
 @media(max-width:800px) {
   .tp-root { padding: 16px !important; } .tp-kpis { grid-template-columns: repeat(2,minmax(130px,1fr)); }
-  .tp-dashboard-grid { grid-template-columns: 1fr; } .tp-board { grid-template-columns: repeat(5,270px); }
+  .tp-dashboard-grid { grid-template-columns: 1fr; } .tp-board { grid-template-columns: repeat(4,270px); }
   .tp-head h2 { font-size: 1.35em; } .tp-head>.mod-cta { white-space: nowrap; } .tp-head .tp-muted { font-size: .74em; } .tp-panel { padding: 16px; }
 }
 @media(prefers-reduced-motion:reduce) { .tp-root * { transition: none !important; } }

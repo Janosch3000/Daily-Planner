@@ -2,9 +2,13 @@ const { Plugin, ItemView, Modal, Notice } = require('obsidian');
 const VIEW = 'tagesplaner-view';
 const DAY = 86400000;
 const COLS = [
-  { name: 'In Bearbeitung', key: 'progress' }, { name: 'Offen', key: 'open' },
-  { name: 'Warten auf Person', key: 'waiting' }, { name: 'Delayed', key: 'delayed' }, { name: 'Fertig', key: 'done' }
+  { name: 'ToDo', key: 'open' }, { name: 'In Progress', key: 'progress' },
+  { name: 'Waiting', key: 'waiting' }, { name: 'Done', key: 'done' }
 ];
+const LEGACY_STATUS = Object.freeze({
+  'Offen': 'ToDo', 'In Bearbeitung': 'In Progress',
+  'Warten auf Person': 'Waiting', 'Delayed': 'Waiting', 'Fertig': 'Done'
+});
 const copy = value => JSON.parse(JSON.stringify(value));
 const uid = () => Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 11);
 const stamp = value => typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
@@ -25,14 +29,15 @@ function normalize(raw, now = Date.now()) {
   if (source.tasks != null && !Array.isArray(source.tasks)) throw new Error('Das gespeicherte Aufgabenformat ist ungültig.');
   const tasks = (source.tasks || []).map(t => {
     if (!t || typeof t !== 'object') throw new Error('Eine gespeicherte Aufgabe ist ungültig.');
-    const status = COLS.some(c => c.name === t.status) ? t.status : 'Offen';
+    const incomingStatus = Object.prototype.hasOwnProperty.call(LEGACY_STATUS, t.status) ? LEGACY_STATUS[t.status] : t.status;
+    const status = COLS.some(c => c.name === incomingStatus) ? incomingStatus : 'ToDo';
     return {
       ...t, id: String(t.id || uid()), title: String(t.title || 'Ohne Titel'), status,
       due: dateKeyValid(t.due) ? t.due : '', note: String(t.note || ''), estimateHours: Math.max(0, Number(t.estimateHours) || 0),
       createdAt: stamp(t.createdAt), updatedAt: stamp(t.updatedAt),
-      completedAt: status === 'Fertig' ? stamp(t.completedAt) || now : null,
-      completionDateEstimated: status === 'Fertig' && (!!t.completionDateEstimated || !stamp(t.completedAt)),
-      archivedAt: status === 'Fertig' ? stamp(t.archivedAt) : null,
+      completedAt: status === 'Done' ? stamp(t.completedAt) || now : null,
+      completionDateEstimated: status === 'Done' && (!!t.completionDateEstimated || !stamp(t.completedAt)),
+      archivedAt: status === 'Done' ? stamp(t.archivedAt) : null,
       subtasks: Array.isArray(t.subtasks) ? t.subtasks.map(s => ({ ...s, id: String(s.id || uid()), title: String(s.title || ''), done: !!s.done })) : [],
       worklog: Array.isArray(t.worklog) ? t.worklog.map(e => ({ ...e, id: String(e.id || uid()), text: String(e.text || ''), at: stamp(e.at) || now })) : []
     };
@@ -41,35 +46,35 @@ function normalize(raw, now = Date.now()) {
 }
 function setStatus(task, status, now = Date.now()) {
   if (!COLS.some(c => c.name === status)) throw new Error('Unbekannter Status.');
-  if (task.status !== status) { task.completedAt = status === 'Fertig' ? now : null; task.completionDateEstimated = false; }
+  if (task.status !== status) { task.completedAt = status === 'Done' ? now : null; task.completionDateEstimated = false; }
   task.status = status; task.archivedAt = null; task.updatedAt = now;
 }
 function archiveDue(data, now = Date.now()) {
   let changed = false;
   for (const task of data.tasks) {
-    if (task.status === 'Fertig' && !task.archivedAt && task.completedAt && now - task.completedAt >= DAY) { task.archivedAt = now; changed = true; }
+    if (task.status === 'Done' && !task.archivedAt && task.completedAt && now - task.completedAt >= DAY) { task.archivedAt = now; changed = true; }
   }
   return changed;
 }
 function remaining(task) {
-  if (task.status === 'Fertig') return 0;
+  if (task.status === 'Done') return 0;
   const ratio = task.subtasks.length ? task.subtasks.filter(s => !s.done).length / task.subtasks.length : 1;
   return task.estimateHours * ratio;
 }
 function metrics(data, now = Date.now()) {
   const today = dayKey(now), sunday = dayKey(shiftDay(now, (7 - new Date(now).getDay()) % 7));
-  const tasks = data.tasks, active = tasks.filter(t => !t.archivedAt && t.status !== 'Fertig'), done = tasks.filter(t => t.status === 'Fertig');
+  const tasks = data.tasks, active = tasks.filter(t => !t.archivedAt && t.status !== 'Done'), done = tasks.filter(t => t.status === 'Done');
   const week = Array.from({ length: 7 }, (_, i) => {
     const key = dayKey(shiftDay(now, i - 6));
     return { key, count: done.filter(t => !t.completionDateEstimated && t.completedAt && t.completedAt <= now && dayKey(t.completedAt) === key).length };
   });
-  const scheduled = active.filter(t => t.due ? t.due <= sunday : t.status === 'In Bearbeitung');
+  const scheduled = active.filter(t => t.due ? t.due <= sunday : t.status === 'In Progress');
   const plannedHours = scheduled.reduce((n, t) => n + remaining(t), 0);
   return {
     today, active, done, week, scheduled, plannedHours, capacity: data.settings.weeklyCapacityHours,
     utilization: Math.round(plannedHours / data.settings.weeklyCapacityHours * 100),
     overdue: active.filter(t => t.due && t.due < today), dueToday: active.filter(t => t.due === today),
-    inProgress: active.filter(t => t.status === 'In Bearbeitung'), waiting: active.filter(t => ['Warten auf Person', 'Delayed'].includes(t.status)),
+    inProgress: active.filter(t => t.status === 'In Progress'), waiting: active.filter(t => t.status === 'Waiting'),
     done7: week.reduce((n, d) => n + d.count, 0),
     done30: done.filter(t => !t.completionDateEstimated && t.completedAt && dayKey(t.completedAt) >= dayKey(shiftDay(now, -29)) && t.completedAt <= now).length,
     subtasks: tasks.reduce((n, t) => n + t.subtasks.length, 0), subtasksDone: tasks.reduce((n, t) => n + t.subtasks.filter(s => s.done).length, 0),
@@ -120,7 +125,7 @@ class TaskModal extends Modal {
         const task = data.tasks.find(t => t.id === this.taskId);
         if (!task || task.archivedAt) throw new Error('Diese Aufgabe ist nicht mehr bearbeitbar.');
         Object.assign(task, values);
-      } else data.tasks.push({ id: uid(), ...values, status: 'Offen', createdAt: Date.now(), completedAt: null, archivedAt: null, subtasks: [], worklog: [] });
+      } else data.tasks.push({ id: uid(), ...values, status: 'ToDo', createdAt: Date.now(), completedAt: null, archivedAt: null, subtasks: [], worklog: [] });
     });
     if (ok) this.close(); else { this.saving = false; this.saveButton.disabled = false; }
   }
@@ -173,13 +178,13 @@ class PlannerView extends ItemView {
       title.ondragstart = e => { e.dataTransfer.setData('application/x-tagesplaner', task.id); e.dataTransfer.effectAllowed = 'move'; };
     }
     const meta = card.createDiv('tp-meta');
-    if (task.due) meta.createSpan({ text: shortDate(task.due), cls: 'tp-badge' + (!archived && task.status !== 'Fertig' && task.due < dayKey() ? ' tp-overdue' : '') });
+    if (task.due) meta.createSpan({ text: shortDate(task.due), cls: 'tp-badge' + (!archived && task.status !== 'Done' && task.due < dayKey() ? ' tp-overdue' : '') });
     if (task.estimateHours) meta.createSpan({ text: hourText(task.estimateHours) + ' geplant', cls: 'tp-badge' });
     if (task.completedAt) meta.createSpan({ text: task.completionDateEstimated ? 'Vor dem Update erledigt · Archivtimer ab Update' : 'Erledigt ' + timeText(task.completedAt), cls: 'tp-muted' });
     if (archived) meta.createSpan({ text: 'Archiviert ' + timeText(task.archivedAt), cls: 'tp-muted' });
     if (task.note) card.createDiv({ text: task.note, cls: 'tp-description' });
     const actions = card.createDiv('tp-card-actions');
-    if (archived) button(actions, 'Wieder öffnen', () => this.plugin.changeStatus(task.id, 'Offen'));
+    if (archived) button(actions, 'Wieder öffnen', () => this.plugin.changeStatus(task.id, 'ToDo'));
     else {
       const select = actions.createEl('select', { attr: { 'aria-label': 'Status für ' + task.title } });
       COLS.forEach(col => select.createEl('option', { text: col.name, value: col.name })); select.value = task.status;
@@ -245,10 +250,10 @@ class PlannerView extends ItemView {
     const metric = (label, value, hint, tone = '') => {
       const tile = kpis.createDiv('tp-kpi ' + tone); tile.createDiv({ text: label, cls: 'tp-muted' }); tile.createDiv({ text: String(value), cls: 'tp-kpi-value' }); tile.createDiv({ text: hint, cls: 'tp-kpi-hint' });
     };
-    metric('Offene Aufgaben', m.active.length, 'Alle noch nicht fertigen Aufgaben'); metric('In Bearbeitung', m.inProgress.length, 'Aktuell im Fokus', 'tp-progress');
-    metric('Heute fällig', m.dueToday.length, 'Noch zu erledigen'); metric('Überfällig', m.overdue.length, 'Fälligkeit bereits überschritten', m.overdue.length ? 'tp-delayed' : '');
+    metric('Offene Aufgaben', m.active.length, 'Alle noch nicht fertigen Aufgaben'); metric('In Progress', m.inProgress.length, 'Aktuell im Fokus', 'tp-progress');
+    metric('Heute fällig', m.dueToday.length, 'Noch zu erledigen'); metric('Überfällig', m.overdue.length, 'Fälligkeit bereits überschritten', m.overdue.length ? 'tp-risk' : '');
     metric('Erledigt · 7 Tage', m.done7, 'Heute und die letzten 6 Tage', 'tp-done'); metric('Erledigt · 30 Tage', m.done30, 'Inklusive archivierter Aufgaben', 'tp-done');
-    metric('Wartend / verzögert', m.waiting.length, 'Braucht eventuell Unterstützung', 'tp-waiting'); metric('Unteraufgaben', m.subtasksDone + '/' + m.subtasks, 'Erledigt / gesamt, inklusive Archiv');
+    metric('Waiting', m.waiting.length, 'Braucht eventuell Unterstützung', 'tp-waiting'); metric('Unteraufgaben', m.subtasksDone + '/' + m.subtasks, 'Erledigt / gesamt, inklusive Archiv');
     const grid = parent.createDiv('tp-dashboard-grid');
     const panel = title => { const box = grid.createDiv('tp-panel'); box.createEl('h4', { text: title }); return box; };
     const capacity = panel('Geplanter Aufwand bis Sonntag'); capacity.createDiv({ text: m.utilization + ' %', cls: 'tp-capacity-value' + (m.utilization > 100 ? ' tp-warning' : '') });

@@ -1,5 +1,14 @@
 # Änderungen
 
+## 1.1.1
+
+- Die Kategorien heißen jetzt **ToDo**, **In Progress**, **Waiting** und **Done**, in dieser Reihenfolge.
+- Bestehende Aufgaben werden automatisch zugeordnet: Offen → ToDo, In Bearbeitung → In Progress, Warten auf Person / Delayed → Waiting und Fertig → Done.
+- Arbeitsverlauf, Unteraufgaben, Abschlussdaten und vorhandene Archivtimer bleiben erhalten.
+- Dashboard, Drag-and-drop, Status-Auswahl und Archivierung verwenden die vier neuen Kategorien.
+
+Release-Assets: `main.js`, `manifest.json` und `styles.css`. Neuer Tag: **1.1.1**, Zielbranch: **main**.
+
 ## 1.1.0
 
 - Fertige Aufgaben werden nach 24 Stunden automatisch archiviert; geschlossene Obsidian-Zeiten werden beim nächsten Start berücksichtigt.
