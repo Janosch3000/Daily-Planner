@@ -1,5 +1,18 @@
 # Änderungen
 
+## 1.2.0
+
+- Beschreibungen direkt auf den Aufgabenkarten nachträglich ergänzen, ändern und leeren; auch über den Bearbeitungsdialog.
+- Prioritätstags: **low**, **mid**, **high**, **immediately**. Bestehende Aufgaben ohne Priorität erhalten mid.
+- Zweites, dezent farbiges Prioritätenboard direkt unter den Statuskategorien.
+- Beide Boards bearbeiten dieselben Aufgaben und bieten dieselben Funktionen einschließlich Unteraufgaben und Arbeitsverlauf.
+- Auswahlfeld, farbiger Tag und Prioritätsspalte bleiben synchron. Verschieben im Prioritätenboard ändert nur die Priorität, Verschieben im Statusboard nur den Status.
+- Textentwürfe sind zwischen beiden Darstellungen synchronisiert. Mehrfaches schnelles Speichern desselben Arbeitsschritts oder derselben Unteraufgabe wird innerhalb der Ansicht abgefangen.
+- Scrollpositionen bleiben beim Speichern, Verschieben und Wechseln zwischen den Ansichten erhalten.
+- Archivierung und Dashboard rechnen mit eindeutigen Aufgaben, unabhängig von ihrer Darstellung in zwei Boards.
+
+Release-Assets: `main.js`, `manifest.json` und `styles.css` einzeln anhängen. Tag: **1.2.0**, Zielbranch: **main**.
+
 ## 1.1.1
 
 - Die Kategorien heißen jetzt **ToDo**, **In Progress**, **Waiting** und **Done**, in dieser Reihenfolge.

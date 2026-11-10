@@ -5,6 +5,10 @@ const COLS = [
   { name: 'ToDo', key: 'open' }, { name: 'In Progress', key: 'progress' },
   { name: 'Waiting', key: 'waiting' }, { name: 'Done', key: 'done' }
 ];
+const PRIORITIES = [
+  { name: 'low', key: 'low' }, { name: 'mid', key: 'mid' },
+  { name: 'high', key: 'high' }, { name: 'immediately', key: 'immediately' }
+];
 const LEGACY_STATUS = Object.freeze({
   'Offen': 'ToDo', 'In Bearbeitung': 'In Progress',
   'Warten auf Person': 'Waiting', 'Delayed': 'Waiting', 'Fertig': 'Done'
@@ -33,6 +37,7 @@ function normalize(raw, now = Date.now()) {
     const status = COLS.some(c => c.name === incomingStatus) ? incomingStatus : 'ToDo';
     return {
       ...t, id: String(t.id || uid()), title: String(t.title || 'Ohne Titel'), status,
+      priority: PRIORITIES.some(p => p.name === t.priority) ? t.priority : 'mid',
       due: dateKeyValid(t.due) ? t.due : '', note: String(t.note || ''), estimateHours: Math.max(0, Number(t.estimateHours) || 0),
       createdAt: stamp(t.createdAt), updatedAt: stamp(t.updatedAt),
       completedAt: status === 'Done' ? stamp(t.completedAt) || now : null,
@@ -102,6 +107,10 @@ class TaskModal extends Modal {
       const input = label.createEl(tag, type ? { type } : {}); input.value = value || ''; return input;
     };
     this.titleInput = field('Aufgabe', 'input', 'text', task?.title); this.titleInput.required = true;
+    const priorityLabel = form.createEl('label', { cls: 'tp-field', text: 'Priorität' });
+    this.priorityInput = priorityLabel.createEl('select');
+    PRIORITIES.forEach(p => this.priorityInput.createEl('option', { text: p.name, value: p.name }));
+    this.priorityInput.value = task?.priority || 'mid';
     this.dueInput = field('Fällig am · optional', 'input', 'date', task?.due);
     this.estimateInput = field('Geschätzter Gesamtaufwand in Stunden · optional', 'input', 'number', task?.estimateHours || '');
     this.estimateInput.min = '0'; this.estimateInput.step = '0.25'; this.estimateInput.placeholder = 'z. B. 2';
@@ -118,8 +127,9 @@ class TaskModal extends Modal {
     if (this.dueInput.value && !dateKeyValid(this.dueInput.value)) return;
     const estimateHours = Number(this.estimateInput.value) || 0;
     if (!Number.isFinite(estimateHours) || estimateHours < 0) return;
+    if (!PRIORITIES.some(p => p.name === this.priorityInput.value)) return;
     this.saving = true; this.saveButton.disabled = true;
-    const values = { title, due: this.dueInput.value, note: this.noteInput.value.trim(), estimateHours, updatedAt: Date.now() };
+    const values = { title, due: this.dueInput.value, note: this.noteInput.value.trim(), priority: this.priorityInput.value, estimateHours, updatedAt: Date.now() };
     const ok = await this.plugin.mutate(data => {
       if (this.taskId) {
         const task = data.tasks.find(t => t.id === this.taskId);
@@ -133,14 +143,26 @@ class TaskModal extends Modal {
 }
 
 class PlannerView extends ItemView {
-  constructor(leaf, plugin) { super(leaf); this.plugin = plugin; this.tab = 'board'; this.drafts = new Map(); this.expanded = new Set(); this.archiveSearch = ''; }
+  constructor(leaf, plugin) {
+    super(leaf); this.plugin = plugin; this.tab = 'board'; this.drafts = new Map();
+    this.draftInputs = new Map(); this.draftControls = new Map(); this.pendingDrafts = new Set();
+    this.expanded = new Set(); this.archiveSearch = ''; this.scrollPositions = new Map();
+  }
   getViewType() { return VIEW; }
   getDisplayText() { return 'Tagesplaner'; }
   getIcon() { return 'layout-dashboard'; }
   async onOpen() { await this.plugin.archiveExpired(); this.render(); }
   async onClose() { this.drafts.clear(); }
   render() {
-    const root = this.contentEl || this.containerEl.children[1]; root.empty(); root.addClass('tp-root');
+    this.draftInputs = new Map(); this.draftControls = new Map();
+    const root = this.contentEl || this.containerEl.children[1];
+    const previousBody = root.querySelector?.('.tp-body');
+    if (previousBody && this.renderedTab) {
+      const boards = {};
+      for (const group of root.querySelectorAll('[data-board]')) boards[group.getAttribute('data-board')] = group.querySelector('.tp-board-scroll')?.scrollLeft || 0;
+      this.scrollPositions.set(this.renderedTab, { top: previousBody.scrollTop, boards });
+    }
+    root.empty(); root.addClass('tp-root');
     const head = root.createDiv('tp-head'), heading = head.createDiv(); heading.createEl('h2', { text: 'Tagesplaner' });
     heading.createDiv({ text: 'Fokus für heute. Überblick für die Woche.', cls: 'tp-muted' });
     button(head, '+ Aufgabe', () => new TaskModal(this.app, this.plugin).open(), 'mod-cta');
@@ -151,19 +173,62 @@ class PlannerView extends ItemView {
     }
     const body = root.createDiv('tp-body');
     if (this.tab === 'dashboard') this.renderDashboard(body); else if (this.tab === 'archive') this.renderArchive(body); else this.renderBoard(body);
+    const position = this.scrollPositions.get(this.tab);
+    if (position) {
+      body.scrollTop = position.top;
+      for (const group of root.querySelectorAll?.('[data-board]') || []) group.querySelector('.tp-board-scroll').scrollLeft = position.boards[group.getAttribute('data-board')] || 0;
+    }
+    this.renderedTab = this.tab;
   }
   renderBoard(parent) {
-    const board = parent.createDiv('tp-board');
-    for (const col of COLS) {
-      const tasks = this.plugin.data.tasks.filter(t => !t.archivedAt && t.status === col.name), lane = board.createDiv('tp-lane tp-' + col.key);
+    this.renderTaskBoard(parent, 'Status', 'Nach Arbeitsstand verschieben', 'status', COLS);
+    this.renderTaskBoard(parent, 'Prioritäten', 'Dieselben Aufgaben nach Dringlichkeit · Änderungen gelten in beiden Übersichten', 'priority', PRIORITIES);
+  }
+  renderTaskBoard(parent, heading, hint, field, columns) {
+    const group = parent.createDiv('tp-board-group'); group.setAttribute('data-board', field);
+    const headingEl = group.createDiv('tp-board-heading'); headingEl.createEl('h3', { text: heading });
+    headingEl.createDiv({ text: hint, cls: 'tp-muted' });
+    const board = group.createDiv('tp-board-scroll').createDiv('tp-board');
+    for (const col of columns) {
+      const tasks = this.plugin.data.tasks.filter(t => !t.archivedAt && t[field] === col.name);
+      const lane = board.createDiv('tp-lane ' + (field === 'priority' ? 'tp-priority-' : 'tp-') + col.key);
+      lane.setAttribute('data-value', col.name);
       const head = lane.createDiv('tp-lane-head'); head.createEl('h3', { text: col.name }); head.createSpan({ text: String(tasks.length), cls: 'tp-count' });
-      if (col.key === 'done') lane.createDiv({ text: 'Nach 24 Stunden automatisch im Archiv', cls: 'tp-lane-hint' });
+      if (field === 'status' && col.key === 'done') lane.createDiv({ text: 'Nach 24 Stunden automatisch im Archiv', cls: 'tp-lane-hint' });
       lane.ondragover = e => { if (e.dataTransfer?.types.includes('application/x-tagesplaner')) { e.preventDefault(); lane.addClass('tp-over'); } };
       lane.ondragleave = e => { if (!lane.contains(e.relatedTarget)) lane.removeClass('tp-over'); };
-      lane.ondrop = e => { e.preventDefault(); lane.removeClass('tp-over'); const id = e.dataTransfer?.getData('application/x-tagesplaner'); if (id) void this.plugin.changeStatus(id, col.name); };
+      lane.ondrop = e => {
+        e.preventDefault(); lane.removeClass('tp-over'); const id = e.dataTransfer?.getData('application/x-tagesplaner');
+        if (id) void (field === 'priority' ? this.plugin.changePriority(id, col.name) : this.plugin.changeStatus(id, col.name));
+      };
       if (!tasks.length) lane.createDiv({ text: 'Hier ist gerade Platz.', cls: 'tp-empty-lane' });
       tasks.sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999')).forEach(t => this.renderCard(lane, t, false));
     }
+  }
+  bindDraft(input, key, initial = '') {
+    input.value = this.drafts.has(key) ? this.drafts.get(key) : initial;
+    if (!this.draftInputs.has(key)) this.draftInputs.set(key, new Set());
+    this.draftInputs.get(key).add(input); this.registerDraftControl(key, input);
+    input.oninput = () => {
+      this.drafts.set(key, input.value);
+      for (const other of this.draftInputs.get(key) || []) if (other !== input) other.value = input.value;
+    };
+  }
+  registerDraftControl(key, control) {
+    if (!this.draftControls.has(key)) this.draftControls.set(key, new Set());
+    this.draftControls.get(key).add(control); control.disabled = this.pendingDrafts.has(key);
+  }
+  async saveDraft(taskId, kind, change) {
+    const key = taskId + ':' + kind;
+    if (this.pendingDrafts.has(key)) return false;
+    const originalDraft = this.drafts.get(key);
+    this.pendingDrafts.add(key);
+    for (const control of this.draftControls.get(key) || []) control.disabled = true;
+    try {
+      const ok = await this.editTask(taskId, change);
+      if (ok && this.drafts.get(key) === originalDraft) this.drafts.delete(key);
+      return ok;
+    } finally { this.pendingDrafts.delete(key); this.render(); }
   }
   async editTask(id, change) {
     return this.plugin.mutate(data => {
@@ -173,22 +238,40 @@ class PlannerView extends ItemView {
   }
   renderCard(parent, task, archived) {
     const card = parent.createDiv('tp-card'), title = card.createDiv('tp-card-head'); title.createEl('h4', { text: task.title, cls: 'tp-title' });
+    card.setAttribute('data-task-id', task.id);
     if (!archived) {
       title.draggable = true; title.title = 'Am Titel ziehen, um die Kategorie zu ändern';
       title.ondragstart = e => { e.dataTransfer.setData('application/x-tagesplaner', task.id); e.dataTransfer.effectAllowed = 'move'; };
     }
     const meta = card.createDiv('tp-meta');
+    meta.createSpan({ text: task.priority, cls: 'tp-priority-tag tp-priority-' + task.priority });
     if (task.due) meta.createSpan({ text: shortDate(task.due), cls: 'tp-badge' + (!archived && task.status !== 'Done' && task.due < dayKey() ? ' tp-overdue' : '') });
     if (task.estimateHours) meta.createSpan({ text: hourText(task.estimateHours) + ' geplant', cls: 'tp-badge' });
     if (task.completedAt) meta.createSpan({ text: task.completionDateEstimated ? 'Vor dem Update erledigt · Archivtimer ab Update' : 'Erledigt ' + timeText(task.completedAt), cls: 'tp-muted' });
     if (archived) meta.createSpan({ text: 'Archiviert ' + timeText(task.archivedAt), cls: 'tp-muted' });
-    if (task.note) card.createDiv({ text: task.note, cls: 'tp-description' });
+    const description = card.createDiv('tp-description-section');
+    description.createDiv({ text: 'Beschreibung', cls: 'tp-section-title' });
+    description.createDiv({ text: task.note || 'Noch keine Beschreibung.', cls: 'tp-description' });
+    if (!archived) {
+      const editor = description.createEl('details', { cls: 'tp-description-editor' });
+      editor.createEl('summary', { text: 'Beschreibung bearbeiten' });
+      const form = editor.createEl('form', { cls: 'tp-description-form' });
+      const input = form.createEl('textarea', { attr: { 'aria-label': 'Beschreibung für ' + task.title, placeholder: 'Beschreibung eingeben oder anpassen …' } }); input.rows = 3;
+      const key = task.id + ':description'; this.bindDraft(input, key, task.note);
+      editor.open = this.drafts.has(key);
+      const save = form.createEl('button', { text: 'Beschreibung speichern', type: 'submit', cls: 'tp-small-button' });
+      this.registerDraftControl(key, save);
+      form.onsubmit = async e => { e.preventDefault(); const note = input.value.trim(); return this.saveDraft(task.id, 'description', t => { t.note = note; }); };
+    }
     const actions = card.createDiv('tp-card-actions');
     if (archived) button(actions, 'Wieder öffnen', () => this.plugin.changeStatus(task.id, 'ToDo'));
     else {
       const select = actions.createEl('select', { attr: { 'aria-label': 'Status für ' + task.title } });
       COLS.forEach(col => select.createEl('option', { text: col.name, value: col.name })); select.value = task.status;
       select.onchange = () => this.plugin.changeStatus(task.id, select.value); button(actions, 'Bearbeiten', () => new TaskModal(this.app, this.plugin, task.id).open());
+      const priority = actions.createEl('select', { cls: 'tp-priority-select', attr: { 'aria-label': 'Priorität für ' + task.title } });
+      PRIORITIES.forEach(p => priority.createEl('option', { text: p.name, value: p.name })); priority.value = task.priority;
+      priority.onchange = () => this.plugin.changePriority(task.id, priority.value);
     }
     const sub = card.createDiv('tp-section'), subDone = task.subtasks.filter(s => s.done).length;
     sub.createDiv({ text: 'Unteraufgaben' + (task.subtasks.length ? ' · ' + subDone + '/' + task.subtasks.length : ''), cls: 'tp-section-title' });
@@ -201,12 +284,12 @@ class PlannerView extends ItemView {
     }
     if (!archived) {
       const form = sub.createEl('form', { cls: 'tp-sub-form' }), input = form.createEl('input', { type: 'text', attr: { placeholder: 'Neue Unteraufgabe …', 'aria-label': 'Neue Unteraufgabe für ' + task.title } });
-      const key = task.id + ':sub'; input.value = this.drafts.get(key) || ''; input.oninput = () => this.drafts.set(key, input.value);
+      const key = task.id + ':sub'; this.bindDraft(input, key);
       const add = form.createEl('button', { text: '+', type: 'submit', attr: { 'aria-label': 'Unteraufgabe hinzufügen' } });
+      this.registerDraftControl(key, add);
       form.onsubmit = async e => {
-        e.preventDefault(); const value = input.value.trim(); if (!value || add.disabled) return; add.disabled = true;
-        const ok = await this.editTask(task.id, t => t.subtasks.push({ id: uid(), title: value, done: false }));
-        if (ok) { this.drafts.delete(key); this.render(); } else add.disabled = false;
+        e.preventDefault(); const value = input.value.trim(); if (!value) return;
+        return this.saveDraft(task.id, 'sub', t => t.subtasks.push({ id: uid(), title: value, done: false }));
       };
     }
     const log = card.createDiv('tp-section tp-worklog'); log.createDiv({ text: 'Was wurde gemacht?', cls: 'tp-section-title' });
@@ -221,12 +304,12 @@ class PlannerView extends ItemView {
     if (!archived) {
       const form = log.createEl('form', { cls: 'tp-log-form' });
       const input = form.createEl('textarea', { attr: { placeholder: 'Arbeitsschritt oder Ergebnis eintragen …', 'aria-label': 'Arbeitsschritt für ' + task.title } }); input.rows = 2;
-      const key = task.id + ':log'; input.value = this.drafts.get(key) || ''; input.oninput = () => this.drafts.set(key, input.value);
+      const key = task.id + ':log'; this.bindDraft(input, key);
       const save = form.createEl('button', { text: 'Eintrag speichern', type: 'submit', cls: 'tp-small-button' });
+      this.registerDraftControl(key, save);
       form.onsubmit = async e => {
-        e.preventDefault(); const text = input.value.trim(); if (!text || save.disabled) return; save.disabled = true;
-        const ok = await this.editTask(task.id, t => t.worklog.push({ id: uid(), text, at: Date.now() }));
-        if (ok) { this.drafts.delete(key); this.render(); } else save.disabled = false;
+        e.preventDefault(); const text = input.value.trim(); if (!text) return;
+        return this.saveDraft(task.id, 'log', t => t.worklog.push({ id: uid(), text, at: Date.now() }));
       };
     }
   }
@@ -333,6 +416,14 @@ module.exports = class TagesplanerPlugin extends Plugin {
     this.queue = operation.catch(error => console.error(error)); return operation;
   }
   changeStatus(id, status) { return this.mutate(data => { const task = data.tasks.find(t => t.id === id); if (!task) throw new Error('Aufgabe nicht gefunden.'); setStatus(task, status); }); }
+  changePriority(id, priority) {
+    return this.mutate(data => {
+      if (!PRIORITIES.some(p => p.name === priority)) throw new Error('Unbekannte Priorität.');
+      const task = data.tasks.find(t => t.id === id);
+      if (!task || task.archivedAt) throw new Error('Die Aufgabe ist nicht mehr bearbeitbar.');
+      task.priority = priority; task.updatedAt = Date.now();
+    });
+  }
   async activate(tab = 'board') {
     let leaf = this.app.workspace.getLeavesOfType(VIEW)[0];
     if (!leaf) { leaf = this.app.workspace.getLeaf(true); await leaf.setViewState({ type: VIEW, active: true }); }
