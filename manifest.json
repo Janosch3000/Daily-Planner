@@ -1,7 +1,7 @@
 {
   "id": "tagesplaner",
   "name": "Tagesplaner",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "minAppVersion": "1.4.0",
   "description": "Aufgaben- und Prioritätenboards mit Vorlagen, Unteraufgaben, Arbeitsverlauf, Archiv und Dashboard.",
   "author": "Janosch",

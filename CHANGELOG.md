@@ -1,5 +1,17 @@
 # Änderungen
 
+## 1.5.0
+
+- Neue Aufgaben aus einer Vorlage öffnen sich sofort im Bearbeitungsdialog. Anpassungen werden auf genau dieser Aufgabe gespeichert.
+- Gesamtaufwand und Stundenanzeigen aus Aufgaben, Vorlagen und Karten entfernt.
+- Wochenkapazität und stundenbasierte Auslastung aus dem Dashboard entfernt; stattdessen Prioritätenverteilung der offenen Aufgaben.
+- Neues Layout mit ruhigeren Flächen, übersichtlicheren Karten und stärker hervorgehobenen Symbolen.
+- Statussymbole: leeres Kästchen für ToDo, Baustellenabsperrung für In Progress, Uhr für Waiting und Kästchen mit Haken für Done.
+- Prioritätssymbole: low ↓, mid →, high ↑, immediately ⇈. Die Symbolfarben sind kräftiger als die Hintergrundfarben.
+- Bestehende Aufgaben, Vorlagen, Unteraufgaben und Arbeitsverläufe bleiben verfügbar. Die Done-/Prioritäten-Regel bleibt erhalten.
+
+Release-Assets: `main.js`, `manifest.json` und `styles.css` einzeln anhängen. Tag: **1.5.0**, Zielbranch: **main**.
+
 ## 1.4.1
 
 - Unteraufgaben lassen sich direkt in der Vorlage vordefinieren; eine erste Eingabezeile steht sofort bereit.

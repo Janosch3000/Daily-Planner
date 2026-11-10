@@ -2,12 +2,12 @@ const { Plugin, ItemView, Modal, Notice } = require('obsidian');
 const VIEW = 'tagesplaner-view';
 const DAY = 86400000;
 const COLS = [
-  { name: 'ToDo', key: 'open' }, { name: 'In Progress', key: 'progress' },
-  { name: 'Waiting', key: 'waiting' }, { name: 'Done', key: 'done' }
+  { name: 'ToDo', key: 'open', icon: 'square', glyph: '☐' }, { name: 'In Progress', key: 'progress', icon: 'construction', glyph: '🚧' },
+  { name: 'Waiting', key: 'waiting', icon: 'clock', glyph: '◷' }, { name: 'Done', key: 'done', icon: 'square-check', glyph: '☑' }
 ];
 const PRIORITIES = [
-  { name: 'low', key: 'low' }, { name: 'mid', key: 'mid' },
-  { name: 'high', key: 'high' }, { name: 'immediately', key: 'immediately' }
+  { name: 'low', key: 'low', icon: 'arrow-down', glyph: '↓' }, { name: 'mid', key: 'mid', icon: 'arrow-right', glyph: '→' },
+  { name: 'high', key: 'high', icon: 'arrow-up', glyph: '↑' }, { name: 'immediately', key: 'immediately', icon: 'arrows-up', glyph: '⇈' }
 ];
 const LEGACY_STATUS = Object.freeze({
   'Offen': 'ToDo', 'In Bearbeitung': 'In Progress',
@@ -16,7 +16,38 @@ const LEGACY_STATUS = Object.freeze({
 const copy = value => JSON.parse(JSON.stringify(value));
 const uid = () => Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 11);
 const stamp = value => typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
-const hourText = value => (Math.round((Number(value) || 0) * 10) / 10).toLocaleString('de-CH') + ' h';
+const SYMBOLS = {
+  square: [['rect', { x: 4, y: 4, width: 16, height: 16, rx: 3 }]],
+  'square-check': [['rect', { x: 4, y: 4, width: 16, height: 16, rx: 3 }], ['path', { d: 'M8 12l3 3 5-6' }]],
+  clock: [['circle', { cx: 12, cy: 12, r: 9 }], ['path', { d: 'M12 7v5l3 2' }]],
+  construction: [['rect', { x: 3, y: 7, width: 18, height: 8, rx: 1.5 }], ['path', { d: 'M7 7l4 8m3-8l4 8M6 15v5m12-5v5' }]],
+  'arrow-down': [['path', { d: 'M12 4v16m-6-6 6 6 6-6' }]],
+  'arrow-right': [['path', { d: 'M4 12h16m-6-6 6 6-6 6' }]],
+  'arrow-up': [['path', { d: 'M12 20V4m-6 6 6-6 6 6' }]],
+  'arrows-up': [['path', { d: 'M6 14l6-6 6 6M6 20l6-6 6 6' }]]
+};
+function addSymbol(parent, definition) {
+  const wrapper = parent.createSpan({ cls: 'tp-symbol tp-symbol-' + definition.key });
+  wrapper.setAttribute('aria-hidden', 'true'); wrapper.setAttribute('data-icon', definition.icon);
+  const doc = wrapper.ownerDocument, ns = 'http://www.w3.org/2000/svg';
+  const svg = doc.createElementNS(ns, 'svg');
+  for (const [key, value] of Object.entries({ viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.9', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', focusable: 'false' })) svg.setAttribute(key, value);
+  for (const [tag, attrs] of SYMBOLS[definition.icon]) {
+    const shape = doc.createElementNS(ns, tag); for (const [key, value] of Object.entries(attrs)) shape.setAttribute(key, String(value)); svg.appendChild(shape);
+  }
+  wrapper.appendChild(svg); return wrapper;
+}
+function symbolLabel(parent, definition, cls = '') {
+  const label = parent.createSpan({ cls: 'tp-symbol-label ' + cls }); addSymbol(label, definition); label.createSpan({ text: definition.name }); return label;
+}
+function priorityBadge(parent, priority) {
+  const definition = PRIORITIES.find(p => p.name === priority) || PRIORITIES[1];
+  return symbolLabel(parent, definition, 'tp-priority-tag tp-priority-' + definition.key);
+}
+function statusBadge(parent, status) {
+  const definition = COLS.find(c => c.name === status) || COLS[0];
+  return symbolLabel(parent, definition, 'tp-status-tag tp-' + definition.key);
+}
 function dayKey(value = Date.now()) {
   const d = new Date(value);
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
@@ -33,7 +64,6 @@ function templateFields(source = {}) {
     title: String(source.title || ''), note: String(source.note || ''),
     priority: PRIORITIES.some(p => p.name === source.priority) ? source.priority : 'mid',
     status: ['ToDo', 'In Progress', 'Waiting'].includes(source.status) ? source.status : 'ToDo',
-    estimateHours: Number.isFinite(Number(source.estimateHours)) ? Math.max(0, Number(source.estimateHours)) : 0,
     dueInDays: offset !== null && offset !== undefined && offset !== '' && Number.isInteger(Number(offset)) && Number(offset) >= 0 && Number(offset) <= 3650 ? Number(offset) : null,
     subtasks: Array.isArray(source.subtasks) ? source.subtasks.map(s => ({ title: String(s.title || '').trim() })).filter(s => s.title) : []
   };
@@ -50,7 +80,7 @@ function normalize(raw, now = Date.now()) {
     return {
       ...t, id: String(t.id || uid()), title: String(t.title || 'Ohne Titel'), status,
       priority: PRIORITIES.some(p => p.name === t.priority) ? t.priority : 'mid',
-      due: dateKeyValid(t.due) ? t.due : '', note: String(t.note || ''), estimateHours: Math.max(0, Number(t.estimateHours) || 0),
+      due: dateKeyValid(t.due) ? t.due : '', note: String(t.note || ''),
       createdAt: stamp(t.createdAt), updatedAt: stamp(t.updatedAt),
       completedAt: status === 'Done' ? stamp(t.completedAt) || now : null,
       completionDateEstimated: status === 'Done' && (!!t.completionDateEstimated || !stamp(t.completedAt)),
@@ -63,7 +93,7 @@ function normalize(raw, now = Date.now()) {
     if (!t || typeof t !== 'object') throw new Error('Eine gespeicherte Vorlage ist ungültig.');
     return { id: String(t.id || uid()), name: String(t.name || 'Ohne Namen'), ...templateFields(t), createdAt: stamp(t.createdAt), updatedAt: stamp(t.updatedAt) };
   });
-  return { ...source, schemaVersion: 2, tasks, templates, settings: { ...source.settings, weeklyCapacityHours: Number(source.settings?.weeklyCapacityHours) > 0 ? Number(source.settings.weeklyCapacityHours) : 40 } };
+  return { ...source, schemaVersion: 2, tasks, templates, settings: { ...source.settings } };
 }
 function setStatus(task, status, now = Date.now()) {
   if (!COLS.some(c => c.name === status)) throw new Error('Unbekannter Status.');
@@ -77,29 +107,20 @@ function archiveDue(data, now = Date.now()) {
   }
   return changed;
 }
-function remaining(task) {
-  if (task.status === 'Done') return 0;
-  const ratio = task.subtasks.length ? task.subtasks.filter(s => !s.done).length / task.subtasks.length : 1;
-  return task.estimateHours * ratio;
-}
 function metrics(data, now = Date.now()) {
-  const today = dayKey(now), sunday = dayKey(shiftDay(now, (7 - new Date(now).getDay()) % 7));
+  const today = dayKey(now);
   const tasks = data.tasks, active = tasks.filter(t => !t.archivedAt && t.status !== 'Done'), done = tasks.filter(t => t.status === 'Done');
   const week = Array.from({ length: 7 }, (_, i) => {
     const key = dayKey(shiftDay(now, i - 6));
     return { key, count: done.filter(t => !t.completionDateEstimated && t.completedAt && t.completedAt <= now && dayKey(t.completedAt) === key).length };
   });
-  const scheduled = active.filter(t => t.due ? t.due <= sunday : t.status === 'In Progress');
-  const plannedHours = scheduled.reduce((n, t) => n + remaining(t), 0);
   return {
-    today, active, done, week, scheduled, plannedHours, capacity: data.settings.weeklyCapacityHours,
-    utilization: Math.round(plannedHours / data.settings.weeklyCapacityHours * 100),
+    today, active, done, week,
     overdue: active.filter(t => t.due && t.due < today), dueToday: active.filter(t => t.due === today),
     inProgress: active.filter(t => t.status === 'In Progress'), waiting: active.filter(t => t.status === 'Waiting'),
     done7: week.reduce((n, d) => n + d.count, 0),
     done30: done.filter(t => !t.completionDateEstimated && t.completedAt && dayKey(t.completedAt) >= dayKey(shiftDay(now, -29)) && t.completedAt <= now).length,
-    subtasks: tasks.reduce((n, t) => n + t.subtasks.length, 0), subtasksDone: tasks.reduce((n, t) => n + t.subtasks.filter(s => s.done).length, 0),
-    unestimated: scheduled.filter(t => !t.estimateHours).length
+    subtasks: tasks.reduce((n, t) => n + t.subtasks.length, 0), subtasksDone: tasks.reduce((n, t) => n + t.subtasks.filter(s => s.done).length, 0)
   };
 }
 function button(parent, text, handler, cls = '') {
@@ -133,18 +154,16 @@ class TaskModal extends Modal {
     }
     this.titleInput = field(this.isTemplate ? 'Vorgabe für den Aufgabentitel · optional' : 'Aufgabe', 'input', 'text', task?.title); this.titleInput.required = !this.isTemplate;
     this.priorityInput = field('Priorität', 'select', null, '');
-    PRIORITIES.forEach(p => this.priorityInput.createEl('option', { text: p.name, value: p.name })); this.priorityInput.value = task?.priority || 'mid';
+    PRIORITIES.forEach(p => this.priorityInput.createEl('option', { text: p.glyph + ' ' + p.name, value: p.name })); this.priorityInput.value = task?.priority || 'mid';
     this.statusInput = field(this.taskId ? 'Status' : 'Startstatus', 'select', null, '');
     const statusOptions = this.taskId && !this.isTemplate ? COLS : COLS.filter(c => c.name !== 'Done');
-    statusOptions.forEach(c => this.statusInput.createEl('option', { text: c.name, value: c.name }));
+    statusOptions.forEach(c => this.statusInput.createEl('option', { text: c.glyph + ' ' + c.name, value: c.name }));
     this.statusInput.value = statusOptions.some(c => c.name === task?.status) ? task.status : 'ToDo';
     if (this.isTemplate) {
       const offset = savedTemplate ? savedTemplate.dueInDays : (dateKeyValid(task?.due) ? Math.max(0, Math.round((Date.parse(task.due + 'T00:00:00Z') - Date.parse(dayKey() + 'T00:00:00Z')) / DAY)) : null);
       this.offsetInput = field('Fällig in Tagen ab Erstellung · optional', 'input', 'number', offset);
       this.offsetInput.min = '0'; this.offsetInput.max = '3650'; this.offsetInput.step = '1'; this.offsetInput.placeholder = '0 = am Tag der Erstellung';
     } else this.dueInput = field('Fällig am · optional', 'input', 'date', task?.due);
-    this.estimateInput = field('Geschätzter Gesamtaufwand in Stunden · optional', 'input', 'number', task?.estimateHours || '');
-    this.estimateInput.min = '0'; this.estimateInput.step = '0.25'; this.estimateInput.placeholder = 'z. B. 2';
     this.noteInput = field('Beschreibung · optional', 'textarea', null, task?.note); this.noteInput.rows = 3;
     const subSection = form.createDiv('tp-modal-subtasks'); subSection.createEl('h3', { text: 'Unteraufgaben' });
     this.subtaskList = subSection.createDiv('tp-modal-subtask-list');
@@ -248,7 +267,6 @@ class TaskModal extends Modal {
     const values = templateFields(source);
     this.titleInput.value = values.title; this.noteInput.value = values.note;
     this.priorityInput.value = values.priority; this.statusInput.value = values.status;
-    this.estimateInput.value = values.estimateHours ? String(values.estimateHours) : '';
     this.dueInput.value = values.dueInDays == null ? '' : dayKey(shiftDay(Date.now(), values.dueInDays));
     this.subtaskRows = values.subtasks.map(s => ({ id: uid(), title: s.title, done: false })); this.renderSubtasks(); return true;
   }
@@ -258,18 +276,16 @@ class TaskModal extends Modal {
     const title = this.titleInput.value.trim(), name = this.nameInput?.value.trim();
     if (this.isTemplate ? !name : !title) { new Notice(this.isTemplate ? 'Bitte gib der Vorlage einen Namen.' : 'Bitte gib einen Aufgabentitel ein.'); (this.nameInput || this.titleInput).focus(); return; }
     if (this.isTemplate && this.plugin.data.templates.some(t => t.id !== this.options.templateId && t.name.toLocaleLowerCase() === name.toLocaleLowerCase())) { new Notice('Eine Vorlage mit diesem Namen existiert bereits. Bitte wähle einen anderen Namen.'); return; }
-    if (!this.estimateInput.checkValidity()) { this.estimateInput.reportValidity(); return; }
     if (this.dueInput && (!this.dueInput.checkValidity() || (this.dueInput.value && !dateKeyValid(this.dueInput.value)))) { this.dueInput.reportValidity(); return; }
     if (this.offsetInput && !this.offsetInput.checkValidity()) { this.offsetInput.reportValidity(); return; }
-    const estimateHours = Number(this.estimateInput.value) || 0;
     const dueInDays = this.offsetInput && this.offsetInput.value !== '' ? Number(this.offsetInput.value) : null;
-    if (!Number.isFinite(estimateHours) || estimateHours < 0 || (dueInDays != null && (!Number.isInteger(dueInDays) || dueInDays < 0 || dueInDays > 3650))) return;
+    if (dueInDays != null && (!Number.isInteger(dueInDays) || dueInDays < 0 || dueInDays > 3650)) return;
     if (!PRIORITIES.some(p => p.name === this.priorityInput.value)) return;
     const status = this.statusInput.value;
     if (!COLS.some(c => c.name === status) || ((!this.taskId || this.isTemplate) && status === 'Done')) return;
     this.saving = true; this.saveButton.disabled = true; this.setSubtaskSaving(true);
     const subtasks = this.subtaskRows.filter(s => s.title.trim()).map(s => ({ id: s.id, title: s.title.trim(), done: !!s.done }));
-    const values = { title, note: this.noteInput.value.trim(), priority: this.priorityInput.value, estimateHours, updatedAt: Date.now() };
+    const values = { title, note: this.noteInput.value.trim(), priority: this.priorityInput.value, updatedAt: Date.now() };
     const ok = await this.plugin.mutate(data => {
       if (this.isTemplate) {
         if (data.templates.some(t => t.id !== this.options.templateId && t.name.toLocaleLowerCase() === name.toLocaleLowerCase())) throw new Error('Eine Vorlage mit diesem Namen existiert bereits.');
@@ -297,7 +313,7 @@ class TemplatePickerModal extends Modal {
   onOpen() {
     this.contentEl.empty(); this.contentEl.addClass('tp-template-picker');
     this.contentEl.createEl('h2', { text: 'Aufgabe nach Vorlage erstellen' });
-    this.contentEl.createEl('p', { text: 'Wähle eine Vorlage aus. Die Aufgabe wird direkt erstellt und lässt sich anschließend frei bearbeiten.', cls: 'tp-muted' });
+    this.contentEl.createEl('p', { text: 'Wähle eine Vorlage aus. Die neue Aufgabe öffnet sich direkt zum Bearbeiten.', cls: 'tp-muted' });
     this.searchInput = this.contentEl.createEl('input', { type: 'search', attr: { placeholder: 'Vorlage suchen …', 'aria-label': 'Vorlagen durchsuchen' } });
     this.list = this.contentEl.createDiv('tp-template-picker-list');
     this.searchInput.oninput = () => this.renderOptions();
@@ -312,8 +328,8 @@ class TemplatePickerModal extends Modal {
       const row = this.list.createDiv('tp-template-picker-option'); row.setAttribute('data-template-id', t.id);
       const choose = button(row, t.name, () => this.choose(t.id), 'tp-template-choice');
       choose.setAttribute('aria-label', 'Aufgabe aus Vorlage ' + t.name + ' erstellen'); choose.disabled = this.creating; this.templateButtons.push(choose);
-      const meta = row.createDiv('tp-meta'); meta.createSpan({ text: t.priority, cls: 'tp-priority-tag tp-priority-' + t.priority });
-      meta.createSpan({ text: t.subtasks.length + ' Unteraufgaben · ' + t.status, cls: 'tp-muted' });
+      const meta = row.createDiv('tp-meta'); priorityBadge(meta, t.priority); statusBadge(meta, t.status);
+      meta.createSpan({ text: t.subtasks.length + ' Unteraufgaben', cls: 'tp-muted' });
       if (t.title) row.createDiv({ text: t.title, cls: 'tp-template-title' });
     }
     if (!templates.length) this.list.createDiv({ text: search ? 'Keine passenden Vorlagen.' : 'Noch keine Vorlagen. Erstelle zuerst eine über + Vorlage neben + Aufgabe.', cls: 'tp-empty' });
@@ -321,10 +337,10 @@ class TemplatePickerModal extends Modal {
   async choose(id) {
     if (this.creating) return false;
     this.creating = true; this.searchInput.disabled = true; this.cancelButton.disabled = true; this.templateButtons.forEach(b => { b.disabled = true; });
-    const ok = await this.plugin.createTaskFromTemplate(id);
-    if (ok) { this.close(); this.taskModal?.close(); }
+    const taskId = await this.plugin.createTaskFromTemplate(id);
+    if (taskId) { this.close(); this.taskModal?.close(); new TaskModal(this.app, this.plugin, taskId).open(); }
     else { this.creating = false; this.searchInput.disabled = false; this.cancelButton.disabled = false; this.renderOptions(); }
-    return ok;
+    return !!taskId;
   }
   onClose() { this.contentEl.empty(); }
 }
@@ -412,9 +428,7 @@ class PlannerView extends ItemView {
     for (const template of templates) {
       const card = grid.createDiv('tp-template-card'); card.setAttribute('data-template-id', template.id);
       card.createEl('h4', { text: template.name });
-      const meta = card.createDiv('tp-meta'); meta.createSpan({ text: template.priority, cls: 'tp-priority-tag tp-priority-' + template.priority });
-      meta.createSpan({ text: template.status, cls: 'tp-badge' });
-      if (template.estimateHours) meta.createSpan({ text: hourText(template.estimateHours), cls: 'tp-badge' });
+      const meta = card.createDiv('tp-meta'); priorityBadge(meta, template.priority); statusBadge(meta, template.status);
       if (template.dueInDays != null) meta.createSpan({ text: template.dueInDays === 0 ? 'Fällig am Erstellungstag' : 'Fällig nach ' + template.dueInDays + ' Tagen', cls: 'tp-badge' });
       if (template.title) card.createDiv({ text: template.title, cls: 'tp-template-title' });
       if (template.note) card.createDiv({ text: template.note, cls: 'tp-description' });
@@ -437,7 +451,7 @@ class PlannerView extends ItemView {
       const tasks = this.plugin.data.tasks.filter(t => !t.archivedAt && t[field] === col.name && (field !== 'priority' || t.status !== 'Done'));
       const lane = board.createDiv('tp-lane ' + (field === 'priority' ? 'tp-priority-' : 'tp-') + col.key);
       lane.setAttribute('data-value', col.name);
-      const head = lane.createDiv('tp-lane-head'); head.createEl('h3', { text: col.name }); head.createSpan({ text: String(tasks.length), cls: 'tp-count' });
+      const head = lane.createDiv('tp-lane-head'); symbolLabel(head.createEl('h3'), col); head.createSpan({ text: String(tasks.length), cls: 'tp-count' });
       if (field === 'status' && col.key === 'done') lane.createDiv({ text: 'Nach 24 Stunden automatisch im Archiv', cls: 'tp-lane-hint' });
       lane.ondragover = e => { if (e.dataTransfer?.types.includes('application/x-tagesplaner')) { e.preventDefault(); lane.addClass('tp-over'); } };
       lane.ondragleave = e => { if (!lane.contains(e.relatedTarget)) lane.removeClass('tp-over'); };
@@ -488,9 +502,8 @@ class PlannerView extends ItemView {
       title.ondragstart = e => { e.dataTransfer.setData('application/x-tagesplaner', task.id); e.dataTransfer.effectAllowed = 'move'; };
     }
     const meta = card.createDiv('tp-meta');
-    meta.createSpan({ text: task.priority, cls: 'tp-priority-tag tp-priority-' + task.priority });
+    priorityBadge(meta, task.priority); statusBadge(meta, task.status);
     if (task.due) meta.createSpan({ text: shortDate(task.due), cls: 'tp-badge' + (!archived && task.status !== 'Done' && task.due < dayKey() ? ' tp-overdue' : '') });
-    if (task.estimateHours) meta.createSpan({ text: hourText(task.estimateHours) + ' geplant', cls: 'tp-badge' });
     if (task.completedAt) meta.createSpan({ text: task.completionDateEstimated ? 'Vor dem Update erledigt · Archivtimer ab Update' : 'Erledigt ' + timeText(task.completedAt), cls: 'tp-muted' });
     if (archived) meta.createSpan({ text: 'Archiviert ' + timeText(task.archivedAt), cls: 'tp-muted' });
     const description = card.createDiv('tp-description-section');
@@ -511,10 +524,10 @@ class PlannerView extends ItemView {
     if (archived) button(actions, 'Wieder öffnen', () => this.plugin.changeStatus(task.id, 'ToDo'));
     else {
       const select = actions.createEl('select', { attr: { 'aria-label': 'Status für ' + task.title } });
-      COLS.forEach(col => select.createEl('option', { text: col.name, value: col.name })); select.value = task.status;
+      COLS.forEach(col => select.createEl('option', { text: col.glyph + ' ' + col.name, value: col.name })); select.value = task.status;
       select.onchange = () => this.plugin.changeStatus(task.id, select.value); button(actions, 'Bearbeiten', () => new TaskModal(this.app, this.plugin, task.id).open());
       const priority = actions.createEl('select', { cls: 'tp-priority-select', attr: { 'aria-label': 'Priorität für ' + task.title } });
-      PRIORITIES.forEach(p => priority.createEl('option', { text: p.name, value: p.name })); priority.value = task.priority;
+      PRIORITIES.forEach(p => priority.createEl('option', { text: p.glyph + ' ' + p.name, value: p.name })); priority.value = task.priority;
       priority.onchange = () => this.plugin.changePriority(task.id, priority.value);
     }
     const sub = card.createDiv('tp-section'), subDone = task.subtasks.filter(s => s.done).length;
@@ -574,28 +587,20 @@ class PlannerView extends ItemView {
     const m = metrics(this.plugin.data), intro = parent.createDiv('tp-dashboard-intro'); intro.createEl('h3', { text: 'Deine Woche im Blick' });
     intro.createDiv({ text: new Date().toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long' }), cls: 'tp-muted' });
     const kpis = parent.createDiv('tp-kpis');
-    const metric = (label, value, hint, tone = '') => {
-      const tile = kpis.createDiv('tp-kpi ' + tone); tile.createDiv({ text: label, cls: 'tp-muted' }); tile.createDiv({ text: String(value), cls: 'tp-kpi-value' }); tile.createDiv({ text: hint, cls: 'tp-kpi-hint' });
+    const metric = (label, value, hint, tone = '', symbol = COLS[0]) => {
+      const tile = kpis.createDiv('tp-kpi ' + tone), header = tile.createDiv('tp-kpi-header'); addSymbol(header, symbol); header.createDiv({ text: label, cls: 'tp-muted' }); tile.createDiv({ text: String(value), cls: 'tp-kpi-value' }); tile.createDiv({ text: hint, cls: 'tp-kpi-hint' });
     };
-    metric('Offene Aufgaben', m.active.length, 'Alle noch nicht fertigen Aufgaben'); metric('In Progress', m.inProgress.length, 'Aktuell im Fokus', 'tp-progress');
-    metric('Heute fällig', m.dueToday.length, 'Noch zu erledigen'); metric('Überfällig', m.overdue.length, 'Fälligkeit bereits überschritten', m.overdue.length ? 'tp-risk' : '');
-    metric('Erledigt · 7 Tage', m.done7, 'Heute und die letzten 6 Tage', 'tp-done'); metric('Erledigt · 30 Tage', m.done30, 'Inklusive archivierter Aufgaben', 'tp-done');
-    metric('Waiting', m.waiting.length, 'Braucht eventuell Unterstützung', 'tp-waiting'); metric('Unteraufgaben', m.subtasksDone + '/' + m.subtasks, 'Erledigt / gesamt, inklusive Archiv');
+    metric('Offene Aufgaben', m.active.length, 'Alle noch nicht fertigen Aufgaben'); metric('In Progress', m.inProgress.length, 'Aktuell im Fokus', 'tp-progress', COLS[1]);
+    metric('Heute fällig', m.dueToday.length, 'Noch zu erledigen', '', COLS[2]); metric('Überfällig', m.overdue.length, 'Fälligkeit bereits überschritten', m.overdue.length ? 'tp-risk' : '', PRIORITIES[3]);
+    metric('Erledigt · 7 Tage', m.done7, 'Heute und die letzten 6 Tage', 'tp-done', COLS[3]); metric('Erledigt · 30 Tage', m.done30, 'Inklusive archivierter Aufgaben', 'tp-done', COLS[3]);
+    metric('Waiting', m.waiting.length, 'Braucht eventuell Unterstützung', 'tp-waiting', COLS[2]); metric('Unteraufgaben', m.subtasksDone + '/' + m.subtasks, 'Erledigt / gesamt, inklusive Archiv', '', COLS[3]);
     const grid = parent.createDiv('tp-dashboard-grid');
     const panel = title => { const box = grid.createDiv('tp-panel'); box.createEl('h4', { text: title }); return box; };
-    const capacity = panel('Geplanter Aufwand bis Sonntag'); capacity.createDiv({ text: m.utilization + ' %', cls: 'tp-capacity-value' + (m.utilization > 100 ? ' tp-warning' : '') });
-    capacity.createDiv({ text: hourText(m.plannedHours) + ' geschätzter Restaufwand / ' + hourText(m.capacity) + ' Wochenkapazität', cls: 'tp-muted' });
-    progress(capacity, m.utilization, 'Geplanter Aufwand relativ zur Wochenkapazität');
-    const form = capacity.createEl('form', { cls: 'tp-capacity-form' }), label = form.createEl('label', { text: 'Wochenkapazität (h)' });
-    const input = label.createEl('input', { type: 'number' }); input.min = '0.25'; input.step = '0.25'; input.required = true; input.value = String(m.capacity);
-    const save = form.createEl('button', { text: 'Speichern', type: 'submit' });
-    form.onsubmit = async e => {
-      e.preventDefault(); if (!input.checkValidity()) { input.reportValidity(); return; }
-      const value = Number(input.value); if (!Number.isFinite(value) || value <= 0 || save.disabled) return; save.disabled = true;
-      if (!await this.plugin.mutate(data => { data.settings.weeklyCapacityHours = value; })) save.disabled = false;
-    };
-    capacity.createEl('p', { text: 'Enthält offene Aufgaben mit Fälligkeit bis Sonntag (auch überfällige) sowie undatierte Aufgaben in Bearbeitung. Restaufwand sinkt anteilig mit erledigten Unteraufgaben. Keine Zeiterfassung.', cls: 'tp-help' });
-    if (m.unestimated) capacity.createDiv({ text: m.unestimated + ' eingeplante Aufgaben haben noch keine Aufwandsschätzung.', cls: 'tp-help tp-warning' });
+    const priorities = panel('Offene Aufgaben nach Priorität');
+    for (const p of PRIORITIES) {
+      const count = m.active.filter(t => t.priority === p.name).length, row = priorities.createDiv('tp-distribution tp-priority-' + p.key);
+      symbolLabel(row, p); row.createSpan({ text: String(count), cls: 'tp-count' }); progress(row, count / Math.max(1, m.active.length) * 100, 'Priorität ' + p.name);
+    }
     const activity = panel('Erledigte Aufgaben · letzte 7 Tage'), chart = activity.createDiv('tp-chart'), max = Math.max(1, ...m.week.map(d => d.count));
     for (const day of m.week) {
       const col = chart.createDiv('tp-chart-column'); col.createSpan({ text: String(day.count), cls: 'tp-chart-count' });
@@ -606,7 +611,7 @@ class PlannerView extends ItemView {
     const distribution = panel('Verteilung auf die Kategorien');
     for (const col of COLS) {
       const count = this.plugin.data.tasks.filter(t => !t.archivedAt && t.status === col.name).length, row = distribution.createDiv('tp-distribution tp-' + col.key);
-      row.createSpan({ text: col.name }); row.createSpan({ text: String(count), cls: 'tp-count' }); progress(row, count / Math.max(1, this.plugin.data.tasks.filter(t => !t.archivedAt).length) * 100, col.name);
+      symbolLabel(row, col); row.createSpan({ text: String(count), cls: 'tp-count' }); progress(row, count / Math.max(1, this.plugin.data.tasks.filter(t => !t.archivedAt).length) * 100, col.name);
     }
     const due = panel('Als Nächstes · Fälligkeit'), upcoming = m.active.filter(t => t.due && t.due <= dayKey(shiftDay(Date.now(), 7))).sort((a, b) => a.due.localeCompare(b.due));
     for (const t of upcoming.slice(0, 6)) {
@@ -668,18 +673,20 @@ module.exports = class TagesplanerPlugin extends Plugin {
       task.priority = priority; task.updatedAt = Date.now();
     });
   }
-  createTaskFromTemplate(id) {
-    return this.mutate(data => {
+  async createTaskFromTemplate(id) {
+    let taskId = null;
+    const ok = await this.mutate(data => {
       const template = data.templates.find(t => t.id === id); if (!template) throw new Error('Vorlage nicht gefunden.');
       const values = templateFields(template), now = Date.now();
-      data.tasks.push({
-        id: uid(), title: values.title.trim() || template.name, note: values.note, priority: values.priority,
-        status: values.status, estimateHours: values.estimateHours,
+      taskId = uid(); data.tasks.push({
+        id: taskId, title: values.title.trim() || template.name, note: values.note, priority: values.priority,
+        status: values.status,
         due: values.dueInDays == null ? '' : dayKey(shiftDay(now, values.dueInDays)),
         subtasks: values.subtasks.map(s => ({ id: uid(), title: s.title, done: false })), worklog: [],
         createdAt: now, updatedAt: now, completedAt: null, archivedAt: null, completionDateEstimated: false
       });
     });
+    return ok ? taskId : false;
   }
   async activate(tab = 'board') {
     let leaf = this.app.workspace.getLeavesOfType(VIEW)[0];
