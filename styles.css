@@ -6,6 +6,18 @@
 }
 .tp-root * { box-sizing: border-box; }
 .tp-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+.tp-head-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.tp-head-actions button { white-space: nowrap; }
+.tp-task-navigation { display: flex; align-items: center; gap: 14px; margin: -4px 0 20px; padding: 10px 14px; border: 1px solid var(--background-modifier-border); border-radius: 9px; background: var(--background-secondary); }
+.tp-task-group-label { font-size: .76em; color: var(--text-muted); font-weight: 600; }
+.tp-task-segments { display: flex; gap: 4px; }
+.tp-task-segments .tp-task-segment { box-shadow: none; background: transparent; border: 1px solid transparent; padding: 6px 14px; color: var(--text-muted); font-size: .8em; }
+.tp-task-segments .tp-task-segment.is-active { background: var(--background-primary); border-color: var(--background-modifier-border); color: var(--text-normal); font-weight: 600; }
+.tp-template-picker { max-height: 75vh; overflow-y: auto; }
+.tp-template-picker>input { width: 100%; margin: 8px 0 16px; }
+.tp-template-picker-list { display: grid; gap: 10px; margin-bottom: 18px; }
+.tp-template-picker-option { border: 1px solid var(--background-modifier-border); border-radius: 8px; padding: 14px; background: var(--background-secondary); }
+.tp-template-choice { width: 100%; text-align: left; font-weight: 600; height: auto; white-space: normal; overflow-wrap: anywhere; }
 .tp-head h2 { font-size: 1.6em; margin: 0 0 5px; font-weight: 650; letter-spacing: -.025em; }
 .tp-muted { font-size: .83em; color: var(--text-muted); }
 .tp-tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--background-modifier-border); padding-bottom: 12px; margin-bottom: 18px; }
@@ -134,7 +146,7 @@
 .tp-template-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 18px; }
 .tp-template-actions button { font-size: .76em; }
 .tp-tabs { flex-wrap: wrap; }
-.tp-inline-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 22px; }
+.tp-inline-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: 22px; }
 @media(max-width:800px) {
   .tp-root { padding: 16px !important; } .tp-kpis { grid-template-columns: repeat(2,minmax(130px,1fr)); }
   .tp-dashboard-grid { grid-template-columns: 1fr; } .tp-board { grid-template-columns: repeat(4,270px); }
@@ -151,4 +163,10 @@
   .tp-head .tp-muted { font-size: .68em; } .tp-tabs { gap: 2px; }
   .tp-tabs .tp-tab { padding: 6px 9px; } .tp-kpi { padding: 12px; }
   .tp-capacity-form { flex-wrap: wrap; } .tp-chart { gap: 6px; }
+}
+@container tagesplaner (max-width:480px) {
+  .tp-head { flex-wrap: wrap; align-items: flex-start; }
+  .tp-head-actions { width: 100%; justify-content: flex-start; }
+  .tp-task-navigation { gap: 8px; flex-wrap: wrap; }
+  .tp-task-segments .tp-task-segment { padding: 6px 10px; }
 }

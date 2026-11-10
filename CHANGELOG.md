@@ -1,5 +1,16 @@
 # Änderungen
 
+## 1.4.0
+
+- **+ Vorlage** steht zentral neben **+ Aufgabe** und öffnet einen taskähnlichen Vorlageneditor mit **Vorlage speichern**.
+- Der Vorlagenknopf wurde von den einzelnen Aufgabenkarten entfernt.
+- Unten im Aufgabendialog steht neben **Aufgabe erstellen** der Knopf **Aufgabe nach Vorlage erstellen**. Die anschließende Auswahl erstellt die Aufgabe direkt aus der angeklickten Vorlage.
+- Vorlagen bleiben in der **Vorlagenverwaltung** benennbar, bearbeitbar und löschbar.
+- **Status** und **Prioritäten** sind getrennte Unterreiter unter der gemeinsamen Gruppe **Aufgaben**. Beide verwenden dieselben Aufgaben und bewahren ihre Scrollposition und Textentwürfe.
+- Bestehende Aufgaben und Vorlagen bleiben erhalten. Done-Aufgaben bleiben aus den Prioritäten ausgeblendet und erscheinen beim Wiederöffnen dort erneut.
+
+Release-Assets: `main.js`, `manifest.json` und `styles.css` einzeln anhängen. Tag: **1.4.0**, Zielbranch: **main**.
+
 ## 1.3.0
 
 - Neuer Vorlagenbereich: Aufgabenvorlagen erstellen, bearbeiten und nach Bestätigung löschen.

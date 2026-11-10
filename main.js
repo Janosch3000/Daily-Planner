@@ -130,14 +130,6 @@ class TaskModal extends Modal {
     };
     if (this.isTemplate) {
       this.nameInput = field('Name der Vorlage', 'input', 'text', savedTemplate?.name || task?.title || ''); this.nameInput.required = true;
-    } else if (!this.taskId) {
-      const label = form.createEl('label', { cls: 'tp-field', text: 'Mit Vorlage starten · optional' });
-      this.templateSelect = label.createEl('select'); this.templateSelect.createEl('option', { text: 'Ohne Vorlage', value: '' });
-      [...this.plugin.data.templates].sort((a, b) => a.name.localeCompare(b.name)).forEach(t => this.templateSelect.createEl('option', { text: t.name, value: t.id }));
-      this.templateSelect.value = '';
-      this.applyButton = button(label, 'Vorlage übernehmen', () => this.applyTemplate(this.templateSelect.value), 'tp-small-button'); this.applyButton.disabled = true;
-      this.templateSelect.onchange = () => { this.applyButton.disabled = !this.templateSelect.value; };
-      label.createDiv({ text: 'Übernehmen füllt die Felder neu aus. Danach kannst du alles für diese Aufgabe ändern.', cls: 'tp-help' });
     }
     this.titleInput = field(this.isTemplate ? 'Vorgabe für den Aufgabentitel · optional' : 'Aufgabe', 'input', 'text', task?.title); this.titleInput.required = !this.isTemplate;
     this.priorityInput = field('Priorität', 'select', null, '');
@@ -161,9 +153,10 @@ class TaskModal extends Modal {
     button(subSection, '+ Unteraufgabe', () => { this.subtaskRows.push({ id: uid(), title: '', done: false }); this.renderSubtasks(); this.subtaskList.lastElementChild?.querySelector('input[type=text]')?.focus(); });
     const actions = form.createDiv('tp-inline-actions');
     this.saveButton = actions.createEl('button', { text: this.isTemplate ? 'Vorlage speichern' : (task ? 'Änderungen speichern' : 'Aufgabe erstellen'), cls: 'mod-cta', type: 'submit' });
+    if (!this.isTemplate && !this.taskId) this.fromTemplateButton = button(actions, 'Aufgabe nach Vorlage erstellen', () => new TemplatePickerModal(this.app, this.plugin, this).open());
     button(actions, 'Abbrechen', () => this.close()); form.onsubmit = e => { e.preventDefault(); void this.submit(); };
     if (this.options.initialTemplateId && !this.taskId && !this.isTemplate) {
-      this.templateSelect.value = this.options.initialTemplateId; this.applyButton.disabled = false; this.applyTemplate(this.options.initialTemplateId);
+      this.applyTemplate(this.options.initialTemplateId);
     }
     (this.nameInput || this.titleInput).focus();
   }
@@ -228,6 +221,42 @@ class TaskModal extends Modal {
 class TemplateModal extends TaskModal {
   constructor(app, plugin, templateId = null, seedTask = null) { super(app, plugin, null, { mode: 'template', templateId, seedTask: seedTask ? copy(seedTask) : null }); }
 }
+class TemplatePickerModal extends Modal {
+  constructor(app, plugin, taskModal = null) { super(app); this.plugin = plugin; this.taskModal = taskModal; this.creating = false; this.templateButtons = []; }
+  onOpen() {
+    this.contentEl.empty(); this.contentEl.addClass('tp-template-picker');
+    this.contentEl.createEl('h2', { text: 'Aufgabe nach Vorlage erstellen' });
+    this.contentEl.createEl('p', { text: 'Wähle eine Vorlage aus. Die Aufgabe wird direkt erstellt und lässt sich anschließend frei bearbeiten.', cls: 'tp-muted' });
+    this.searchInput = this.contentEl.createEl('input', { type: 'search', attr: { placeholder: 'Vorlage suchen …', 'aria-label': 'Vorlagen durchsuchen' } });
+    this.list = this.contentEl.createDiv('tp-template-picker-list');
+    this.searchInput.oninput = () => this.renderOptions();
+    this.cancelButton = button(this.contentEl, 'Abbrechen', () => { if (!this.creating) this.close(); });
+    this.renderOptions(); this.searchInput.focus();
+  }
+  renderOptions() {
+    this.list.empty(); this.templateButtons = [];
+    const search = this.searchInput.value.trim().toLocaleLowerCase();
+    const templates = this.plugin.data.templates.filter(t => [t.name, t.title, t.note].join(' ').toLocaleLowerCase().includes(search)).sort((a, b) => a.name.localeCompare(b.name));
+    for (const t of templates) {
+      const row = this.list.createDiv('tp-template-picker-option'); row.setAttribute('data-template-id', t.id);
+      const choose = button(row, t.name, () => this.choose(t.id), 'tp-template-choice');
+      choose.setAttribute('aria-label', 'Aufgabe aus Vorlage ' + t.name + ' erstellen'); choose.disabled = this.creating; this.templateButtons.push(choose);
+      const meta = row.createDiv('tp-meta'); meta.createSpan({ text: t.priority, cls: 'tp-priority-tag tp-priority-' + t.priority });
+      meta.createSpan({ text: t.subtasks.length + ' Unteraufgaben · ' + t.status, cls: 'tp-muted' });
+      if (t.title) row.createDiv({ text: t.title, cls: 'tp-template-title' });
+    }
+    if (!templates.length) this.list.createDiv({ text: search ? 'Keine passenden Vorlagen.' : 'Noch keine Vorlagen. Erstelle zuerst eine über + Vorlage neben + Aufgabe.', cls: 'tp-empty' });
+  }
+  async choose(id) {
+    if (this.creating) return false;
+    this.creating = true; this.searchInput.disabled = true; this.cancelButton.disabled = true; this.templateButtons.forEach(b => { b.disabled = true; });
+    const ok = await this.plugin.createTaskFromTemplate(id);
+    if (ok) { this.close(); this.taskModal?.close(); }
+    else { this.creating = false; this.searchInput.disabled = false; this.cancelButton.disabled = false; this.renderOptions(); }
+    return ok;
+  }
+  onClose() { this.contentEl.empty(); }
+}
 class DeleteTemplateModal extends Modal {
   constructor(app, plugin, templateId) { super(app); this.plugin = plugin; this.templateId = templateId; this.saving = false; }
   onOpen() {
@@ -246,7 +275,7 @@ class DeleteTemplateModal extends Modal {
 
 class PlannerView extends ItemView {
   constructor(leaf, plugin) {
-    super(leaf); this.plugin = plugin; this.tab = 'board'; this.drafts = new Map();
+    super(leaf); this.plugin = plugin; this.tab = 'board'; this.taskBoard = 'status'; this.drafts = new Map();
     this.draftInputs = new Map(); this.draftControls = new Map(); this.pendingDrafts = new Set();
     this.expanded = new Set(); this.archiveSearch = ''; this.scrollPositions = new Map();
   }
@@ -267,33 +296,48 @@ class PlannerView extends ItemView {
     root.empty(); root.addClass('tp-root');
     const head = root.createDiv('tp-head'), heading = head.createDiv(); heading.createEl('h2', { text: 'Tagesplaner' });
     heading.createDiv({ text: 'Fokus für heute. Überblick für die Woche.', cls: 'tp-muted' });
-    button(head, '+ Aufgabe', () => new TaskModal(this.app, this.plugin).open(), 'mod-cta');
+    const headActions = head.createDiv('tp-head-actions');
+    button(headActions, '+ Aufgabe', () => new TaskModal(this.app, this.plugin).open(), 'mod-cta');
+    button(headActions, '+ Vorlage', () => new TemplateModal(this.app, this.plugin).open());
     const nav = root.createDiv('tp-tabs'); nav.setAttribute('aria-label', 'Planner-Ansichten');
     const archiveCount = this.plugin.data.tasks.filter(t => t.archivedAt).length;
-    for (const [id, label] of [['board', 'Aufgaben'], ['dashboard', 'Dashboard'], ['templates', 'Vorlagen'], ['archive', 'Archiv · ' + archiveCount]]) {
+    for (const [id, label] of [['board', 'Aufgaben'], ['dashboard', 'Dashboard'], ['templates', 'Vorlagenverwaltung'], ['archive', 'Archiv · ' + archiveCount]]) {
       const b = button(nav, label, () => { this.tab = id; this.render(); }, this.tab === id ? 'tp-tab is-active' : 'tp-tab'); b.setAttribute('aria-pressed', String(this.tab === id));
+    }
+    if (this.tab === 'board') {
+      const taskNav = root.createDiv('tp-task-navigation'); taskNav.setAttribute('aria-label', 'Ansichten innerhalb von Aufgaben');
+      taskNav.createSpan({ text: 'Aufgaben', cls: 'tp-task-group-label' });
+      const segments = taskNav.createDiv('tp-task-segments'); segments.setAttribute('role', 'group'); segments.setAttribute('aria-label', 'Aufgabenübersicht wählen');
+      for (const [id, label] of [['status', 'Status'], ['priority', 'Prioritäten']]) {
+        const b = button(segments, label, () => this.switchTaskBoard(id), this.taskBoard === id ? 'tp-task-segment is-active' : 'tp-task-segment');
+        b.setAttribute('aria-pressed', String(this.taskBoard === id)); b.setAttribute('data-task-board', id);
+      }
     }
     const body = root.createDiv('tp-body');
     if (this.tab === 'dashboard') this.renderDashboard(body); else if (this.tab === 'archive') this.renderArchive(body); else if (this.tab === 'templates') this.renderTemplates(body); else this.renderBoard(body);
-    const position = this.scrollPositions.get(this.tab);
+    const viewKey = this.tab === 'board' ? 'board:' + this.taskBoard : this.tab;
+    const position = this.scrollPositions.get(viewKey);
     if (position) {
       body.scrollTop = position.top;
       for (const group of root.querySelectorAll?.('[data-board]') || []) group.querySelector('.tp-board-scroll').scrollLeft = position.boards[group.getAttribute('data-board')] || 0;
     }
-    this.renderedTab = this.tab;
+    this.renderedTab = viewKey;
+  }
+  switchTaskBoard(board) {
+    if (!['status', 'priority'].includes(board)) return;
+    this.tab = 'board'; this.taskBoard = board; this.render();
   }
   renderBoard(parent) {
-    this.renderTaskBoard(parent, 'Status', 'Nach Arbeitsstand verschieben', 'status', COLS);
-    this.renderTaskBoard(parent, 'Prioritäten', 'Nicht abgeschlossene Aufgaben nach Dringlichkeit · Änderungen gelten in beiden Übersichten', 'priority', PRIORITIES);
+    if (this.taskBoard === 'priority') this.renderTaskBoard(parent, 'Prioritäten', 'Nicht abgeschlossene Aufgaben nach Dringlichkeit · Teil deiner Aufgaben', 'priority', PRIORITIES);
+    else this.renderTaskBoard(parent, 'Status', 'Nach Arbeitsstand verschieben · Teil deiner Aufgaben', 'status', COLS);
   }
   renderTemplates(parent) {
     const head = parent.createDiv('tp-template-heading');
     const heading = head.createDiv(); heading.createEl('h3', { text: 'Deine Aufgabenvorlagen' });
     heading.createDiv({ text: 'Wiederkehrende Abläufe vorbereiten. Jede neue Aufgabe bleibt frei anpassbar.', cls: 'tp-muted' });
-    button(head, '+ Vorlage', () => new TemplateModal(this.app, this.plugin).open(), 'mod-cta');
     const grid = parent.createDiv('tp-template-grid');
     const templates = [...this.plugin.data.templates].sort((a, b) => a.name.localeCompare(b.name));
-    if (!templates.length) grid.createDiv({ text: 'Noch keine Vorlagen. Erstelle eine mit + Vorlage oder speichere eine vorhandene Aufgabe über Als Vorlage.', cls: 'tp-empty' });
+    if (!templates.length) grid.createDiv({ text: 'Noch keine Vorlagen. Erstelle eine mit + Vorlage neben + Aufgabe.', cls: 'tp-empty' });
     for (const template of templates) {
       const card = grid.createDiv('tp-template-card'); card.setAttribute('data-template-id', template.id);
       card.createEl('h4', { text: template.name });
@@ -308,8 +352,8 @@ class PlannerView extends ItemView {
         const list = card.createEl('ul', { cls: 'tp-template-subtasks' }); template.subtasks.forEach(s => list.createEl('li', { text: s.title }));
       }
       const actions = card.createDiv('tp-template-actions');
-      button(actions, '+ Aufgabe', () => new TaskModal(this.app, this.plugin, null, { initialTemplateId: template.id }).open(), 'mod-cta');
       button(actions, 'Bearbeiten', () => new TemplateModal(this.app, this.plugin, template.id).open());
+      button(actions, 'Umbenennen', () => new TemplateModal(this.app, this.plugin, template.id).open());
       button(actions, 'Löschen', () => new DeleteTemplateModal(this.app, this.plugin, template.id).open());
     }
   }
@@ -402,7 +446,6 @@ class PlannerView extends ItemView {
       PRIORITIES.forEach(p => priority.createEl('option', { text: p.name, value: p.name })); priority.value = task.priority;
       priority.onchange = () => this.plugin.changePriority(task.id, priority.value);
     }
-    button(actions, 'Als Vorlage', () => new TemplateModal(this.app, this.plugin, null, task).open());
     const sub = card.createDiv('tp-section'), subDone = task.subtasks.filter(s => s.done).length;
     sub.createDiv({ text: 'Unteraufgaben' + (task.subtasks.length ? ' · ' + subDone + '/' + task.subtasks.length : ''), cls: 'tp-section-title' });
     if (task.subtasks.length) progress(sub, subDone / task.subtasks.length * 100, 'Unteraufgaben abgeschlossen');
@@ -552,6 +595,19 @@ module.exports = class TagesplanerPlugin extends Plugin {
       const task = data.tasks.find(t => t.id === id);
       if (!task || task.archivedAt) throw new Error('Die Aufgabe ist nicht mehr bearbeitbar.');
       task.priority = priority; task.updatedAt = Date.now();
+    });
+  }
+  createTaskFromTemplate(id) {
+    return this.mutate(data => {
+      const template = data.templates.find(t => t.id === id); if (!template) throw new Error('Vorlage nicht gefunden.');
+      const values = templateFields(template), now = Date.now();
+      data.tasks.push({
+        id: uid(), title: values.title.trim() || template.name, note: values.note, priority: values.priority,
+        status: values.status, estimateHours: values.estimateHours,
+        due: values.dueInDays == null ? '' : dayKey(shiftDay(now, values.dueInDays)),
+        subtasks: values.subtasks.map(s => ({ id: uid(), title: s.title, done: false })), worklog: [],
+        createdAt: now, updatedAt: now, completedAt: null, archivedAt: null, completionDateEstimated: false
+      });
     });
   }
   async activate(tab = 'board') {
