@@ -1,6 +1,6 @@
 # Tagesplaner für Obsidian
 
-Version **1.5.0** · Synchronisierte Status- und Prioritätenboards mit Aufgabenvorlagen, bearbeitbaren Beschreibungen, Dashboard, Unteraufgaben, Arbeitsverlauf und Archiv.
+Version **1.5.1** · Synchronisierte Status- und Prioritätenboards mit Aufgabenvorlagen, bearbeitbaren Beschreibungen, Dashboard, Unteraufgaben, Arbeitsverlauf und Archiv.
 
 ## Installation über BRAT
 
@@ -78,7 +78,7 @@ Die Statuskategorien haben eindeutige, farbige Symbole neben ihrer Beschriftung:
 - **Waiting**: Uhr.
 - **Done**: Kästchen mit Haken.
 
-Bei den Prioritäten stehen Pfeile für die Dringlichkeit: **low ↓**, **mid →**, **high ↑**, **immediately ⇈**. Die Symbole sind kräftiger eingefärbt als die dezenten Spaltenhintergründe. Sie erscheinen in Spaltenüberschriften, auf Karten, in der Vorlagenauswahl und im Dashboard; Auswahlfelder verwenden ebenfalls passende Zeichen. Alle Beschriftungen bleiben zusätzlich sichtbar. Die Symbole werden lokal als SVG dargestellt, ohne externe Bilder zu laden.
+Bei den Prioritäten stehen Pfeile für die Dringlichkeit: **low ↓**, **mid →**, **high ↑**, **immediately ⇈**. Die Symbole sind kräftiger eingefärbt als die dezenten Spaltenhintergründe. Jede Aufgabenkarte hat einen dezenten Rahmen in der Farbe ihrer aktuellen Status- beziehungsweise Prioritätsspalte. Beim Darüberfahren mit der Maus wird der Rahmen heller und erhält einen leichten Farbschein. Derselbe Effekt erscheint bei Tastaturfokus innerhalb der Karte. Sie erscheinen in Spaltenüberschriften, auf Karten, in der Vorlagenauswahl und im Dashboard; Auswahlfelder verwenden ebenfalls passende Zeichen. Alle Beschriftungen bleiben zusätzlich sichtbar. Die Symbole werden lokal als SVG dargestellt, ohne externe Bilder zu laden.
 
 Aufwandseingabe, Stundenanzeigen, Wochenkapazität und die daraus berechnete Auslastung sind in dieser Version aus der Oberfläche entfernt. Das Dashboard konzentriert sich auf Aufgaben, Prioritäten, Fälligkeiten, Unteraufgaben und Abschlüsse.
 
@@ -103,15 +103,15 @@ Erneut geöffnete Aufgaben zählen bis zu ihrem nächsten Abschluss nicht als er
 
 Vorhandene Aufgaben und Vorlagen aus früheren Versionen werden automatisch übernommen. Fehlende Prioritäten werden auf mid gesetzt. Die bisherigen Kategorien werden zugeordnet: Offen → ToDo, In Bearbeitung → In Progress, Warten auf Person und Delayed → Waiting, Fertig → Done. Vorhandene Abschlussdaten und Archivtimer bleiben dabei erhalten. Titel, Status, Fälligkeitsdatum und Beschreibung bleiben erhalten. Neue Felder werden ergänzt.
 
-Alte Aufgaben im Status Done besitzen noch kein gespeichertes Abschlussdatum. Für sie beginnt der Archivtimer beim ersten Laden von Version 1.5.0. Sie werden als vor dem Update erledigt gekennzeichnet und nicht rückwirkend in 7-/30-Tage-Statistiken eingerechnet.
+Alte Aufgaben im Status Done besitzen noch kein gespeichertes Abschlussdatum. Für sie beginnt der Archivtimer beim ersten Laden von Version 1.5.1. Sie werden als vor dem Update erledigt gekennzeichnet und nicht rückwirkend in 7-/30-Tage-Statistiken eingerechnet.
 
 Alle Daten liegen lokal in `<Vault>/.obsidian/plugins/tagesplaner/data.json`; das Archiv ist Teil dieser Datei. Persönliche Aufgaben gehören nicht ins öffentliche GitHub-Repository. Vor einem späteren Downgrade auf eine ältere Plugin-Version die Datei sichern: Ältere Versionen kennen die neuen Kategorien beziehungsweise das neue Datenformat nicht.
 
-## Release 1.5.0 erstellen
+## Release 1.5.1 erstellen
 
 Repository: https://github.com/Janosch3000/Daily-Planner
 
-1. Ein neues Release mit neuem Tag **1.5.0**, Ziel **main**, Titel **Tagesplaner 1.5.0** erstellen.
+1. Ein neues Release mit neuem Tag **1.5.1**, Ziel **main**, Titel **Tagesplaner 1.5.1** erstellen.
 2. Die aktuellen Dateien **main.js**, **manifest.json** und **styles.css** aus dieser Version als drei einzelne Assets anhängen.
 3. Die Notizen aus `CHANGELOG.md` verwenden und das Release veröffentlichen. Nicht als Pre-release markieren, wenn BRAT es regulär als neueste Version beziehen soll.
 
@@ -121,4 +121,4 @@ Die Plugin-ID `tagesplaner` bleibt unverändert, damit BRAT vorhandene Installat
 
 ## Grenzen dieser Version
 
-Die Full-Calendar-Anbindung, die tägliche Übertragung unerledigter Aufgaben und eine Zeiterfassung sind nicht Bestandteil von 1.5.0. Das Archiv arbeitet mit abgeschlossenen Aufgaben und läuft, während das Plugin in Obsidian geladen ist.
+Die Full-Calendar-Anbindung, die tägliche Übertragung unerledigter Aufgaben und eine Zeiterfassung sind nicht Bestandteil von 1.5.1. Das Archiv arbeitet mit abgeschlossenen Aufgaben und läuft, während das Plugin in Obsidian geladen ist.

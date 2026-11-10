@@ -61,8 +61,16 @@
 .tp-count { font-size: .75em; min-width: 24px; text-align: center; padding: 2px 7px; border-radius: 12px; background: var(--background-primary); border: 1px solid var(--background-modifier-border); font-variant-numeric: tabular-nums; }
 .tp-lane-hint { font-size: .7em; line-height: 1.5; color: var(--text-muted); margin: -7px 0 12px; }
 .tp-empty-lane { padding: 28px 4px; color: var(--text-faint); text-align: center; font-size: .8em; }
-.tp-card { background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: 11px; padding: 16px; margin: 0 0 13px; box-shadow: 0 3px 10px rgba(0,0,0,.035); min-width: 0; transition: border-color .15s,box-shadow .15s; }
-.tp-card:hover { border-color: var(--tp-tone,var(--background-modifier-border)); box-shadow: 0 4px 14px rgba(0,0,0,.055); }
+.tp-lane.tp-open { --tp-card-line: #93abc9; --tp-card-bright: #b6d2f5; --tp-card-glow: rgba(91,131,189,.17); }
+.tp-lane.tp-progress { --tp-card-line: #c1aa80; --tp-card-bright: #efd4a0; --tp-card-glow: rgba(190,151,85,.17); }
+.tp-lane.tp-waiting { --tp-card-line: #ad9bc7; --tp-card-bright: #d3bcf4; --tp-card-glow: rgba(147,112,181,.17); }
+.tp-lane.tp-done,.tp-archive-grid { --tp-card-line: #88b39d; --tp-card-bright: #b3e4cb; --tp-card-glow: rgba(86,153,119,.17); }
+.tp-lane.tp-priority-low { --tp-card-line: #83b4a5; --tp-card-bright: #b1e1d1; --tp-card-glow: rgba(70,145,121,.17); }
+.tp-lane.tp-priority-mid { --tp-card-line: #8caacd; --tp-card-bright: #b7d7fa; --tp-card-glow: rgba(91,131,189,.17); }
+.tp-lane.tp-priority-high { --tp-card-line: #c4aa7b; --tp-card-bright: #efd4a1; --tp-card-glow: rgba(184,143,74,.17); }
+.tp-lane.tp-priority-immediately { --tp-card-line: #c79ba7; --tp-card-bright: #f0bdce; --tp-card-glow: rgba(190,118,137,.17); }
+.tp-card { background: var(--background-primary); border: 1px solid var(--tp-card-line,var(--tp-tone,var(--background-modifier-border))); border-radius: 11px; padding: 16px; margin: 0 0 13px; box-shadow: 0 3px 10px rgba(0,0,0,.035); min-width: 0; transition: border-color .18s,box-shadow .18s; }
+.tp-card:hover,.tp-card:focus-within { border-color: var(--tp-card-bright,var(--tp-tone,var(--background-modifier-border))); box-shadow: 0 0 0 1px var(--tp-card-glow,transparent),0 4px 14px rgba(0,0,0,.055); }
 .tp-card-head[draggable=true] { cursor: grab; }
 .tp-card-head[draggable=true]:active { cursor: grabbing; }
 .tp-title { font-size: .94em !important; line-height: 1.45; margin: 0 !important; overflow-wrap: anywhere; font-weight: 650; }

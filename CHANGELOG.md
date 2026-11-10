@@ -1,5 +1,13 @@
 # Änderungen
 
+## 1.5.1
+
+- Aufgaben haben bereits im normalen Zustand einen dezenten Rahmen in der jeweiligen Status- oder Prioritätsfarbe.
+- Bei Hover und Tastaturfokus wird die Umrandung heller und durch einen leichten Farbschein hervorgehoben.
+- Archivierte Aufgaben verwenden die Done-Farbe.
+
+Release-Assets: `main.js`, `manifest.json` und `styles.css` einzeln anhängen. Tag: **1.5.1**, Zielbranch: **main**.
+
 ## 1.5.0
 
 - Neue Aufgaben aus einer Vorlage öffnen sich sofort im Bearbeitungsdialog. Anpassungen werden auf genau dieser Aufgabe gespeichert.
