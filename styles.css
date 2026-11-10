@@ -115,6 +115,25 @@
 .tp-empty { padding: 36px 18px; color: var(--text-muted); font-size: .9em; grid-column: 1/-1; text-align: center; }
 .tp-field { display: flex; flex-direction: column; gap: 7px; margin: 16px 0; font-size: .88em; color: var(--text-muted); }
 .tp-field input,.tp-field textarea { width: 100%; }
+.tp-field select { width: 100%; }
+.tp-modal { max-height: 75vh; overflow-y: auto; padding-right: 4px; }
+.tp-modal-subtasks { margin: 22px 0; }
+.tp-modal-subtasks h3 { font-size: .95em; margin: 0 0 12px; }
+.tp-modal-subtask { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+.tp-modal-subtask input[type=text] { flex: 1; min-width: 0; }
+.tp-modal-subtask input[type=checkbox] { flex-shrink: 0; }
+.tp-modal .tp-icon-button { background: transparent; box-shadow: none; border: 0; color: var(--text-muted); }
+.tp-template-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 22px; }
+.tp-template-heading h3 { margin: 0 0 8px; font-size: 1.08em; }
+.tp-template-heading>.mod-cta { white-space: nowrap; }
+.tp-template-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(min(100%,290px),1fr)); gap: 16px; align-items: start; }
+.tp-template-card { border: 1px solid var(--background-modifier-border); border-radius: 10px; padding: 18px; background: var(--background-secondary); min-width: 0; }
+.tp-template-card h4 { margin: 0 0 10px; font-size: 1em; overflow-wrap: anywhere; }
+.tp-template-title { margin-top: 14px; font-size: .86em; font-weight: 600; overflow-wrap: anywhere; }
+.tp-template-subtasks { padding-left: 18px; font-size: .8em; color: var(--text-muted); line-height: 1.7; overflow-wrap: anywhere; }
+.tp-template-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 18px; }
+.tp-template-actions button { font-size: .76em; }
+.tp-tabs { flex-wrap: wrap; }
 .tp-inline-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 22px; }
 @media(max-width:800px) {
   .tp-root { padding: 16px !important; } .tp-kpis { grid-template-columns: repeat(2,minmax(130px,1fr)); }

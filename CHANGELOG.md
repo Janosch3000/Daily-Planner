@@ -1,5 +1,18 @@
 # Änderungen
 
+## 1.3.0
+
+- Neuer Vorlagenbereich: Aufgabenvorlagen erstellen, bearbeiten und nach Bestätigung löschen.
+- Vorlagen enthalten Titel, Beschreibung, Priorität, Startstatus, Aufwand, Unteraufgaben und eine optionale relative Fälligkeit.
+- Neue Aufgaben über die Vorlagenauswahl im Erstelldialog oder direkt aus dem Vorlagenbereich anlegen.
+- Alle übernommenen Angaben bleiben vor und nach der Erstellung anpassbar. Aufgaben und Vorlagen sind unabhängige Kopien.
+- Vorhandene Aufgaben über **Als Vorlage** übernehmen; erledigte Häkchen und Arbeitsverlauf werden nicht kopiert.
+- Unteraufgaben lassen sich nun auch im Erstell- und Bearbeitungsdialog hinzufügen, umbenennen, abhaken und entfernen.
+- Vorlagenänderungen und das Löschen einer Vorlage lassen bestehende Aufgaben unverändert.
+- Bestehende Aufgaben und die Done-/Prioritäten-Regel aus 1.2.1 bleiben erhalten.
+
+Release-Assets: `main.js`, `manifest.json` und `styles.css` einzeln anhängen. Tag: **1.3.0**, Zielbranch: **main**.
+
 ## 1.2.1
 
 - Aufgaben in Done werden sofort aus allen Prioritätsspalten ausgeblendet.

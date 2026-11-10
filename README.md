@@ -1,6 +1,6 @@
 # Tagesplaner für Obsidian
 
-Version **1.2.1** · Synchronisierte Status- und Prioritätenboards mit bearbeitbaren Beschreibungen, Dashboard, Unteraufgaben, Arbeitsverlauf und Archiv.
+Version **1.3.0** · Synchronisierte Status- und Prioritätenboards mit Aufgabenvorlagen, bearbeitbaren Beschreibungen, Dashboard, Unteraufgaben, Arbeitsverlauf und Archiv.
 
 ## Installation über BRAT
 
@@ -21,6 +21,33 @@ Für Updates in BRAT nach Plugin-Updates suchen. Danach den Tagesplaner deaktivi
 - Der übergeordnete Status wird bewusst manuell gesetzt. Erledigte Unteraufgaben setzen die Hauptaufgabe nicht automatisch auf Done.
 - Unten in jeder Karte steht **Was wurde gemacht?**. Einträge mit **Eintrag speichern** ablegen; sie bleiben mit Datum und Uhrzeit im Arbeitsverlauf erhalten.
 - Noch nicht gespeicherte Texte für Unteraufgaben und Arbeitsschritte bleiben beim Wechsel zwischen den Ansichten innerhalb derselben geöffneten Planner-Ansicht erhalten. Vor dem Schließen oder Neustart speichern.
+
+## Aufgabenvorlagen
+
+### Vorlage erstellen oder aus einer Aufgabe übernehmen
+
+Im Reiter **Vorlagen** auf **+ Vorlage** klicken. Jede Vorlage besitzt einen eindeutigen Namen und kann folgende Vorgaben enthalten:
+
+- Aufgabentitel (optional), Beschreibung, Priorität und Gesamtaufwand.
+- Startstatus: ToDo, In Progress oder Waiting.
+- Beliebig viele Unteraufgaben. Alle beginnen bei einer neuen Aufgabe wieder offen.
+- Optionale Fälligkeit als Anzahl Kalendertage nach der Erstellung: **0** bedeutet heute, **2** bedeutet zwei Tage später. Leer bedeutet ohne Fälligkeit. Möglich sind 0 bis 3650 Tage.
+
+Alternativ auf einer vorhandenen Aufgabe **Als Vorlage** wählen – im Statusboard, im Prioritätenboard oder im Archiv. Titel, Beschreibung, Priorität, Aufwand und Unteraufgaben werden als Vorschlag übernommen und können vor dem Speichern geändert werden. Eine bestehende Fälligkeit wird dabei in verbleibende Kalendertage umgerechnet; vergangene Daten ergeben 0 Tage. Aus einer Done-Aufgabe entsteht eine Vorlage mit Startstatus ToDo. Arbeitsverlauf, Abschlussdatum, Archivdatum und erledigte Häkchen werden nicht übernommen.
+
+### Aufgabe aus einer Vorlage erstellen
+
+1. **+ Aufgabe** öffnen.
+2. Oben bei **Mit Vorlage starten** die Vorlage auswählen und **Vorlage übernehmen** klicken. Das ersetzt die aktuellen Formularwerte durch die Vorgaben der Vorlage.
+3. Titel, Beschreibung, Priorität, Startstatus, Fälligkeitsdatum, Aufwand und Unteraufgaben nach Bedarf anpassen und **Aufgabe erstellen** wählen.
+
+Die relative Fälligkeit wird beim Übernehmen der Vorlage anhand des aktuellen Tages in ein konkretes Datum umgerechnet; dieses Datum kann im Formular geändert werden. Im Vorlagenbereich kann auch direkt bei der gewünschten Vorlage **+ Aufgabe** gewählt werden. Ein Aufgabentitel ist vor dem Erstellen erforderlich, auch wenn die Vorlage keinen Titel vorgibt.
+
+Alle übernommenen Angaben bleiben nach der Erstellung bearbeitbar. Unteraufgaben können auch im Erstell- und Bearbeitungsdialog hinzugefügt, umbenannt, abgehakt oder entfernt werden. Die Aufgabe erhält eigene IDs und ist keine Verknüpfung zur Vorlage: Änderungen an ihr verändern weder die Vorlage noch andere daraus erstellte Aufgaben.
+
+### Vorlagen verwalten
+
+Im Reiter **Vorlagen** stehen **Bearbeiten** und **Löschen** bereit. Änderungen gelten für künftige Übernahmen; bereits erstellte Aufgaben bleiben unverändert. Das Löschen erfordert eine Bestätigung im Plugin und entfernt keine Aufgaben. Vorlagen sind lokal zusammen mit den Aufgaben in der Plugin-Datei data.json gespeichert. Beim Update bleiben vorhandene Aufgaben erhalten; die Vorlagenliste beginnt zunächst leer.
 
 ## Prioritäten und zweite Übersicht
 
@@ -59,15 +86,15 @@ Erneut geöffnete Aufgaben zählen bis zu ihrem nächsten Abschluss nicht als er
 
 Vorhandene Daten aus 1.0.0, 1.1.0 und 1.1.1 werden automatisch übernommen. Fehlende Prioritäten werden auf mid gesetzt. Die bisherigen Kategorien werden zugeordnet: Offen → ToDo, In Bearbeitung → In Progress, Warten auf Person und Delayed → Waiting, Fertig → Done. Vorhandene Abschlussdaten und Archivtimer bleiben dabei erhalten. Titel, Status, Fälligkeitsdatum und Beschreibung bleiben erhalten. Neue Felder werden ergänzt.
 
-Alte Aufgaben im Status Done besitzen noch kein gespeichertes Abschlussdatum. Für sie beginnt der Archivtimer beim ersten Laden von Version 1.2.1. Sie werden als vor dem Update erledigt gekennzeichnet und nicht rückwirkend in 7-/30-Tage-Statistiken eingerechnet.
+Alte Aufgaben im Status Done besitzen noch kein gespeichertes Abschlussdatum. Für sie beginnt der Archivtimer beim ersten Laden von Version 1.3.0. Sie werden als vor dem Update erledigt gekennzeichnet und nicht rückwirkend in 7-/30-Tage-Statistiken eingerechnet.
 
 Alle Daten liegen lokal in `<Vault>/.obsidian/plugins/tagesplaner/data.json`; das Archiv ist Teil dieser Datei. Persönliche Aufgaben gehören nicht ins öffentliche GitHub-Repository. Vor einem späteren Downgrade auf eine ältere Plugin-Version die Datei sichern: Ältere Versionen kennen die neuen Kategorien beziehungsweise das neue Datenformat nicht.
 
-## Release 1.2.1 erstellen
+## Release 1.3.0 erstellen
 
 Repository: https://github.com/Janosch3000/Daily-Planner
 
-1. Ein neues Release mit neuem Tag **1.2.1**, Ziel **main**, Titel **Tagesplaner 1.2.1** erstellen.
+1. Ein neues Release mit neuem Tag **1.3.0**, Ziel **main**, Titel **Tagesplaner 1.3.0** erstellen.
 2. Die aktuellen Dateien **main.js**, **manifest.json** und **styles.css** aus dieser Version als drei einzelne Assets anhängen.
 3. Die Notizen aus `CHANGELOG.md` verwenden und das Release veröffentlichen. Nicht als Pre-release markieren, wenn BRAT es regulär als neueste Version beziehen soll.
 
@@ -77,4 +104,4 @@ Die Plugin-ID `tagesplaner` bleibt unverändert, damit BRAT vorhandene Installat
 
 ## Grenzen dieser Version
 
-Die Full-Calendar-Anbindung, die tägliche Übertragung unerledigter Aufgaben und eine Zeiterfassung sind nicht Bestandteil von 1.2.1. Das Archiv arbeitet mit abgeschlossenen Aufgaben und läuft, während das Plugin in Obsidian geladen ist.
+Die Full-Calendar-Anbindung, die tägliche Übertragung unerledigter Aufgaben und eine Zeiterfassung sind nicht Bestandteil von 1.3.0. Das Archiv arbeitet mit abgeschlossenen Aufgaben und läuft, während das Plugin in Obsidian geladen ist.

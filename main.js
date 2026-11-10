@@ -27,10 +27,22 @@ function dateKeyValid(value) {
 function shortDate(key) { return new Date(key + 'T12:00:00').toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit' }); }
 function timeText(value) { return new Date(value).toLocaleString('de-CH', { dateStyle: 'short', timeStyle: 'short' }); }
 function shiftDay(value, days) { const d = new Date(value); d.setDate(d.getDate() + days); return d.getTime(); }
+function templateFields(source = {}) {
+  const offset = source.dueInDays;
+  return {
+    title: String(source.title || ''), note: String(source.note || ''),
+    priority: PRIORITIES.some(p => p.name === source.priority) ? source.priority : 'mid',
+    status: ['ToDo', 'In Progress', 'Waiting'].includes(source.status) ? source.status : 'ToDo',
+    estimateHours: Number.isFinite(Number(source.estimateHours)) ? Math.max(0, Number(source.estimateHours)) : 0,
+    dueInDays: offset !== null && offset !== undefined && offset !== '' && Number.isInteger(Number(offset)) && Number(offset) >= 0 && Number(offset) <= 3650 ? Number(offset) : null,
+    subtasks: Array.isArray(source.subtasks) ? source.subtasks.map(s => ({ title: String(s.title || '').trim() })).filter(s => s.title) : []
+  };
+}
 function normalize(raw, now = Date.now()) {
   if (raw && !Array.isArray(raw) && raw.schemaVersion > 2) throw new Error('Diese Daten benötigen eine neuere Tagesplaner-Version.');
   const source = Array.isArray(raw) ? { tasks: raw } : raw || {};
   if (source.tasks != null && !Array.isArray(source.tasks)) throw new Error('Das gespeicherte Aufgabenformat ist ungültig.');
+  if (source.templates != null && !Array.isArray(source.templates)) throw new Error('Das gespeicherte Vorlagenformat ist ungültig.');
   const tasks = (source.tasks || []).map(t => {
     if (!t || typeof t !== 'object') throw new Error('Eine gespeicherte Aufgabe ist ungültig.');
     const incomingStatus = Object.prototype.hasOwnProperty.call(LEGACY_STATUS, t.status) ? LEGACY_STATUS[t.status] : t.status;
@@ -47,7 +59,11 @@ function normalize(raw, now = Date.now()) {
       worklog: Array.isArray(t.worklog) ? t.worklog.map(e => ({ ...e, id: String(e.id || uid()), text: String(e.text || ''), at: stamp(e.at) || now })) : []
     };
   });
-  return { ...source, schemaVersion: 2, tasks, settings: { ...source.settings, weeklyCapacityHours: Number(source.settings?.weeklyCapacityHours) > 0 ? Number(source.settings.weeklyCapacityHours) : 40 } };
+  const templates = (source.templates || []).map(t => {
+    if (!t || typeof t !== 'object') throw new Error('Eine gespeicherte Vorlage ist ungültig.');
+    return { id: String(t.id || uid()), name: String(t.name || 'Ohne Namen'), ...templateFields(t), createdAt: stamp(t.createdAt), updatedAt: stamp(t.updatedAt) };
+  });
+  return { ...source, schemaVersion: 2, tasks, templates, settings: { ...source.settings, weeklyCapacityHours: Number(source.settings?.weeklyCapacityHours) > 0 ? Number(source.settings.weeklyCapacityHours) : 40 } };
 }
 function setStatus(task, status, now = Date.now()) {
   if (!COLS.some(c => c.name === status)) throw new Error('Unbekannter Status.');
@@ -96,48 +112,134 @@ function progress(parent, value, label) {
 }
 
 class TaskModal extends Modal {
-  constructor(app, plugin, taskId = null) { super(app); this.plugin = plugin; this.taskId = taskId; this.saving = false; }
+  constructor(app, plugin, taskId = null, options = {}) {
+    super(app); this.plugin = plugin; this.taskId = taskId; this.options = options;
+    this.isTemplate = options.mode === 'template'; this.saving = false; this.subtaskRows = [];
+  }
   onOpen() {
     this.contentEl.empty(); this.contentEl.addClass('tp-modal');
-    const task = this.plugin.data.tasks.find(t => t.id === this.taskId);
-    this.contentEl.createEl('h2', { text: task ? 'Aufgabe bearbeiten' : 'Neue Aufgabe' });
+    const savedTemplate = this.isTemplate ? this.plugin.data.templates.find(t => t.id === this.options.templateId) : null;
+    const task = this.isTemplate ? savedTemplate || this.options.seedTask : this.plugin.data.tasks.find(t => t.id === this.taskId);
+    this.originalStatus = task?.status || 'ToDo';
+    const heading = this.isTemplate ? (savedTemplate ? 'Vorlage bearbeiten' : 'Neue Vorlage') : (task ? 'Aufgabe bearbeiten' : 'Neue Aufgabe');
+    this.contentEl.createEl('h2', { text: heading });
     const form = this.contentEl.createEl('form');
     const field = (text, tag, type, value) => {
       const label = form.createEl('label', { cls: 'tp-field', text });
-      const input = label.createEl(tag, type ? { type } : {}); input.value = value || ''; return input;
+      const input = label.createEl(tag, type ? { type } : {}); input.value = value == null ? '' : String(value); return input;
     };
-    this.titleInput = field('Aufgabe', 'input', 'text', task?.title); this.titleInput.required = true;
-    const priorityLabel = form.createEl('label', { cls: 'tp-field', text: 'Priorität' });
-    this.priorityInput = priorityLabel.createEl('select');
-    PRIORITIES.forEach(p => this.priorityInput.createEl('option', { text: p.name, value: p.name }));
-    this.priorityInput.value = task?.priority || 'mid';
-    this.dueInput = field('Fällig am · optional', 'input', 'date', task?.due);
+    if (this.isTemplate) {
+      this.nameInput = field('Name der Vorlage', 'input', 'text', savedTemplate?.name || task?.title || ''); this.nameInput.required = true;
+    } else if (!this.taskId) {
+      const label = form.createEl('label', { cls: 'tp-field', text: 'Mit Vorlage starten · optional' });
+      this.templateSelect = label.createEl('select'); this.templateSelect.createEl('option', { text: 'Ohne Vorlage', value: '' });
+      [...this.plugin.data.templates].sort((a, b) => a.name.localeCompare(b.name)).forEach(t => this.templateSelect.createEl('option', { text: t.name, value: t.id }));
+      this.templateSelect.value = '';
+      this.applyButton = button(label, 'Vorlage übernehmen', () => this.applyTemplate(this.templateSelect.value), 'tp-small-button'); this.applyButton.disabled = true;
+      this.templateSelect.onchange = () => { this.applyButton.disabled = !this.templateSelect.value; };
+      label.createDiv({ text: 'Übernehmen füllt die Felder neu aus. Danach kannst du alles für diese Aufgabe ändern.', cls: 'tp-help' });
+    }
+    this.titleInput = field(this.isTemplate ? 'Vorgabe für den Aufgabentitel · optional' : 'Aufgabe', 'input', 'text', task?.title); this.titleInput.required = !this.isTemplate;
+    this.priorityInput = field('Priorität', 'select', null, '');
+    PRIORITIES.forEach(p => this.priorityInput.createEl('option', { text: p.name, value: p.name })); this.priorityInput.value = task?.priority || 'mid';
+    this.statusInput = field(this.taskId ? 'Status' : 'Startstatus', 'select', null, '');
+    const statusOptions = this.taskId && !this.isTemplate ? COLS : COLS.filter(c => c.name !== 'Done');
+    statusOptions.forEach(c => this.statusInput.createEl('option', { text: c.name, value: c.name }));
+    this.statusInput.value = statusOptions.some(c => c.name === task?.status) ? task.status : 'ToDo';
+    if (this.isTemplate) {
+      const offset = savedTemplate ? savedTemplate.dueInDays : (dateKeyValid(task?.due) ? Math.max(0, Math.round((Date.parse(task.due + 'T00:00:00Z') - Date.parse(dayKey() + 'T00:00:00Z')) / DAY)) : null);
+      this.offsetInput = field('Fällig in Tagen ab Erstellung · optional', 'input', 'number', offset);
+      this.offsetInput.min = '0'; this.offsetInput.max = '3650'; this.offsetInput.step = '1'; this.offsetInput.placeholder = '0 = am Tag der Erstellung';
+    } else this.dueInput = field('Fällig am · optional', 'input', 'date', task?.due);
     this.estimateInput = field('Geschätzter Gesamtaufwand in Stunden · optional', 'input', 'number', task?.estimateHours || '');
     this.estimateInput.min = '0'; this.estimateInput.step = '0.25'; this.estimateInput.placeholder = 'z. B. 2';
     this.noteInput = field('Beschreibung · optional', 'textarea', null, task?.note); this.noteInput.rows = 3;
+    const subSection = form.createDiv('tp-modal-subtasks'); subSection.createEl('h3', { text: 'Unteraufgaben' });
+    this.subtaskList = subSection.createDiv('tp-modal-subtask-list');
+    this.originalSubtasks = copy(task?.subtasks || []);
+    this.subtaskRows = copy(task?.subtasks || []).map(s => ({ id: s.id || uid(), title: s.title, done: !this.isTemplate && !!s.done })); this.renderSubtasks();
+    button(subSection, '+ Unteraufgabe', () => { this.subtaskRows.push({ id: uid(), title: '', done: false }); this.renderSubtasks(); this.subtaskList.lastElementChild?.querySelector('input[type=text]')?.focus(); });
     const actions = form.createDiv('tp-inline-actions');
-    this.saveButton = actions.createEl('button', { text: task ? 'Änderungen speichern' : 'Aufgabe erstellen', cls: 'mod-cta', type: 'submit' });
-    button(actions, 'Abbrechen', () => this.close()); form.onsubmit = e => { e.preventDefault(); void this.submit(); }; this.titleInput.focus();
+    this.saveButton = actions.createEl('button', { text: this.isTemplate ? 'Vorlage speichern' : (task ? 'Änderungen speichern' : 'Aufgabe erstellen'), cls: 'mod-cta', type: 'submit' });
+    button(actions, 'Abbrechen', () => this.close()); form.onsubmit = e => { e.preventDefault(); void this.submit(); };
+    if (this.options.initialTemplateId && !this.taskId && !this.isTemplate) {
+      this.templateSelect.value = this.options.initialTemplateId; this.applyButton.disabled = false; this.applyTemplate(this.options.initialTemplateId);
+    }
+    (this.nameInput || this.titleInput).focus();
+  }
+  renderSubtasks() {
+    this.subtaskList.empty();
+    for (const item of this.subtaskRows) {
+      const row = this.subtaskList.createDiv('tp-modal-subtask');
+      if (!this.isTemplate) {
+        const check = row.createEl('input', { type: 'checkbox', attr: { 'aria-label': 'Unteraufgabe erledigt' } }); check.checked = item.done; check.onchange = () => { item.done = check.checked; };
+      }
+      const input = row.createEl('input', { type: 'text', attr: { placeholder: 'Unteraufgabe', 'aria-label': 'Titel der Unteraufgabe' } }); input.value = item.title;
+      input.oninput = () => { item.title = input.value; };
+      button(row, '×', () => { this.subtaskRows = this.subtaskRows.filter(s => s.id !== item.id); this.renderSubtasks(); }, 'tp-icon-button').setAttribute('aria-label', 'Unteraufgabe entfernen');
+    }
+  }
+  applyTemplate(id) {
+    const source = this.plugin.data.templates.find(t => t.id === id);
+    if (!source) { new Notice('Diese Vorlage ist nicht mehr vorhanden.'); return false; }
+    const values = templateFields(source);
+    this.titleInput.value = values.title; this.noteInput.value = values.note;
+    this.priorityInput.value = values.priority; this.statusInput.value = values.status;
+    this.estimateInput.value = values.estimateHours ? String(values.estimateHours) : '';
+    this.dueInput.value = values.dueInDays == null ? '' : dayKey(shiftDay(Date.now(), values.dueInDays));
+    this.subtaskRows = values.subtasks.map(s => ({ id: uid(), title: s.title, done: false })); this.renderSubtasks(); return true;
   }
   async submit() {
     if (this.saving) return;
-    const title = this.titleInput.value.trim();
-    if (!title) { new Notice('Bitte gib einen Aufgabentitel ein.'); this.titleInput.focus(); return; }
-    if (!this.dueInput.checkValidity() || !this.estimateInput.checkValidity()) { this.dueInput.reportValidity(); this.estimateInput.reportValidity(); return; }
-    if (this.dueInput.value && !dateKeyValid(this.dueInput.value)) return;
+    const title = this.titleInput.value.trim(), name = this.nameInput?.value.trim();
+    if (this.isTemplate ? !name : !title) { new Notice(this.isTemplate ? 'Bitte gib der Vorlage einen Namen.' : 'Bitte gib einen Aufgabentitel ein.'); (this.nameInput || this.titleInput).focus(); return; }
+    if (this.isTemplate && this.plugin.data.templates.some(t => t.id !== this.options.templateId && t.name.toLocaleLowerCase() === name.toLocaleLowerCase())) { new Notice('Eine Vorlage mit diesem Namen existiert bereits. Bitte wähle einen anderen Namen.'); return; }
+    if (!this.estimateInput.checkValidity()) { this.estimateInput.reportValidity(); return; }
+    if (this.dueInput && (!this.dueInput.checkValidity() || (this.dueInput.value && !dateKeyValid(this.dueInput.value)))) { this.dueInput.reportValidity(); return; }
+    if (this.offsetInput && !this.offsetInput.checkValidity()) { this.offsetInput.reportValidity(); return; }
     const estimateHours = Number(this.estimateInput.value) || 0;
-    if (!Number.isFinite(estimateHours) || estimateHours < 0) return;
+    const dueInDays = this.offsetInput && this.offsetInput.value !== '' ? Number(this.offsetInput.value) : null;
+    if (!Number.isFinite(estimateHours) || estimateHours < 0 || (dueInDays != null && (!Number.isInteger(dueInDays) || dueInDays < 0 || dueInDays > 3650))) return;
     if (!PRIORITIES.some(p => p.name === this.priorityInput.value)) return;
+    const status = this.statusInput.value;
+    if (!COLS.some(c => c.name === status) || ((!this.taskId || this.isTemplate) && status === 'Done')) return;
     this.saving = true; this.saveButton.disabled = true;
-    const values = { title, due: this.dueInput.value, note: this.noteInput.value.trim(), priority: this.priorityInput.value, estimateHours, updatedAt: Date.now() };
+    const subtasks = this.subtaskRows.filter(s => s.title.trim()).map(s => ({ id: s.id, title: s.title.trim(), done: !!s.done }));
+    const values = { title, note: this.noteInput.value.trim(), priority: this.priorityInput.value, estimateHours, updatedAt: Date.now() };
     const ok = await this.plugin.mutate(data => {
-      if (this.taskId) {
-        const task = data.tasks.find(t => t.id === this.taskId);
-        if (!task || task.archivedAt) throw new Error('Diese Aufgabe ist nicht mehr bearbeitbar.');
-        Object.assign(task, values);
-      } else data.tasks.push({ id: uid(), ...values, status: 'ToDo', createdAt: Date.now(), completedAt: null, archivedAt: null, subtasks: [], worklog: [] });
+      if (this.isTemplate) {
+        if (data.templates.some(t => t.id !== this.options.templateId && t.name.toLocaleLowerCase() === name.toLocaleLowerCase())) throw new Error('Eine Vorlage mit diesem Namen existiert bereits.');
+        const fields = { name, ...templateFields({ ...values, status, dueInDays, subtasks }), updatedAt: Date.now() };
+        if (this.options.templateId) {
+          const template = data.templates.find(t => t.id === this.options.templateId); if (!template) throw new Error('Vorlage nicht gefunden.'); Object.assign(template, fields);
+        } else data.templates.push({ id: uid(), ...fields, createdAt: Date.now() });
+      } else if (this.taskId) {
+        const task = data.tasks.find(t => t.id === this.taskId); if (!task || task.archivedAt) throw new Error('Diese Aufgabe ist nicht mehr bearbeitbar.');
+        const subtasksChanged = JSON.stringify(subtasks) !== JSON.stringify(this.originalSubtasks);
+        if (subtasksChanged && JSON.stringify(task.subtasks) !== JSON.stringify(this.originalSubtasks)) throw new Error('Unteraufgaben wurden inzwischen geändert. Bitte den Dialog erneut öffnen.');
+        Object.assign(task, values, { due: this.dueInput.value }); if (subtasksChanged) task.subtasks = subtasks;
+        if (status !== this.originalStatus) setStatus(task, status);
+      } else data.tasks.push({ id: uid(), ...values, status, due: this.dueInput.value, createdAt: Date.now(), completedAt: null, archivedAt: null, subtasks, worklog: [] });
     });
     if (ok) this.close(); else { this.saving = false; this.saveButton.disabled = false; }
+  }
+  onClose() { this.contentEl.empty(); }
+}
+class TemplateModal extends TaskModal {
+  constructor(app, plugin, templateId = null, seedTask = null) { super(app, plugin, null, { mode: 'template', templateId, seedTask: seedTask ? copy(seedTask) : null }); }
+}
+class DeleteTemplateModal extends Modal {
+  constructor(app, plugin, templateId) { super(app); this.plugin = plugin; this.templateId = templateId; this.saving = false; }
+  onOpen() {
+    this.contentEl.createEl('h2', { text: 'Vorlage löschen?' });
+    this.contentEl.createEl('p', { text: 'Die Vorlage wird entfernt. Bereits daraus erstellte Aufgaben bleiben erhalten.' });
+    const actions = this.contentEl.createDiv('tp-inline-actions');
+    this.deleteButton = button(actions, 'Vorlage löschen', () => this.confirm(), 'mod-warning'); button(actions, 'Abbrechen', () => this.close());
+  }
+  async confirm() {
+    if (this.saving) return; this.saving = true; this.deleteButton.disabled = true;
+    const ok = await this.plugin.mutate(data => { data.templates = data.templates.filter(t => t.id !== this.templateId); });
+    if (ok) this.close(); else { this.saving = false; this.deleteButton.disabled = false; }
   }
   onClose() { this.contentEl.empty(); }
 }
@@ -168,11 +270,11 @@ class PlannerView extends ItemView {
     button(head, '+ Aufgabe', () => new TaskModal(this.app, this.plugin).open(), 'mod-cta');
     const nav = root.createDiv('tp-tabs'); nav.setAttribute('aria-label', 'Planner-Ansichten');
     const archiveCount = this.plugin.data.tasks.filter(t => t.archivedAt).length;
-    for (const [id, label] of [['board', 'Aufgaben'], ['dashboard', 'Dashboard'], ['archive', 'Archiv · ' + archiveCount]]) {
+    for (const [id, label] of [['board', 'Aufgaben'], ['dashboard', 'Dashboard'], ['templates', 'Vorlagen'], ['archive', 'Archiv · ' + archiveCount]]) {
       const b = button(nav, label, () => { this.tab = id; this.render(); }, this.tab === id ? 'tp-tab is-active' : 'tp-tab'); b.setAttribute('aria-pressed', String(this.tab === id));
     }
     const body = root.createDiv('tp-body');
-    if (this.tab === 'dashboard') this.renderDashboard(body); else if (this.tab === 'archive') this.renderArchive(body); else this.renderBoard(body);
+    if (this.tab === 'dashboard') this.renderDashboard(body); else if (this.tab === 'archive') this.renderArchive(body); else if (this.tab === 'templates') this.renderTemplates(body); else this.renderBoard(body);
     const position = this.scrollPositions.get(this.tab);
     if (position) {
       body.scrollTop = position.top;
@@ -183,6 +285,33 @@ class PlannerView extends ItemView {
   renderBoard(parent) {
     this.renderTaskBoard(parent, 'Status', 'Nach Arbeitsstand verschieben', 'status', COLS);
     this.renderTaskBoard(parent, 'Prioritäten', 'Nicht abgeschlossene Aufgaben nach Dringlichkeit · Änderungen gelten in beiden Übersichten', 'priority', PRIORITIES);
+  }
+  renderTemplates(parent) {
+    const head = parent.createDiv('tp-template-heading');
+    const heading = head.createDiv(); heading.createEl('h3', { text: 'Deine Aufgabenvorlagen' });
+    heading.createDiv({ text: 'Wiederkehrende Abläufe vorbereiten. Jede neue Aufgabe bleibt frei anpassbar.', cls: 'tp-muted' });
+    button(head, '+ Vorlage', () => new TemplateModal(this.app, this.plugin).open(), 'mod-cta');
+    const grid = parent.createDiv('tp-template-grid');
+    const templates = [...this.plugin.data.templates].sort((a, b) => a.name.localeCompare(b.name));
+    if (!templates.length) grid.createDiv({ text: 'Noch keine Vorlagen. Erstelle eine mit + Vorlage oder speichere eine vorhandene Aufgabe über Als Vorlage.', cls: 'tp-empty' });
+    for (const template of templates) {
+      const card = grid.createDiv('tp-template-card'); card.setAttribute('data-template-id', template.id);
+      card.createEl('h4', { text: template.name });
+      const meta = card.createDiv('tp-meta'); meta.createSpan({ text: template.priority, cls: 'tp-priority-tag tp-priority-' + template.priority });
+      meta.createSpan({ text: template.status, cls: 'tp-badge' });
+      if (template.estimateHours) meta.createSpan({ text: hourText(template.estimateHours), cls: 'tp-badge' });
+      if (template.dueInDays != null) meta.createSpan({ text: template.dueInDays === 0 ? 'Fällig am Erstellungstag' : 'Fällig nach ' + template.dueInDays + ' Tagen', cls: 'tp-badge' });
+      if (template.title) card.createDiv({ text: template.title, cls: 'tp-template-title' });
+      if (template.note) card.createDiv({ text: template.note, cls: 'tp-description' });
+      if (template.subtasks.length) {
+        card.createDiv({ text: template.subtasks.length + ' Unteraufgaben', cls: 'tp-section-title' });
+        const list = card.createEl('ul', { cls: 'tp-template-subtasks' }); template.subtasks.forEach(s => list.createEl('li', { text: s.title }));
+      }
+      const actions = card.createDiv('tp-template-actions');
+      button(actions, '+ Aufgabe', () => new TaskModal(this.app, this.plugin, null, { initialTemplateId: template.id }).open(), 'mod-cta');
+      button(actions, 'Bearbeiten', () => new TemplateModal(this.app, this.plugin, template.id).open());
+      button(actions, 'Löschen', () => new DeleteTemplateModal(this.app, this.plugin, template.id).open());
+    }
   }
   renderTaskBoard(parent, heading, hint, field, columns) {
     const group = parent.createDiv('tp-board-group'); group.setAttribute('data-board', field);
@@ -273,6 +402,7 @@ class PlannerView extends ItemView {
       PRIORITIES.forEach(p => priority.createEl('option', { text: p.name, value: p.name })); priority.value = task.priority;
       priority.onchange = () => this.plugin.changePriority(task.id, priority.value);
     }
+    button(actions, 'Als Vorlage', () => new TemplateModal(this.app, this.plugin, null, task).open());
     const sub = card.createDiv('tp-section'), subDone = task.subtasks.filter(s => s.done).length;
     sub.createDiv({ text: 'Unteraufgaben' + (task.subtasks.length ? ' · ' + subDone + '/' + task.subtasks.length : ''), cls: 'tp-section-title' });
     if (task.subtasks.length) progress(sub, subDone / task.subtasks.length * 100, 'Unteraufgaben abgeschlossen');
