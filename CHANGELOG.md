@@ -1,5 +1,16 @@
 # Änderungen
 
+## 1.4.1
+
+- Unteraufgaben lassen sich direkt in der Vorlage vordefinieren; eine erste Eingabezeile steht sofort bereit.
+- Enter ergänzt die nächste Unteraufgabe und sendet das Formular nicht versehentlich ab.
+- Vorhandene Eingabefelder werden beim Hinzufügen und Entfernen anderer Zeilen beibehalten; Fokus und Texte bleiben stabil.
+- Noch ausstehende Eingabewerte werden vor Listenänderungen und beim Speichern übernommen.
+- Vorgegebene Unteraufgaben bleiben beim Speichern und erneuten Öffnen erhalten und werden vollständig in neue Aufgaben kopiert.
+- Leere Zeilen werden beim Speichern ausgelassen. Speicherfehler lassen sämtliche Eingaben für einen erneuten Versuch stehen.
+
+Release-Assets: `main.js`, `manifest.json` und `styles.css` einzeln anhängen. Tag: **1.4.1**, Zielbranch: **main**.
+
 ## 1.4.0
 
 - **+ Vorlage** steht zentral neben **+ Aufgabe** und öffnet einen taskähnlichen Vorlageneditor mit **Vorlage speichern**.

@@ -114,7 +114,7 @@ function progress(parent, value, label) {
 class TaskModal extends Modal {
   constructor(app, plugin, taskId = null, options = {}) {
     super(app); this.plugin = plugin; this.taskId = taskId; this.options = options;
-    this.isTemplate = options.mode === 'template'; this.saving = false; this.subtaskRows = [];
+    this.isTemplate = options.mode === 'template'; this.saving = false; this.subtaskRows = []; this.subtaskElements = new Map();
   }
   onOpen() {
     this.contentEl.empty(); this.contentEl.addClass('tp-modal');
@@ -148,28 +148,98 @@ class TaskModal extends Modal {
     this.noteInput = field('Beschreibung · optional', 'textarea', null, task?.note); this.noteInput.rows = 3;
     const subSection = form.createDiv('tp-modal-subtasks'); subSection.createEl('h3', { text: 'Unteraufgaben' });
     this.subtaskList = subSection.createDiv('tp-modal-subtask-list');
+    this.subtaskElements = new Map();
     this.originalSubtasks = copy(task?.subtasks || []);
-    this.subtaskRows = copy(task?.subtasks || []).map(s => ({ id: s.id || uid(), title: s.title, done: !this.isTemplate && !!s.done })); this.renderSubtasks();
-    button(subSection, '+ Unteraufgabe', () => { this.subtaskRows.push({ id: uid(), title: '', done: false }); this.renderSubtasks(); this.subtaskList.lastElementChild?.querySelector('input[type=text]')?.focus(); });
+    this.subtaskRows = copy(task?.subtasks || []).map(s => ({ id: s.id || uid(), title: s.title, done: !this.isTemplate && !!s.done }));
+    if (this.isTemplate && !this.subtaskRows.length) this.subtaskRows.push({ id: uid(), title: '', done: false });
+    subSection.createDiv({ text: 'Unteraufgaben direkt eingeben. Enter ergänzt die nächste Zeile; gespeichert wird über den Speichern-Knopf unten.', cls: 'tp-help' });
+    this.renderSubtasks();
+    this.addSubtaskButton = button(subSection, '+ Unteraufgabe', () => this.addSubtask());
     const actions = form.createDiv('tp-inline-actions');
     this.saveButton = actions.createEl('button', { text: this.isTemplate ? 'Vorlage speichern' : (task ? 'Änderungen speichern' : 'Aufgabe erstellen'), cls: 'mod-cta', type: 'submit' });
     if (!this.isTemplate && !this.taskId) this.fromTemplateButton = button(actions, 'Aufgabe nach Vorlage erstellen', () => new TemplatePickerModal(this.app, this.plugin, this).open());
-    button(actions, 'Abbrechen', () => this.close()); form.onsubmit = e => { e.preventDefault(); void this.submit(); };
+    button(actions, 'Abbrechen', () => this.close());
+    form.onkeydown = e => {
+      if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229 && e.target?.tagName === 'INPUT') e.preventDefault();
+    };
+    form.onsubmit = e => {
+      e.preventDefault();
+      // Enter in a text field must not implicitly save a partly written template.
+      if (e.submitter && e.submitter !== this.saveButton) return;
+      if (!e.submitter && this.subtaskList.contains(this.contentEl.ownerDocument?.activeElement)) return;
+      void this.submit();
+    };
     if (this.options.initialTemplateId && !this.taskId && !this.isTemplate) {
       this.applyTemplate(this.options.initialTemplateId);
     }
     (this.nameInput || this.titleInput).focus();
   }
   renderSubtasks() {
-    this.subtaskList.empty();
-    for (const item of this.subtaskRows) {
-      const row = this.subtaskList.createDiv('tp-modal-subtask');
-      if (!this.isTemplate) {
-        const check = row.createEl('input', { type: 'checkbox', attr: { 'aria-label': 'Unteraufgabe erledigt' } }); check.checked = item.done; check.onchange = () => { item.done = check.checked; };
+    const ids = new Set(this.subtaskRows.map(s => s.id));
+    for (const [id, entry] of this.subtaskElements) {
+      if (!ids.has(id)) { entry.row.remove(); this.subtaskElements.delete(id); }
+    }
+    this.subtaskRows.forEach((item, index) => {
+      let entry = this.subtaskElements.get(item.id);
+      if (!entry) {
+        const row = this.subtaskList.createDiv('tp-modal-subtask'); entry = { row, item };
+        if (!this.isTemplate) {
+          entry.check = row.createEl('input', { type: 'checkbox', attr: { 'aria-label': 'Unteraufgabe erledigt' } });
+          entry.check.onchange = () => { entry.item.done = entry.check.checked; entry.lastDone = entry.check.checked; };
+        }
+        entry.input = row.createEl('input', { type: 'text', attr: { placeholder: 'Titel der Unteraufgabe' } });
+        entry.input.oninput = () => { entry.item.title = entry.input.value; entry.lastTitle = entry.input.value; };
+        entry.input.onkeydown = e => {
+          if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229) return;
+          e.preventDefault(); e.stopPropagation(); this.addSubtask(entry.item.id);
+        };
+        entry.remove = button(row, '×', () => this.removeSubtask(entry.item.id), 'tp-icon-button');
+        this.subtaskElements.set(item.id, entry);
       }
-      const input = row.createEl('input', { type: 'text', attr: { placeholder: 'Unteraufgabe', 'aria-label': 'Titel der Unteraufgabe' } }); input.value = item.title;
-      input.oninput = () => { item.title = input.value; };
-      button(row, '×', () => { this.subtaskRows = this.subtaskRows.filter(s => s.id !== item.id); this.renderSubtasks(); }, 'tp-icon-button').setAttribute('aria-label', 'Unteraufgabe entfernen');
+      entry.item = item;
+      if (entry.input.value !== item.title) entry.input.value = item.title;
+      entry.lastTitle = item.title; entry.input.setAttribute('aria-label', 'Titel der Unteraufgabe ' + (index + 1));
+      entry.remove.setAttribute('aria-label', 'Unteraufgabe ' + (index + 1) + ' entfernen');
+      if (entry.check) { entry.check.checked = item.done; entry.lastDone = item.done; }
+      const atPosition = this.subtaskList.children[index];
+      if (atPosition !== entry.row) this.subtaskList.insertBefore(entry.row, atPosition || null);
+    });
+  }
+  captureSubtasks() {
+    // Read pending field values before list changes/save, even if an input event was delayed.
+    for (const item of this.subtaskRows) {
+      const entry = this.subtaskElements.get(item.id); if (!entry) continue;
+      if (entry.input.value !== entry.lastTitle) { item.title = entry.input.value; entry.lastTitle = entry.input.value; }
+      if (entry.check && entry.check.checked !== entry.lastDone) { item.done = entry.check.checked; entry.lastDone = entry.check.checked; }
+    }
+  }
+  focusSubtask(id) {
+    const input = this.subtaskElements.get(id)?.input; input?.focus();
+  }
+  addSubtask(afterId = null) {
+    if (this.saving) return;
+    this.captureSubtasks();
+    const index = afterId == null ? this.subtaskRows.length - 1 : this.subtaskRows.findIndex(s => s.id === afterId);
+    const current = this.subtaskRows[index];
+    if (current && !current.title.trim()) { this.focusSubtask(current.id); return; }
+    const next = this.subtaskRows[index + 1];
+    if (next && !next.title.trim()) { this.focusSubtask(next.id); return; }
+    const item = { id: uid(), title: '', done: false };
+    this.subtaskRows.splice(index + 1, 0, item); this.renderSubtasks(); this.focusSubtask(item.id);
+  }
+  removeSubtask(id) {
+    if (this.saving) return;
+    this.captureSubtasks();
+    const index = this.subtaskRows.findIndex(s => s.id === id);
+    if (index < 0) return;
+    this.subtaskRows.splice(index, 1); this.renderSubtasks();
+    const next = this.subtaskRows[Math.min(index, this.subtaskRows.length - 1)]; if (next) this.focusSubtask(next.id);
+  }
+  setSubtaskSaving(saving) {
+    this.addSubtaskButton.disabled = saving;
+    for (const entry of this.subtaskElements.values()) {
+      entry.input.disabled = saving; entry.remove.disabled = saving;
+      if (entry.check) entry.check.disabled = saving;
     }
   }
   applyTemplate(id) {
@@ -184,6 +254,7 @@ class TaskModal extends Modal {
   }
   async submit() {
     if (this.saving) return;
+    this.captureSubtasks();
     const title = this.titleInput.value.trim(), name = this.nameInput?.value.trim();
     if (this.isTemplate ? !name : !title) { new Notice(this.isTemplate ? 'Bitte gib der Vorlage einen Namen.' : 'Bitte gib einen Aufgabentitel ein.'); (this.nameInput || this.titleInput).focus(); return; }
     if (this.isTemplate && this.plugin.data.templates.some(t => t.id !== this.options.templateId && t.name.toLocaleLowerCase() === name.toLocaleLowerCase())) { new Notice('Eine Vorlage mit diesem Namen existiert bereits. Bitte wähle einen anderen Namen.'); return; }
@@ -196,7 +267,7 @@ class TaskModal extends Modal {
     if (!PRIORITIES.some(p => p.name === this.priorityInput.value)) return;
     const status = this.statusInput.value;
     if (!COLS.some(c => c.name === status) || ((!this.taskId || this.isTemplate) && status === 'Done')) return;
-    this.saving = true; this.saveButton.disabled = true;
+    this.saving = true; this.saveButton.disabled = true; this.setSubtaskSaving(true);
     const subtasks = this.subtaskRows.filter(s => s.title.trim()).map(s => ({ id: s.id, title: s.title.trim(), done: !!s.done }));
     const values = { title, note: this.noteInput.value.trim(), priority: this.priorityInput.value, estimateHours, updatedAt: Date.now() };
     const ok = await this.plugin.mutate(data => {
@@ -214,7 +285,7 @@ class TaskModal extends Modal {
         if (status !== this.originalStatus) setStatus(task, status);
       } else data.tasks.push({ id: uid(), ...values, status, due: this.dueInput.value, createdAt: Date.now(), completedAt: null, archivedAt: null, subtasks, worklog: [] });
     });
-    if (ok) this.close(); else { this.saving = false; this.saveButton.disabled = false; }
+    if (ok) this.close(); else { this.saving = false; this.saveButton.disabled = false; this.setSubtaskSaving(false); }
   }
   onClose() { this.contentEl.empty(); }
 }

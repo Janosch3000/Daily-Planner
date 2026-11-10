@@ -1,6 +1,6 @@
 # Tagesplaner für Obsidian
 
-Version **1.4.0** · Synchronisierte Status- und Prioritätenboards mit Aufgabenvorlagen, bearbeitbaren Beschreibungen, Dashboard, Unteraufgaben, Arbeitsverlauf und Archiv.
+Version **1.4.1** · Synchronisierte Status- und Prioritätenboards mit Aufgabenvorlagen, bearbeitbaren Beschreibungen, Dashboard, Unteraufgaben, Arbeitsverlauf und Archiv.
 
 ## Installation über BRAT
 
@@ -32,6 +32,10 @@ Oben neben **+ Aufgabe** steht **+ Vorlage**. Der Knopf öffnet einen taskähnli
 - Priorität, Startstatus (ToDo, In Progress oder Waiting), Beschreibung und Aufwand;
 - Unteraufgaben, die für neue Aufgaben jeweils offen beginnen;
 - einer optionalen relativen Fälligkeit in Kalendertagen nach Erstellung: 0 = heute, 2 = zwei Tage später. Leer bedeutet ohne Fälligkeit; möglich sind 0 bis 3650 Tage.
+
+Unter **Unteraufgaben** steht direkt eine Eingabezeile bereit. Den Titel der ersten vorgegebenen Unteraufgabe eingeben. **Enter** ergänzt die nächste Zeile; alternativ **+ Unteraufgabe** verwenden. Bereits eingegebene Titel können direkt geändert und über **×** entfernt werden. Eine vorhandene leere Zeile wird weiterverwendet, statt weitere leere Zeilen anzulegen.
+
+Enter in einem Eingabefeld speichert das Formular nicht versehentlich. Erst **Vorlage speichern** legt die Vorlage mit allen ausgefüllten Unteraufgaben ab. Leere Zeilen werden nicht gespeichert. Beim erneuten Bearbeiten erscheinen die gespeicherten Unteraufgaben wieder als editierbare Eingabezeilen. Neue Aufgaben aus dieser Vorlage erhalten sämtliche vorgegebenen Unteraufgaben als eigene, offene Kopien.
 
 Alles eingeben und anschließend **Vorlage speichern** wählen. Dadurch entsteht eine Vorlage, noch keine Aufgabe. Auf den einzelnen Aufgabenkarten gibt es keinen Vorlagenknopf.
 
@@ -88,15 +92,15 @@ Erneut geöffnete Aufgaben zählen bis zu ihrem nächsten Abschluss nicht als er
 
 Vorhandene Aufgaben und Vorlagen aus früheren Versionen werden automatisch übernommen. Fehlende Prioritäten werden auf mid gesetzt. Die bisherigen Kategorien werden zugeordnet: Offen → ToDo, In Bearbeitung → In Progress, Warten auf Person und Delayed → Waiting, Fertig → Done. Vorhandene Abschlussdaten und Archivtimer bleiben dabei erhalten. Titel, Status, Fälligkeitsdatum und Beschreibung bleiben erhalten. Neue Felder werden ergänzt.
 
-Alte Aufgaben im Status Done besitzen noch kein gespeichertes Abschlussdatum. Für sie beginnt der Archivtimer beim ersten Laden von Version 1.4.0. Sie werden als vor dem Update erledigt gekennzeichnet und nicht rückwirkend in 7-/30-Tage-Statistiken eingerechnet.
+Alte Aufgaben im Status Done besitzen noch kein gespeichertes Abschlussdatum. Für sie beginnt der Archivtimer beim ersten Laden von Version 1.4.1. Sie werden als vor dem Update erledigt gekennzeichnet und nicht rückwirkend in 7-/30-Tage-Statistiken eingerechnet.
 
 Alle Daten liegen lokal in `<Vault>/.obsidian/plugins/tagesplaner/data.json`; das Archiv ist Teil dieser Datei. Persönliche Aufgaben gehören nicht ins öffentliche GitHub-Repository. Vor einem späteren Downgrade auf eine ältere Plugin-Version die Datei sichern: Ältere Versionen kennen die neuen Kategorien beziehungsweise das neue Datenformat nicht.
 
-## Release 1.4.0 erstellen
+## Release 1.4.1 erstellen
 
 Repository: https://github.com/Janosch3000/Daily-Planner
 
-1. Ein neues Release mit neuem Tag **1.4.0**, Ziel **main**, Titel **Tagesplaner 1.4.0** erstellen.
+1. Ein neues Release mit neuem Tag **1.4.1**, Ziel **main**, Titel **Tagesplaner 1.4.1** erstellen.
 2. Die aktuellen Dateien **main.js**, **manifest.json** und **styles.css** aus dieser Version als drei einzelne Assets anhängen.
 3. Die Notizen aus `CHANGELOG.md` verwenden und das Release veröffentlichen. Nicht als Pre-release markieren, wenn BRAT es regulär als neueste Version beziehen soll.
 
@@ -106,4 +110,4 @@ Die Plugin-ID `tagesplaner` bleibt unverändert, damit BRAT vorhandene Installat
 
 ## Grenzen dieser Version
 
-Die Full-Calendar-Anbindung, die tägliche Übertragung unerledigter Aufgaben und eine Zeiterfassung sind nicht Bestandteil von 1.4.0. Das Archiv arbeitet mit abgeschlossenen Aufgaben und läuft, während das Plugin in Obsidian geladen ist.
+Die Full-Calendar-Anbindung, die tägliche Übertragung unerledigter Aufgaben und eine Zeiterfassung sind nicht Bestandteil von 1.4.1. Das Archiv arbeitet mit abgeschlossenen Aufgaben und läuft, während das Plugin in Obsidian geladen ist.
