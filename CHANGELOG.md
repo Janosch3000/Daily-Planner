@@ -1,5 +1,12 @@
 # Änderungen
 
+## 1.5.2
+
+- Der Aufgabenrahmen wird beim Darüberfahren mit der Maus reinweiß (#ffffff), mit einem dezenten weißen Schein.
+- Der normale Rahmen behält die jeweilige Status- oder Prioritätsfarbe.
+
+Release-Assets: `main.js`, `manifest.json` und `styles.css` einzeln anhängen. Tag: **1.5.2**, Zielbranch: **main**.
+
 ## 1.5.1
 
 - Aufgaben haben bereits im normalen Zustand einen dezenten Rahmen in der jeweiligen Status- oder Prioritätsfarbe.

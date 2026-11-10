@@ -71,6 +71,7 @@
 .tp-lane.tp-priority-immediately { --tp-card-line: #c79ba7; --tp-card-bright: #f0bdce; --tp-card-glow: rgba(190,118,137,.17); }
 .tp-card { background: var(--background-primary); border: 1px solid var(--tp-card-line,var(--tp-tone,var(--background-modifier-border))); border-radius: 11px; padding: 16px; margin: 0 0 13px; box-shadow: 0 3px 10px rgba(0,0,0,.035); min-width: 0; transition: border-color .18s,box-shadow .18s; }
 .tp-card:hover,.tp-card:focus-within { border-color: var(--tp-card-bright,var(--tp-tone,var(--background-modifier-border))); box-shadow: 0 0 0 1px var(--tp-card-glow,transparent),0 4px 14px rgba(0,0,0,.055); }
+.tp-card:hover { border-color: #ffffff; box-shadow: 0 0 0 1px rgba(255,255,255,.35),0 4px 14px rgba(0,0,0,.055); }
 .tp-card-head[draggable=true] { cursor: grab; }
 .tp-card-head[draggable=true]:active { cursor: grabbing; }
 .tp-title { font-size: .94em !important; line-height: 1.45; margin: 0 !important; overflow-wrap: anywhere; font-weight: 650; }
