@@ -1,6 +1,6 @@
 # Tagesplaner für Obsidian
 
-Version **1.2.0** · Synchronisierte Status- und Prioritätenboards mit bearbeitbaren Beschreibungen, Dashboard, Unteraufgaben, Arbeitsverlauf und Archiv.
+Version **1.2.1** · Synchronisierte Status- und Prioritätenboards mit bearbeitbaren Beschreibungen, Dashboard, Unteraufgaben, Arbeitsverlauf und Archiv.
 
 ## Installation über BRAT
 
@@ -33,7 +33,7 @@ Eine Aufgabe besitzt einen Status und eine Priorität. Beide Übersichten zeigen
 - Das Ziehen in eine Statusspalte ändert nur den Status; die Priorität bleibt erhalten.
 - Die farbigen Tags und die Position in der Prioritätenübersicht stimmen immer mit der gespeicherten Priorität überein.
 - Neue Aufgaben und bestehende Aufgaben ohne Priorität beginnen mit **mid**.
-- Nicht archivierte Aufgaben erscheinen genau einmal pro Übersicht. Nach der Archivierung verschwinden sie aus beiden Boards; im Archiv bleibt die Priorität sichtbar.
+- Im Statusboard erscheinen alle nicht archivierten Aufgaben. Die Prioritätenübersicht zeigt nur Aufgaben in ToDo, In Progress oder Waiting. Beim Wechsel zu Done verschwindet eine Aufgabe sofort aus der Prioritätenübersicht, bleibt aber bis zur Archivierung in der Done-Spalte. Beim Zurückverschieben aus Done erscheint sie wieder in ihrer bisherigen Prioritätsspalte. Auch das Wiederherstellen aus dem Archiv bringt sie mit derselben Priorität zurück.
 - Textentwürfe für Beschreibungen, Unteraufgaben und Arbeitsschritte werden innerhalb der geöffneten Ansicht zwischen beiden Darstellungen synchronisiert. Erst Speichern legt sie dauerhaft ab. Scrollpositionen bleiben bei Änderungen erhalten.
 
 ## Archiv
@@ -59,15 +59,15 @@ Erneut geöffnete Aufgaben zählen bis zu ihrem nächsten Abschluss nicht als er
 
 Vorhandene Daten aus 1.0.0, 1.1.0 und 1.1.1 werden automatisch übernommen. Fehlende Prioritäten werden auf mid gesetzt. Die bisherigen Kategorien werden zugeordnet: Offen → ToDo, In Bearbeitung → In Progress, Warten auf Person und Delayed → Waiting, Fertig → Done. Vorhandene Abschlussdaten und Archivtimer bleiben dabei erhalten. Titel, Status, Fälligkeitsdatum und Beschreibung bleiben erhalten. Neue Felder werden ergänzt.
 
-Alte Aufgaben im Status Done besitzen noch kein gespeichertes Abschlussdatum. Für sie beginnt der Archivtimer beim ersten Laden von Version 1.2.0. Sie werden als vor dem Update erledigt gekennzeichnet und nicht rückwirkend in 7-/30-Tage-Statistiken eingerechnet.
+Alte Aufgaben im Status Done besitzen noch kein gespeichertes Abschlussdatum. Für sie beginnt der Archivtimer beim ersten Laden von Version 1.2.1. Sie werden als vor dem Update erledigt gekennzeichnet und nicht rückwirkend in 7-/30-Tage-Statistiken eingerechnet.
 
 Alle Daten liegen lokal in `<Vault>/.obsidian/plugins/tagesplaner/data.json`; das Archiv ist Teil dieser Datei. Persönliche Aufgaben gehören nicht ins öffentliche GitHub-Repository. Vor einem späteren Downgrade auf eine ältere Plugin-Version die Datei sichern: Ältere Versionen kennen die neuen Kategorien beziehungsweise das neue Datenformat nicht.
 
-## Release 1.2.0 erstellen
+## Release 1.2.1 erstellen
 
 Repository: https://github.com/Janosch3000/Daily-Planner
 
-1. Ein neues Release mit neuem Tag **1.2.0**, Ziel **main**, Titel **Tagesplaner 1.2.0** erstellen.
+1. Ein neues Release mit neuem Tag **1.2.1**, Ziel **main**, Titel **Tagesplaner 1.2.1** erstellen.
 2. Die aktuellen Dateien **main.js**, **manifest.json** und **styles.css** aus dieser Version als drei einzelne Assets anhängen.
 3. Die Notizen aus `CHANGELOG.md` verwenden und das Release veröffentlichen. Nicht als Pre-release markieren, wenn BRAT es regulär als neueste Version beziehen soll.
 
@@ -77,4 +77,4 @@ Die Plugin-ID `tagesplaner` bleibt unverändert, damit BRAT vorhandene Installat
 
 ## Grenzen dieser Version
 
-Die Full-Calendar-Anbindung, die tägliche Übertragung unerledigter Aufgaben und eine Zeiterfassung sind nicht Bestandteil von 1.2.0. Das Archiv arbeitet mit abgeschlossenen Aufgaben und läuft, während das Plugin in Obsidian geladen ist.
+Die Full-Calendar-Anbindung, die tägliche Übertragung unerledigter Aufgaben und eine Zeiterfassung sind nicht Bestandteil von 1.2.1. Das Archiv arbeitet mit abgeschlossenen Aufgaben und läuft, während das Plugin in Obsidian geladen ist.

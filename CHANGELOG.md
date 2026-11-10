@@ -1,5 +1,13 @@
 # Änderungen
 
+## 1.2.1
+
+- Aufgaben in Done werden sofort aus allen Prioritätsspalten ausgeblendet.
+- Beim Wechsel von Done nach ToDo, In Progress oder Waiting erscheinen sie automatisch wieder in ihrer bisherigen Prioritätsspalte.
+- Priorität, Beschreibung, Unteraufgaben und Arbeitsverlauf bleiben erhalten. Die Archivierung nach 24 Stunden läuft weiter.
+
+Release-Assets: `main.js`, `manifest.json` und `styles.css` einzeln anhängen. Tag: **1.2.1**, Zielbranch: **main**.
+
 ## 1.2.0
 
 - Beschreibungen direkt auf den Aufgabenkarten nachträglich ergänzen, ändern und leeren; auch über den Bearbeitungsdialog.

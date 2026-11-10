@@ -1,7 +1,7 @@
 {
   "id": "tagesplaner",
   "name": "Tagesplaner",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "minAppVersion": "1.4.0",
   "description": "Synchronisierte Status- und Prioritätenboards mit Unteraufgaben, Arbeitsverlauf, Archiv und Dashboard.",
   "author": "Janosch",

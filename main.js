@@ -182,7 +182,7 @@ class PlannerView extends ItemView {
   }
   renderBoard(parent) {
     this.renderTaskBoard(parent, 'Status', 'Nach Arbeitsstand verschieben', 'status', COLS);
-    this.renderTaskBoard(parent, 'Prioritäten', 'Dieselben Aufgaben nach Dringlichkeit · Änderungen gelten in beiden Übersichten', 'priority', PRIORITIES);
+    this.renderTaskBoard(parent, 'Prioritäten', 'Nicht abgeschlossene Aufgaben nach Dringlichkeit · Änderungen gelten in beiden Übersichten', 'priority', PRIORITIES);
   }
   renderTaskBoard(parent, heading, hint, field, columns) {
     const group = parent.createDiv('tp-board-group'); group.setAttribute('data-board', field);
@@ -190,7 +190,7 @@ class PlannerView extends ItemView {
     headingEl.createDiv({ text: hint, cls: 'tp-muted' });
     const board = group.createDiv('tp-board-scroll').createDiv('tp-board');
     for (const col of columns) {
-      const tasks = this.plugin.data.tasks.filter(t => !t.archivedAt && t[field] === col.name);
+      const tasks = this.plugin.data.tasks.filter(t => !t.archivedAt && t[field] === col.name && (field !== 'priority' || t.status !== 'Done'));
       const lane = board.createDiv('tp-lane ' + (field === 'priority' ? 'tp-priority-' : 'tp-') + col.key);
       lane.setAttribute('data-value', col.name);
       const head = lane.createDiv('tp-lane-head'); head.createEl('h3', { text: col.name }); head.createSpan({ text: String(tasks.length), cls: 'tp-count' });
