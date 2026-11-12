@@ -460,7 +460,13 @@ class PlannerView extends ItemView {
         if (id) void (field === 'priority' ? this.plugin.changePriority(id, col.name) : this.plugin.changeStatus(id, col.name));
       };
       if (!tasks.length) lane.createDiv({ text: 'Hier ist gerade Platz.', cls: 'tp-empty-lane' });
-      tasks.sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999')).forEach(t => this.renderCard(lane, t, false));
+      tasks.sort((a, b) => {
+        if (field === 'status') {
+          const priorityDifference = PRIORITIES.findIndex(p => p.name === b.priority) - PRIORITIES.findIndex(p => p.name === a.priority);
+          if (priorityDifference) return priorityDifference;
+        }
+        return (a.due || '9999').localeCompare(b.due || '9999');
+      }).forEach(t => this.renderCard(lane, t, false));
     }
   }
   bindDraft(input, key, initial = '') {

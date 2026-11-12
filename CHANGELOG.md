@@ -1,5 +1,13 @@
 # Änderungen
 
+## 1.5.3
+
+- Aufgaben innerhalb jeder Statusspalte sind nach Priorität sortiert: immediately, high, mid, low.
+- Bei gleicher Priorität entscheidet weiterhin das Fälligkeitsdatum, Aufgaben ohne Datum stehen dahinter.
+- Prioritätsänderungen und das Verschieben zwischen Statusspalten aktualisieren die Reihenfolge automatisch.
+
+Release-Assets: `main.js`, `manifest.json` und `styles.css` einzeln anhängen. Tag: **1.5.3**, Zielbranch: **main**.
+
 ## 1.5.2
 
 - Der Aufgabenrahmen wird beim Darüberfahren mit der Maus reinweiß (#ffffff), mit einem dezenten weißen Schein.
