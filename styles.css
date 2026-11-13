@@ -17,7 +17,6 @@
 .tp-symbol-mid { --tp-symbol-ink: #548bd1; }
 .tp-symbol-high { --tp-symbol-ink: #cf8b2e; }
 .tp-symbol-immediately { --tp-symbol-ink: #d8627d; }
-.tp-symbol-planner { --tp-symbol-ink: #379fae; }
 .tp-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
 .tp-head-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .tp-head-actions button { white-space: nowrap; }
@@ -37,9 +36,7 @@
 .tp-tabs .tp-tab { box-shadow: none; background: transparent; border: 1px solid transparent; color: var(--text-muted); border-radius: 8px; padding: 7px 14px; }
 .tp-tabs .tp-tab.is-active { color: var(--text-normal); background: var(--background-secondary); border-color: var(--background-modifier-border); font-weight: 650; box-shadow: 0 2px 4px rgba(0,0,0,.035); }
 .tp-body { flex: 1; min-height: 0; overflow: auto; padding: 2px 2px 14px; }
-.tp-board { display: grid; grid-template-columns: repeat(5,minmax(260px,1fr)); gap: 14px; align-items: start; }
-.tp-planner,.tp-priority-planner { --tp-tone: #8bb8c2; --tp-wash: rgba(62,158,174,.06); }
-.tp-lane.tp-planner,.tp-lane.tp-priority-planner { --tp-card-line: #8bb8c2; --tp-card-bright: #b8e4ed; --tp-card-glow: rgba(62,158,174,.17); }
+.tp-board { display: grid; grid-template-columns: repeat(4,minmax(260px,1fr)); gap: 14px; align-items: start; }
 .tp-board-group { margin-bottom: 32px; }
 .tp-board-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 14px; }
 .tp-board-heading h3 { margin: 0; font-size: 1.05em; font-weight: 650; }
@@ -202,7 +199,7 @@
 .tp-inline-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: 22px; }
 @media(max-width:800px) {
   .tp-root { padding: 16px !important; } .tp-kpis { grid-template-columns: repeat(2,minmax(130px,1fr)); }
-  .tp-dashboard-grid { grid-template-columns: 1fr; } .tp-board { grid-template-columns: repeat(5,270px); }
+  .tp-dashboard-grid { grid-template-columns: 1fr; } .tp-board { grid-template-columns: repeat(4,270px); }
   .tp-head h2 { font-size: 1.35em; } .tp-head>.mod-cta { white-space: nowrap; } .tp-head .tp-muted { font-size: .74em; } .tp-panel { padding: 16px; }
 }
 @media(prefers-reduced-motion:reduce) { .tp-root * { transition: none !important; } }

@@ -1,5 +1,13 @@
 # Änderungen
 
+## 1.7.1
+
+- Status und Priorität „Anpassungen Planner“ aus Boards, Auswahlfeldern, Filtern und Dashboard entfernt.
+- Bestehende Aufgaben, Vorlagen und Serien übernehmen stattdessen ToDo beziehungsweise low; Inhalte bleiben erhalten.
+- Beide Boards haben wieder vier Spalten.
+
+Release-Assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.7.1**.
+
 ## 1.7.0
 
 - Suche und kombinierbare Filter nach Status, Priorität, Termin und Projekt; Suche auch in Unteraufgaben, Arbeitsverlauf und wartenden Personen.

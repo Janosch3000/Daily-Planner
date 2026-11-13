@@ -4,13 +4,11 @@ const DAY = 86400000;
 const COLS = [
   { name: 'ToDo', key: 'open', icon: 'square', glyph: '☐' }, { name: 'In Progress', key: 'progress', icon: 'construction', glyph: '🚧' },
   { name: 'Waiting', key: 'waiting', icon: 'clock', glyph: '◷' },
-  { name: 'Done', key: 'done', icon: 'square-check', glyph: '☑' },
-  { name: 'Anpassungen Planner', key: 'planner', icon: 'sliders', glyph: '⚙' }
+  { name: 'Done', key: 'done', icon: 'square-check', glyph: '☑' }
 ];
 const PRIORITIES = [
   { name: 'low', key: 'low', icon: 'arrow-down', glyph: '↓', rank: 1 }, { name: 'mid', key: 'mid', icon: 'arrow-right', glyph: '→', rank: 2 },
-  { name: 'high', key: 'high', icon: 'arrow-up', glyph: '↑', rank: 3 }, { name: 'immediately', key: 'immediately', icon: 'arrows-up', glyph: '⇈', rank: 4 },
-  { name: 'Anpassungen Planner', key: 'planner', icon: 'sliders', glyph: '⚙', rank: 0 }
+  { name: 'high', key: 'high', icon: 'arrow-up', glyph: '↑', rank: 3 }, { name: 'immediately', key: 'immediately', icon: 'arrows-up', glyph: '⇈', rank: 4 }
 ];
 const LEGACY_STATUS = Object.freeze({
   'Offen': 'ToDo', 'In Bearbeitung': 'In Progress',
@@ -20,7 +18,6 @@ const copy = value => JSON.parse(JSON.stringify(value));
 const uid = () => Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 11);
 const stamp = value => typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
 const SYMBOLS = {
-  sliders: [['path', { d: 'M4 6h5m4 0h7M4 12h9m4 0h3M4 18h2m4 0h10' }], ['circle', { cx: 11, cy: 6, r: 2 }], ['circle', { cx: 15, cy: 12, r: 2 }], ['circle', { cx: 8, cy: 18, r: 2 }]],
   square: [['rect', { x: 4, y: 4, width: 16, height: 16, rx: 3 }]],
   'square-check': [['rect', { x: 4, y: 4, width: 16, height: 16, rx: 3 }], ['path', { d: 'M8 12l3 3 5-6' }]],
   clock: [['circle', { cx: 12, cy: 12, r: 9 }], ['path', { d: 'M12 7v5l3 2' }]],
@@ -173,7 +170,7 @@ function templateFields(source = {}) {
   const offset = source.dueInDays;
   return {
     title: String(source.title || ''), note: String(source.note || ''),
-    priority: PRIORITIES.some(p => p.name === source.priority) ? source.priority : 'mid',
+    priority: PRIORITIES.some(p => p.name === source.priority) ? source.priority : source.priority === 'Anpassungen Planner' ? 'low' : 'mid',
     status: COLS.some(c => c.name === source.status && c.name !== 'Done') ? source.status : 'ToDo',
     projectId: source.projectId || null, waitingFor: String(source.waitingFor || ''),
     followUpInDays: offsetDays(source.followUpInDays), repeat: repeatRule(source.repeat),
@@ -199,7 +196,7 @@ function normalize(raw, now = Date.now()) {
     const status = COLS.some(c => c.name === incomingStatus) ? incomingStatus : 'ToDo';
     return {
       ...t, id: String(t.id || uid()), title: String(t.title || 'Ohne Titel'), status,
-      priority: PRIORITIES.some(p => p.name === t.priority) ? t.priority : 'mid',
+      priority: PRIORITIES.some(p => p.name === t.priority) ? t.priority : t.priority === 'Anpassungen Planner' ? 'low' : 'mid',
       projectId: projectIds.has(t.projectId) ? t.projectId : null, waitingFor: String(t.waitingFor || ''), followUpDate: validDate(t.followUpDate),
       recurrenceId: t.recurrenceId ? String(t.recurrenceId) : null, occurrenceDate: validDate(t.occurrenceDate),
       due: dateKeyValid(t.due) ? t.due : '', note: String(t.note || ''),
