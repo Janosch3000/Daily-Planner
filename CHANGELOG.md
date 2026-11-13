@@ -1,5 +1,13 @@
 # Änderungen
 
+## 1.7.2
+
+- Aufgaben des Projekts „Anpassungen Planer“ nur in der Projektansicht anzeigen, einschließlich dessen Archiv.
+- Standardboards, Heute, allgemeines Archiv und Dashboard schließen diese Aufgaben aus; Projektfilter können die Ausnahme nicht umgehen.
+- Aufgaben bleiben unverändert gespeichert und nach einem Projektwechsel wieder regulär sichtbar.
+
+Release-Assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.7.2**.
+
 ## 1.7.1
 
 - Status und Priorität „Anpassungen Planner“ aus Boards, Auswahlfeldern, Filtern und Dashboard entfernt.

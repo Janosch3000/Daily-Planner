@@ -1,6 +1,6 @@
 # Tagesplaner für Obsidian
 
-Version **1.7.1** · Aufgaben- und Projektplanung mit Suche, Heute-Ansicht, wiederkehrenden Aufgaben, Erinnerungen, Unteraufgabenterminen, Vorlagen und Archiv.
+Version **1.7.2** · Aufgaben- und Projektplanung mit Suche, Heute-Ansicht, wiederkehrenden Aufgaben, Erinnerungen, Unteraufgabenterminen, Vorlagen und Archiv.
 
 ## Installation über BRAT
 
@@ -10,6 +10,10 @@ Version **1.7.1** · Aufgaben- und Projektplanung mit Suche, Heute-Ansicht, wied
 4. Über das Dashboard-Symbol in der linken Leiste oder den Befehl **Tagesplaner öffnen** starten.
 
 Für Updates in BRAT nach Plugin-Updates suchen. Danach den Tagesplaner deaktivieren und erneut aktivieren oder Obsidian neu starten. Das Plugin muss vorher nicht deinstalliert werden.
+
+## Projekt „Anpassungen Planer“
+
+Aufgaben dieses Projekts sind ausschließlich in der Projektansicht sichtbar, sowohl bei Auswahl des Projekts als auch unter „Alle Projekte“. Sie erscheinen nicht in den allgemeinen Status-/Prioritätenboards, Heute oder dem allgemeinen Archiv und werden nicht im allgemeinen Dashboard mitgezählt. Das Projektarchiv bleibt verfügbar. Die Zuordnung wird über den Projektnamen erkannt (unabhängig von Groß-/Kleinschreibung und zusätzlichen Leerzeichen). Ein Projektfilter in den allgemeinen Boards hebt die Ausnahme nicht auf. Ohne Projektzuordnung oder nach Zuordnung zu einem anderen Projekt erscheinen Aufgaben dort wieder. Erinnerungen und die automatische Archivierung bleiben aktiv.
 
 ## Suche und Filter
 
@@ -158,15 +162,15 @@ Erneut geöffnete Aufgaben zählen bis zu ihrem nächsten Abschluss nicht als er
 
 Vorhandene Aufgaben und Vorlagen aus früheren Versionen werden automatisch übernommen. Fehlende Prioritäten werden auf mid gesetzt. Die bisherigen Kategorien werden zugeordnet: Offen → ToDo, In Bearbeitung → In Progress, Warten auf Person und Delayed → Waiting, Fertig → Done. Vorhandene Abschlussdaten und Archivtimer bleiben dabei erhalten. Titel, Status, Fälligkeitsdatum und Beschreibung bleiben erhalten. Neue Felder werden ergänzt.
 
-Alte Aufgaben im Status Done besitzen noch kein gespeichertes Abschlussdatum. Für sie beginnt der Archivtimer beim ersten Laden von Version 1.7.1. Sie werden als vor dem Update erledigt gekennzeichnet und nicht rückwirkend in 7-/30-Tage-Statistiken eingerechnet.
+Alte Aufgaben im Status Done besitzen noch kein gespeichertes Abschlussdatum. Für sie beginnt der Archivtimer beim ersten Laden von Version 1.7.2. Sie werden als vor dem Update erledigt gekennzeichnet und nicht rückwirkend in 7-/30-Tage-Statistiken eingerechnet.
 
 Alle Daten liegen lokal in `<Vault>/.obsidian/plugins/tagesplaner/data.json`; das Archiv ist Teil dieser Datei. Persönliche Aufgaben gehören nicht ins öffentliche GitHub-Repository. Vor einem späteren Downgrade auf eine ältere Plugin-Version die Datei sichern: Ältere Versionen kennen die neuen Kategorien beziehungsweise das neue Datenformat nicht.
 
-## Release 1.7.1 erstellen
+## Release 1.7.2 erstellen
 
 Repository: https://github.com/Janosch3000/Daily-Planner
 
-1. Ein neues Release mit neuem Tag **1.7.1**, Ziel **main**, Titel **Tagesplaner 1.7.1** erstellen.
+1. Ein neues Release mit neuem Tag **1.7.2**, Ziel **main**, Titel **Tagesplaner 1.7.2** erstellen.
 2. Die aktuellen Dateien **main.js**, **manifest.json** und **styles.css** aus dieser Version als drei einzelne Assets anhängen.
 3. Die Notizen aus `CHANGELOG.md` verwenden und das Release veröffentlichen. Nicht als Pre-release markieren, wenn BRAT es regulär als neueste Version beziehen soll.
 
@@ -176,4 +180,4 @@ Die Plugin-ID `tagesplaner` bleibt unverändert, damit BRAT vorhandene Installat
 
 ## Grenzen dieser Version
 
-Die Full-Calendar-Anbindung, das automatische Verschieben alter Fälligkeiten auf den nächsten Tag und eine Zeiterfassung sind nicht Bestandteil von 1.7.1. Überfällige Aufgaben bleiben in Heute sichtbar; wiederkehrende Aufgaben werden als neue Vorkommen erstellt. Das Archiv arbeitet mit abgeschlossenen Aufgaben und läuft, während das Plugin in Obsidian geladen ist.
+Die Full-Calendar-Anbindung, das automatische Verschieben alter Fälligkeiten auf den nächsten Tag und eine Zeiterfassung sind nicht Bestandteil von 1.7.2. Überfällige Aufgaben bleiben in Heute sichtbar; wiederkehrende Aufgaben werden als neue Vorkommen erstellt. Das Archiv arbeitet mit abgeschlossenen Aufgaben und läuft, während das Plugin in Obsidian geladen ist.

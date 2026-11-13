@@ -166,6 +166,10 @@ function taskMatches(task, filters, data, now = Date.now()) {
   if (filters.due === 'none' && dates.length) return false;
   return true;
 }
+function projectOnlyTask(data, task) {
+  const project = data.projects.find(p => p.id === task.projectId);
+  return !!project && project.name.trim().replace(/\s+/g, ' ').toLocaleLowerCase() === 'anpassungen planer';
+}
 function templateFields(source = {}) {
   const offset = source.dueInDays;
   return {
@@ -720,7 +724,7 @@ class PlannerView extends ItemView {
   }
   visibleTasks(scope = null, archived = false) {
     const filters = { ...this.filters, project: scope == null ? this.filters.project : scope };
-    return this.plugin.data.tasks.filter(t => !!t.archivedAt === archived && taskMatches(t, filters, this.plugin.data));
+    return this.plugin.data.tasks.filter(t => !!t.archivedAt === archived && (scope != null || !projectOnlyTask(this.plugin.data, t)) && taskMatches(t, filters, this.plugin.data));
   }
   renderToday(parent) {
     const head = parent.createDiv('tp-page-heading'), title = head.createDiv(); title.createEl('h3', { text: 'Heute · ' + new Date().toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long' }) });
@@ -729,7 +733,7 @@ class PlannerView extends ItemView {
     const filters = parent.createDiv(), target = parent.createDiv();
     const draw = () => {
       target.empty(); this.draftInputs = new Map(); this.draftControls = new Map(); const today = dayKey();
-      const filtered = new Set(this.plugin.data.tasks.filter(t => taskMatches(t, { ...this.filters, due: 'all' }, this.plugin.data)).map(t => t.id));
+      const filtered = new Set(this.plugin.data.tasks.filter(t => !projectOnlyTask(this.plugin.data, t) && taskMatches(t, { ...this.filters, due: 'all' }, this.plugin.data)).map(t => t.id));
       const entries = attentionEntries(this.plugin.data).filter(e => e.date <= today && filtered.has(e.task.id));
       const tasks = new Map(); entries.forEach(e => { if (!tasks.has(e.task.id)) tasks.set(e.task.id, { task: e.task, reasons: [] }); tasks.get(e.task.id).reasons.push(e); });
       const summary = target.createDiv('tp-brief-stats'); summary.createSpan({ text: tasks.size + ' Aufgaben' }); summary.createSpan({ text: entries.filter(e => e.kind === 'subtask').length + ' fällige Unteraufgaben' }); summary.createSpan({ text: entries.filter(e => e.kind === 'followup').length + ' Nachfragen' });
@@ -950,14 +954,15 @@ class PlannerView extends ItemView {
     const grid = parent.createDiv('tp-archive-grid');
     const draw = () => {
       grid.empty(); const q = this.archiveSearch.toLocaleLowerCase();
-      const tasks = this.plugin.data.tasks.filter(t => t.archivedAt && [t.title, t.note, ...t.worklog.map(e => e.text), ...t.subtasks.map(s => s.title)].join(' ').toLocaleLowerCase().includes(q));
+      const tasks = this.plugin.data.tasks.filter(t => !projectOnlyTask(this.plugin.data, t) && t.archivedAt && [t.title, t.note, ...t.worklog.map(e => e.text), ...t.subtasks.map(s => s.title)].join(' ').toLocaleLowerCase().includes(q));
       tasks.sort((a, b) => b.archivedAt - a.archivedAt).forEach(t => this.renderCard(grid, t, true));
       if (!tasks.length) grid.createDiv({ text: q ? 'Keine passenden Aufgaben gefunden.' : 'Noch keine archivierten Aufgaben. Fertige Aufgaben erscheinen nach 24 Stunden hier.', cls: 'tp-empty' });
     };
     input.oninput = () => { this.archiveSearch = input.value; draw(); }; draw();
   }
   renderDashboard(parent) {
-    const m = metrics(this.plugin.data), intro = parent.createDiv('tp-dashboard-intro'); intro.createEl('h3', { text: 'Deine Woche im Blick' });
+    const data = { ...this.plugin.data, tasks: this.plugin.data.tasks.filter(t => !projectOnlyTask(this.plugin.data, t)) };
+    const m = metrics(data), intro = parent.createDiv('tp-dashboard-intro'); intro.createEl('h3', { text: 'Deine Woche im Blick' });
     intro.createDiv({ text: new Date().toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long' }), cls: 'tp-muted' });
     const kpis = parent.createDiv('tp-kpis');
     const metric = (label, value, hint, tone = '', symbol = COLS[0]) => {
@@ -983,8 +988,8 @@ class PlannerView extends ItemView {
     activity.createDiv({ text: 'Archivierte Aufgaben zählen weiterhin mit. Wieder geöffnete Aufgaben zählen erst nach erneutem Abschluss. Alte Aufgaben ohne Abschlussdatum sind im Zeitdiagramm nicht enthalten.', cls: 'tp-help' });
     const distribution = panel('Verteilung auf die Kategorien');
     for (const col of COLS) {
-      const count = this.plugin.data.tasks.filter(t => !t.archivedAt && t.status === col.name).length, row = distribution.createDiv('tp-distribution tp-' + col.key);
-      symbolLabel(row, col); row.createSpan({ text: String(count), cls: 'tp-count' }); progress(row, count / Math.max(1, this.plugin.data.tasks.filter(t => !t.archivedAt).length) * 100, col.name);
+      const count = data.tasks.filter(t => !t.archivedAt && t.status === col.name).length, row = distribution.createDiv('tp-distribution tp-' + col.key);
+      symbolLabel(row, col); row.createSpan({ text: String(count), cls: 'tp-count' }); progress(row, count / Math.max(1, data.tasks.filter(t => !t.archivedAt).length) * 100, col.name);
     }
     const due = panel('Als Nächstes · Fälligkeit'), upcoming = m.active.filter(t => t.due && t.due <= dayKey(shiftDay(Date.now(), 7))).sort((a, b) => a.due.localeCompare(b.due));
     for (const t of upcoming.slice(0, 6)) {
