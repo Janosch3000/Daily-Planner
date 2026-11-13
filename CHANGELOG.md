@@ -1,5 +1,15 @@
 # Änderungen
 
+## 1.6.0
+
+- Anpassungen Planner als neuen Status und als zusätzliche Priorität ergänzt.
+- Verfügbar in beiden Boards, Auswahlfeldern, Aufgaben- und Vorlageneditor sowie im Dashboard.
+- Türkise Gestaltung mit Einstellregler-Symbol und weißem Hover-Rahmen.
+- Die Priorität Anpassungen Planner folgt in der Statussortierung auf low.
+- Bestehende Aufgaben und Prioritäten bleiben erhalten; die Done-Regeln gelten weiterhin.
+
+Release-Assets: `main.js`, `manifest.json` und `styles.css` einzeln anhängen. Tag: **1.6.0**, Zielbranch: **main**.
+
 ## 1.5.3
 
 - Aufgaben innerhalb jeder Statusspalte sind nach Priorität sortiert: immediately, high, mid, low.

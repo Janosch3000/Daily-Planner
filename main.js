@@ -3,11 +3,14 @@ const VIEW = 'tagesplaner-view';
 const DAY = 86400000;
 const COLS = [
   { name: 'ToDo', key: 'open', icon: 'square', glyph: '☐' }, { name: 'In Progress', key: 'progress', icon: 'construction', glyph: '🚧' },
-  { name: 'Waiting', key: 'waiting', icon: 'clock', glyph: '◷' }, { name: 'Done', key: 'done', icon: 'square-check', glyph: '☑' }
+  { name: 'Waiting', key: 'waiting', icon: 'clock', glyph: '◷' },
+  { name: 'Anpassungen Planner', key: 'planner', icon: 'sliders', glyph: '⚙' },
+  { name: 'Done', key: 'done', icon: 'square-check', glyph: '☑' }
 ];
 const PRIORITIES = [
-  { name: 'low', key: 'low', icon: 'arrow-down', glyph: '↓' }, { name: 'mid', key: 'mid', icon: 'arrow-right', glyph: '→' },
-  { name: 'high', key: 'high', icon: 'arrow-up', glyph: '↑' }, { name: 'immediately', key: 'immediately', icon: 'arrows-up', glyph: '⇈' }
+  { name: 'low', key: 'low', icon: 'arrow-down', glyph: '↓', rank: 1 }, { name: 'mid', key: 'mid', icon: 'arrow-right', glyph: '→', rank: 2 },
+  { name: 'high', key: 'high', icon: 'arrow-up', glyph: '↑', rank: 3 }, { name: 'immediately', key: 'immediately', icon: 'arrows-up', glyph: '⇈', rank: 4 },
+  { name: 'Anpassungen Planner', key: 'planner', icon: 'sliders', glyph: '⚙', rank: 0 }
 ];
 const LEGACY_STATUS = Object.freeze({
   'Offen': 'ToDo', 'In Bearbeitung': 'In Progress',
@@ -17,6 +20,7 @@ const copy = value => JSON.parse(JSON.stringify(value));
 const uid = () => Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 11);
 const stamp = value => typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
 const SYMBOLS = {
+  sliders: [['path', { d: 'M4 6h5m4 0h7M4 12h9m4 0h3M4 18h2m4 0h10' }], ['circle', { cx: 11, cy: 6, r: 2 }], ['circle', { cx: 15, cy: 12, r: 2 }], ['circle', { cx: 8, cy: 18, r: 2 }]],
   square: [['rect', { x: 4, y: 4, width: 16, height: 16, rx: 3 }]],
   'square-check': [['rect', { x: 4, y: 4, width: 16, height: 16, rx: 3 }], ['path', { d: 'M8 12l3 3 5-6' }]],
   clock: [['circle', { cx: 12, cy: 12, r: 9 }], ['path', { d: 'M12 7v5l3 2' }]],
@@ -63,7 +67,7 @@ function templateFields(source = {}) {
   return {
     title: String(source.title || ''), note: String(source.note || ''),
     priority: PRIORITIES.some(p => p.name === source.priority) ? source.priority : 'mid',
-    status: ['ToDo', 'In Progress', 'Waiting'].includes(source.status) ? source.status : 'ToDo',
+    status: COLS.some(c => c.name === source.status && c.name !== 'Done') ? source.status : 'ToDo',
     dueInDays: offset !== null && offset !== undefined && offset !== '' && Number.isInteger(Number(offset)) && Number(offset) >= 0 && Number(offset) <= 3650 ? Number(offset) : null,
     subtasks: Array.isArray(source.subtasks) ? source.subtasks.map(s => ({ title: String(s.title || '').trim() })).filter(s => s.title) : []
   };
@@ -462,7 +466,7 @@ class PlannerView extends ItemView {
       if (!tasks.length) lane.createDiv({ text: 'Hier ist gerade Platz.', cls: 'tp-empty-lane' });
       tasks.sort((a, b) => {
         if (field === 'status') {
-          const priorityDifference = PRIORITIES.findIndex(p => p.name === b.priority) - PRIORITIES.findIndex(p => p.name === a.priority);
+          const priorityDifference = (PRIORITIES.find(p => p.name === b.priority)?.rank ?? 2) - (PRIORITIES.find(p => p.name === a.priority)?.rank ?? 2);
           if (priorityDifference) return priorityDifference;
         }
         return (a.due || '9999').localeCompare(b.due || '9999');
@@ -598,8 +602,8 @@ class PlannerView extends ItemView {
     };
     metric('Offene Aufgaben', m.active.length, 'Alle noch nicht fertigen Aufgaben'); metric('In Progress', m.inProgress.length, 'Aktuell im Fokus', 'tp-progress', COLS[1]);
     metric('Heute fällig', m.dueToday.length, 'Noch zu erledigen', '', COLS[2]); metric('Überfällig', m.overdue.length, 'Fälligkeit bereits überschritten', m.overdue.length ? 'tp-risk' : '', PRIORITIES[3]);
-    metric('Erledigt · 7 Tage', m.done7, 'Heute und die letzten 6 Tage', 'tp-done', COLS[3]); metric('Erledigt · 30 Tage', m.done30, 'Inklusive archivierter Aufgaben', 'tp-done', COLS[3]);
-    metric('Waiting', m.waiting.length, 'Braucht eventuell Unterstützung', 'tp-waiting', COLS[2]); metric('Unteraufgaben', m.subtasksDone + '/' + m.subtasks, 'Erledigt / gesamt, inklusive Archiv', '', COLS[3]);
+    metric('Erledigt · 7 Tage', m.done7, 'Heute und die letzten 6 Tage', 'tp-done', COLS.find(c => c.name === 'Done')); metric('Erledigt · 30 Tage', m.done30, 'Inklusive archivierter Aufgaben', 'tp-done', COLS.find(c => c.name === 'Done'));
+    metric('Waiting', m.waiting.length, 'Braucht eventuell Unterstützung', 'tp-waiting', COLS[2]); metric('Unteraufgaben', m.subtasksDone + '/' + m.subtasks, 'Erledigt / gesamt, inklusive Archiv', '', COLS.find(c => c.name === 'Done'));
     const grid = parent.createDiv('tp-dashboard-grid');
     const panel = title => { const box = grid.createDiv('tp-panel'); box.createEl('h4', { text: title }); return box; };
     const priorities = panel('Offene Aufgaben nach Priorität');

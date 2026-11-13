@@ -1,6 +1,6 @@
 # Tagesplaner für Obsidian
 
-Version **1.5.3** · Synchronisierte Status- und Prioritätenboards mit Aufgabenvorlagen, bearbeitbaren Beschreibungen, Dashboard, Unteraufgaben, Arbeitsverlauf und Archiv.
+Version **1.6.0** · Synchronisierte Status- und Prioritätenboards mit Aufgabenvorlagen, bearbeitbaren Beschreibungen, Dashboard, Unteraufgaben, Arbeitsverlauf und Archiv.
 
 ## Installation über BRAT
 
@@ -15,7 +15,7 @@ Für Updates in BRAT nach Plugin-Updates suchen. Danach den Tagesplaner deaktivi
 
 - **+ Aufgabe** öffnet einen Obsidian-Dialog für Titel, Priorität, Status, Fälligkeitsdatum, Beschreibung und Unteraufgaben.
 - **Bearbeiten** ändert diese Angaben später. Über **Beschreibung bearbeiten** direkt auf jeder Karte lässt sich eine Beschreibung außerdem jederzeit ergänzen, ändern oder leeren; mit **Beschreibung speichern** übernehmen. Das funktioniert im Statusboard und in der Prioritätenübersicht identisch.
-- Kategorien in dieser Reihenfolge: **ToDo**, **In Progress**, **Waiting**, **Done**. Innerhalb jeder Statusspalte stehen Aufgaben nach Priorität: **immediately → high → mid → low**. Bei gleicher Priorität kommt das frühere Fälligkeitsdatum zuerst; Aufgaben ohne Datum folgen danach.
+- Kategorien in dieser Reihenfolge: **ToDo**, **In Progress**, **Waiting**, **Anpassungen Planner**, **Done**. Innerhalb jeder Statusspalte stehen Aufgaben nach Priorität: **immediately → high → mid → low → Anpassungen Planner**. Bei gleicher Priorität kommt das frühere Fälligkeitsdatum zuerst; Aufgaben ohne Datum folgen danach.
 - Zum Verschieben den Kartentitel ziehen oder die Status-Auswahl verwenden. Die Status-Auswahl funktioniert auch ohne Maus.
 - Innerhalb einer Karte neue Unteraufgaben eingeben und mit **+** oder Enter hinzufügen. Häkchen speichern den Fortschritt, **×** entfernt eine Unteraufgabe.
 - Der übergeordnete Status wird bewusst manuell gesetzt. Erledigte Unteraufgaben setzen die Hauptaufgabe nicht automatisch auf Done.
@@ -29,7 +29,7 @@ Für Updates in BRAT nach Plugin-Updates suchen. Danach den Tagesplaner deaktivi
 Oben neben **+ Aufgabe** steht **+ Vorlage**. Der Knopf öffnet einen taskähnlichen Editor mit:
 
 - einem eindeutigen **Namen der Vorlage** und einem optionalen Aufgabentitel;
-- Priorität, Startstatus (ToDo, In Progress oder Waiting), Beschreibung;
+- Priorität, Startstatus (ToDo, In Progress, Waiting oder Anpassungen Planner), Beschreibung;
 - Unteraufgaben, die für neue Aufgaben jeweils offen beginnen;
 - einer optionalen relativen Fälligkeit in Kalendertagen nach Erstellung: 0 = heute, 2 = zwei Tage später. Leer bedeutet ohne Fälligkeit; möglich sind 0 bis 3650 Tage.
 
@@ -57,7 +57,7 @@ Vorlagen werden lokal zusammen mit den Aufgaben in data.json gespeichert. Besteh
 
 ## Aufgaben: Status und Prioritäten
 
-Unter dem gemeinsamen Hauptreiter **Aufgaben** stehen die zwei zusammengefassten Unterreiter **Status** und **Prioritäten**. Sie wechseln zwischen dem Statusboard und dem Prioritätenboard; Dashboard, Vorlagenverwaltung und Archiv bleiben eigenständige Hauptreiter. Die Prioritäten heißen **low**, **mid**, **high** und **immediately**, mit dezenten Farbtönen Grün, Blau, Bernstein und Rosé.
+Unter dem gemeinsamen Hauptreiter **Aufgaben** stehen die zwei zusammengefassten Unterreiter **Status** und **Prioritäten**. Sie wechseln zwischen dem Statusboard und dem Prioritätenboard; Dashboard, Vorlagenverwaltung und Archiv bleiben eigenständige Hauptreiter. Die Prioritäten heißen **low**, **mid**, **high**, **immediately** und **Anpassungen Planner**, mit dezenten Farbtönen Grün, Blau, Bernstein, Rosé und Türkis.
 
 Eine Aufgabe besitzt einen Status und eine Priorität. Beide Übersichten zeigen dieselbe gespeicherte Aufgabe, keine unabhängigen Kopien. Änderungen an Titel, Beschreibung, Fälligkeit, Status, Priorität, Unteraufgaben und Arbeitsverlauf erscheinen in beiden Übersichten.
 
@@ -66,7 +66,7 @@ Eine Aufgabe besitzt einen Status und eine Priorität. Beide Übersichten zeigen
 - Das Ziehen in eine Statusspalte ändert nur den Status; die Priorität bleibt erhalten.
 - Die farbigen Tags und die Position in der Prioritätenübersicht stimmen immer mit der gespeicherten Priorität überein.
 - Neue Aufgaben und bestehende Aufgaben ohne Priorität beginnen mit **mid**.
-- Im Statusboard erscheinen alle nicht archivierten Aufgaben. Die Prioritätenübersicht zeigt nur Aufgaben in ToDo, In Progress oder Waiting. Beim Wechsel zu Done verschwindet eine Aufgabe sofort aus der Prioritätenübersicht, bleibt aber bis zur Archivierung in der Done-Spalte. Beim Zurückverschieben aus Done erscheint sie wieder in ihrer bisherigen Prioritätsspalte. Auch das Wiederherstellen aus dem Archiv bringt sie mit derselben Priorität zurück.
+- Im Statusboard erscheinen alle nicht archivierten Aufgaben. Die Prioritätenübersicht zeigt nur Aufgaben in ToDo, In Progress, Waiting oder Anpassungen Planner. Beim Wechsel zu Done verschwindet eine Aufgabe sofort aus der Prioritätenübersicht, bleibt aber bis zur Archivierung in der Done-Spalte. Beim Zurückverschieben aus Done erscheint sie wieder in ihrer bisherigen Prioritätsspalte. Auch das Wiederherstellen aus dem Archiv bringt sie mit derselben Priorität zurück.
 - Textentwürfe für Beschreibungen, Unteraufgaben und Arbeitsschritte werden innerhalb der geöffneten Ansicht zwischen beiden Darstellungen synchronisiert. Erst Speichern legt sie dauerhaft ab. Scrollpositionen bleiben bei Änderungen erhalten.
 
 ## Symbole und Gestaltung
@@ -82,6 +82,8 @@ Bei den Prioritäten stehen Pfeile für die Dringlichkeit: **low ↓**, **mid �
 
 Aufwandseingabe, Stundenanzeigen, Wochenkapazität und die daraus berechnete Auslastung sind in dieser Version aus der Oberfläche entfernt. Das Dashboard konzentriert sich auf Aufgaben, Prioritäten, Fälligkeiten, Unteraufgaben und Abschlüsse.
 
+Die zusätzliche Kategorie **Anpassungen Planner** steht sowohl als Status als auch als Priorität zur Verfügung – einschließlich Auswahlfeldern, Drag-and-drop, Vorlagen und Dashboard. Beide Felder sind unabhängig: Eine Aufgabe kann zum Beispiel den Status Anpassungen Planner und die Priorität high haben. Die neue Kategorie ist türkis mit einem Einstellregler-Symbol gestaltet. In der Statussortierung folgt die neue Priorität auf low. Nur Done löst die automatische Archivierung aus.
+
 ## Archiv
 
 Aufgaben wechseln **24 Stunden nach dem Setzen auf Done** automatisch ins Archiv. Das Plugin prüft jede Minute, beim Laden und beim Öffnen der Ansicht. War Obsidian geschlossen, wird die Archivierung beim nächsten Start nachgeholt.
@@ -95,7 +97,7 @@ Das Archiv ist nach Titel, Beschreibung, Unteraufgaben und Arbeitsverlauf durchs
 - Aufgaben in Waiting sowie erledigte Unteraufgaben im Verhältnis zur Gesamtzahl.
 - Verteilung auf die Kategorien und Abschlussdiagramm der letzten 7 Tage.
 - Bevorstehende Fälligkeiten, zuletzt abgeschlossene Aufgaben und letzte dokumentierte Arbeitsschritte.
-- Verteilung der offenen Aufgaben auf die vier Prioritäten.
+- Verteilung der offenen Aufgaben auf die fünf Prioritäten.
 
 Erneut geöffnete Aufgaben zählen bis zu ihrem nächsten Abschluss nicht als erledigt. Die Statistik verwendet den letzten Abschluss der aktuell fertigen Aufgaben und zählt dieselbe Aufgabe nicht mehrfach.
 
@@ -103,15 +105,15 @@ Erneut geöffnete Aufgaben zählen bis zu ihrem nächsten Abschluss nicht als er
 
 Vorhandene Aufgaben und Vorlagen aus früheren Versionen werden automatisch übernommen. Fehlende Prioritäten werden auf mid gesetzt. Die bisherigen Kategorien werden zugeordnet: Offen → ToDo, In Bearbeitung → In Progress, Warten auf Person und Delayed → Waiting, Fertig → Done. Vorhandene Abschlussdaten und Archivtimer bleiben dabei erhalten. Titel, Status, Fälligkeitsdatum und Beschreibung bleiben erhalten. Neue Felder werden ergänzt.
 
-Alte Aufgaben im Status Done besitzen noch kein gespeichertes Abschlussdatum. Für sie beginnt der Archivtimer beim ersten Laden von Version 1.5.3. Sie werden als vor dem Update erledigt gekennzeichnet und nicht rückwirkend in 7-/30-Tage-Statistiken eingerechnet.
+Alte Aufgaben im Status Done besitzen noch kein gespeichertes Abschlussdatum. Für sie beginnt der Archivtimer beim ersten Laden von Version 1.6.0. Sie werden als vor dem Update erledigt gekennzeichnet und nicht rückwirkend in 7-/30-Tage-Statistiken eingerechnet.
 
 Alle Daten liegen lokal in `<Vault>/.obsidian/plugins/tagesplaner/data.json`; das Archiv ist Teil dieser Datei. Persönliche Aufgaben gehören nicht ins öffentliche GitHub-Repository. Vor einem späteren Downgrade auf eine ältere Plugin-Version die Datei sichern: Ältere Versionen kennen die neuen Kategorien beziehungsweise das neue Datenformat nicht.
 
-## Release 1.5.3 erstellen
+## Release 1.6.0 erstellen
 
 Repository: https://github.com/Janosch3000/Daily-Planner
 
-1. Ein neues Release mit neuem Tag **1.5.3**, Ziel **main**, Titel **Tagesplaner 1.5.3** erstellen.
+1. Ein neues Release mit neuem Tag **1.6.0**, Ziel **main**, Titel **Tagesplaner 1.6.0** erstellen.
 2. Die aktuellen Dateien **main.js**, **manifest.json** und **styles.css** aus dieser Version als drei einzelne Assets anhängen.
 3. Die Notizen aus `CHANGELOG.md` verwenden und das Release veröffentlichen. Nicht als Pre-release markieren, wenn BRAT es regulär als neueste Version beziehen soll.
 
@@ -121,4 +123,4 @@ Die Plugin-ID `tagesplaner` bleibt unverändert, damit BRAT vorhandene Installat
 
 ## Grenzen dieser Version
 
-Die Full-Calendar-Anbindung, die tägliche Übertragung unerledigter Aufgaben und eine Zeiterfassung sind nicht Bestandteil von 1.5.3. Das Archiv arbeitet mit abgeschlossenen Aufgaben und läuft, während das Plugin in Obsidian geladen ist.
+Die Full-Calendar-Anbindung, die tägliche Übertragung unerledigter Aufgaben und eine Zeiterfassung sind nicht Bestandteil von 1.6.0. Das Archiv arbeitet mit abgeschlossenen Aufgaben und läuft, während das Plugin in Obsidian geladen ist.
