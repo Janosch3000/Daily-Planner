@@ -151,6 +151,36 @@
 .tp-field { display: flex; flex-direction: column; gap: 7px; margin: 16px 0; font-size: .88em; color: var(--text-muted); }
 .tp-field input,.tp-field textarea { width: 100%; }
 .tp-field select { width: 100%; }
+.tp-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 20px; padding: 12px; border: 1px solid var(--background-modifier-border); border-radius: 10px; background: var(--background-secondary); }
+.tp-filters>input { flex: 1 1 260px; min-width: 180px; font-size: .85em; }
+.tp-filters>select { flex: 0 1 auto; min-width: 120px; max-width: 100%; font-size: .78em; }
+.tp-page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin: 0 0 20px; flex-wrap: wrap; }
+.tp-page-heading h3 { margin: 0 0 8px; font-size: 1.1em; }
+.tp-page-heading .tp-inline-actions { margin-top: 0; }
+.tp-brief-stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 20px; }
+.tp-brief-stats>span { font-size: .82em; background: var(--background-secondary); border: 1px solid var(--background-modifier-border); border-radius: 7px; padding: 7px 12px; }
+.tp-list-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(min(100%,290px),1fr)); gap: 16px; align-items: start; }
+.tp-list-heading { font-size: 1em; margin: 24px 0 14px; }
+.tp-attention-item .tp-card { margin: 0; --tp-card-line: var(--background-modifier-border); }
+.tp-attention-reasons { padding: 8px 12px; font-size: .77em; line-height: 1.65; color: var(--text-muted); background: var(--background-secondary); border-radius: 8px 8px 0 0; }
+.tp-attention-overdue { color: var(--text-error); }
+.tp-project-picker { width: min(100%,420px); margin-bottom: 10px; }
+.tp-project-badge { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.tp-project-archive { margin-top: 24px; border-top: 1px solid var(--background-modifier-border); padding-top: 16px; }
+.tp-project-archive>summary { font-size: .85em; color: var(--text-muted); cursor: pointer; margin-bottom: 14px; }
+.tp-waiting-fields { padding: 0 14px 6px; border: 1px solid var(--background-modifier-border); background: rgba(147,112,181,.05); border-radius: 9px; margin-top: 14px; }
+.tp-waiting-card { padding: 10px; margin: 12px 0; border-radius: 7px; background: rgba(147,112,181,.055); }
+.tp-waiting-card .tp-section-title { margin-bottom: 4px; }
+.tp-reminder-toggle { display: flex; align-items: center; gap: 8px; }
+.tp-series-list { max-height: 60vh; overflow-y: auto; margin: 16px 0; }
+.tp-series-row { padding: 14px; margin-bottom: 12px; border: 1px solid var(--background-modifier-border); border-radius: 9px; }
+.tp-series-row h3 { margin: 0 0 8px; font-size: .95em; }
+.tp-series-row .tp-inline-actions { justify-content: flex-start; margin-top: 12px; }
+.tp-modal-subtask { flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--background-modifier-border); }
+.tp-modal-subtask .tp-subtask-date { flex: 0 1 155px; min-width: 115px; max-width: 100%; font-size: .8em; }
+.tp-subtask { flex-wrap: wrap; }
+.tp-subtask-card-date { flex: 0 1 125px; max-width: 135px; min-width: 105px; height: 26px; padding: 2px 4px!important; font-size: .7em!important; }
+.tp-subtask label { flex-basis: 105px; }
 .tp-modal { max-height: 75vh; overflow-y: auto; padding-right: 4px; }
 .tp-modal-subtasks { margin: 22px 0; }
 .tp-modal-subtasks h3 { font-size: .95em; margin: 0 0 12px; }

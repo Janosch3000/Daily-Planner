@@ -1,5 +1,20 @@
 # Änderungen
 
+## 1.7.0
+
+- Suche und kombinierbare Filter nach Status, Priorität, Termin und Projekt; Suche auch in Unteraufgaben, Arbeitsverlauf und wartenden Personen.
+- Neue Heute-Ansicht für heute fällige und überfällige Aufgaben, Unteraufgaben und Nachfragen, ohne doppelte Aufgabenkarten.
+- Tägliche, wöchentliche und monatliche Serien mit frei wählbarem Intervall, korrekten Monatsenden, Offline-Nachholen und Schutz vor Duplikaten.
+- Wiederholungen auch über Vorlagen starten; Serien unter Heute verwalten und pausieren oder fortsetzen.
+- Konfigurierbare Erinnerungen in Obsidian mit Vorlauf und täglicher Begrenzung. Keine Hintergrundbenachrichtigungen bei geschlossenem Obsidian.
+- Eigene Termine für Unteraufgaben, in Dialog und Karte bearbeitbar. Relative Unteraufgabentermine in Vorlagen.
+- Waiting mit Person/Team und Nachfragedatum; Nachfragen sind in Heute und Erinnerungen integriert.
+- Neue Projektansicht mit Auswahl, Status-/Prioritätenboards, Fortschritt, Archiv und Projektverwaltung.
+- Aufgaben und Vorlagen können Projekten zugeordnet werden oder ausdrücklich ohne Projekt bleiben. Das Entfernen eines Projekts löscht keine Aufgaben.
+- Bestehende Aufgaben, Vorlagen, Arbeitsverläufe, Symbolfarben, weiße Hover-Rahmen und die Prioritätssortierung bleiben erhalten.
+
+Release-Assets: `main.js`, `manifest.json` und `styles.css` einzeln anhängen. Tag: **1.7.0**, Zielbranch: **main**.
+
 ## 1.6.1
 
 - Statusspalten umgeordnet: ToDo, In Progress, Waiting, Done, Anpassungen Planner.

@@ -1,6 +1,6 @@
 # Tagesplaner für Obsidian
 
-Version **1.6.1** · Synchronisierte Status- und Prioritätenboards mit Aufgabenvorlagen, bearbeitbaren Beschreibungen, Dashboard, Unteraufgaben, Arbeitsverlauf und Archiv.
+Version **1.7.0** · Aufgaben- und Projektplanung mit Suche, Heute-Ansicht, wiederkehrenden Aufgaben, Erinnerungen, Unteraufgabenterminen, Vorlagen und Archiv.
 
 ## Installation über BRAT
 
@@ -11,9 +11,62 @@ Version **1.6.1** · Synchronisierte Status- und Prioritätenboards mit Aufgaben
 
 Für Updates in BRAT nach Plugin-Updates suchen. Danach den Tagesplaner deaktivieren und erneut aktivieren oder Obsidian neu starten. Das Plugin muss vorher nicht deinstalliert werden.
 
+## Suche und Filter
+
+Über den Aufgabenboards lassen sich Suchtext und Filter für Status, Priorität, Fälligkeit und Projekt kombinieren. Die Suche berücksichtigt Titel, Beschreibung, Unteraufgaben, Arbeitsverlauf, die wartende Person und Projektnamen. Mehrere Suchwörter müssen alle vorkommen, dürfen aber in unterschiedlichen Feldern stehen. Groß- und Kleinschreibung spielt keine Rolle.
+
+Terminfilter: heute, überfällig, nächste 7 Tage oder ohne Termin. Neben der Hauptfälligkeit werden offene Unteraufgabentermine und bei Waiting das Nachfragedatum berücksichtigt. **Filter zurücksetzen** hebt die Einschränkungen auf. Die Eingaben bleiben beim Wechsel zwischen den Aufgabenansichten erhalten.
+
+## Heute und Erinnerungen
+
+Der neue Hauptreiter **Heute** zeigt Aufgaben, deren eigene Fälligkeit, offene Unteraufgabe oder Nachfrage heute oder früher fällig ist. Überfällige Einträge stehen zuerst. Jede Aufgabe erscheint nur einmal, mit einer Liste der Gründe für ihre Anzeige. Erledigte Aufgaben und bereits abgehakte Unteraufgaben erzeugen keine offenen Fälligkeiten.
+
+Unter **Heute → Erinnerungen** lassen sich die Obsidian-Hinweise aktivieren oder abschalten und ein Vorlauf von 0, 1, 3 oder 7 Tagen einstellen. Anfangs sind sie mit einem Tag Vorlauf aktiv. Automatische Erinnerungen erscheinen beim Laden beziehungsweise Öffnen des Planners und bei neuen Fälligkeiten während der minütlichen Prüfung. Jede Fälligkeit wird höchstens einmal pro Kalendertag automatisch gemeldet; dieser Zustand bleibt auch nach einem Neustart erhalten. **Jetzt prüfen** darf ausdrücklich erneut erinnern.
+
+Die Hinweise berücksichtigen Aufgaben, Unteraufgaben und Nachfragen. Vorab gemeldete zukünftige Termine lassen sich über die Aufgabenfilter finden; die Heute-Ansicht bleibt auf heute und überfällige Einträge beschränkt. Es handelt sich um Hinweise innerhalb von Obsidian. Bei geschlossenem Obsidian oder deaktiviertem Plugin gibt es keine Hintergrund- oder Systembenachrichtigungen.
+
+## Unteraufgaben mit eigenen Terminen
+
+Unteraufgaben haben ein eigenes optionales Datum, unabhängig von der Hauptaufgabe. Es lässt sich im Erstell-/Bearbeitungsdialog und direkt neben der Unteraufgabe auf der Karte setzen, ändern oder leeren. Fällige offene Unteraufgaben erscheinen über ihre Hauptaufgabe unter Heute und in den Erinnerungen. Das Abhaken einer Unteraufgabe beendet nur deren offene Fälligkeit.
+
+In Vorlagen wird für jede Unteraufgabe statt eines festen Datums ein optionaler Abstand in Tagen ab Erstellung gespeichert. Beim Verwenden der Vorlage wird daraus ein konkreter Termin. Alle Daten bleiben anschließend frei änderbar.
+
+## Warten auf jemanden
+
+Im Status **Waiting** bietet der Aufgabendialog die Felder **Warten auf · Person oder Team** und **Nachfragen am**. Beide sind optional. Die Person und das Datum werden auf der Karte angezeigt und sind über **Bearbeiten** anpassbar. Nachfragen erscheinen am entsprechenden Tag unter Heute und werden bei aktivierten Erinnerungen berücksichtigt. Ein Statuswechsel aus Waiting beendet die aktive Nachfrage, bewahrt aber die Angaben für einen späteren Wechsel zurück.
+
+Vorlagen können eine wartende Person und eine relative Nachfragefrist in Tagen enthalten.
+
+## Projekte
+
+Im Hauptreiter **Projekte** ein Projekt auswählen. Alternativ **Alle Projekte** oder **Kein Projekt** wählen. Die Projektansicht zeigt die zugehörigen Aufgaben als Status- oder Prioritätenboard, einen Fortschrittsbalken sowie offene und erledigte Aufgaben. Erledigte Aufgaben im Archiv zählen beim Projektfortschritt weiter mit; sie können im ausklappbaren Archivbereich des Projekts gelesen und wieder geöffnet werden.
+
+- **+ Projekt** erstellt ein Projekt mit Namen und optionaler Beschreibung. Doppelte Namen sind nicht erlaubt.
+- **Projekt bearbeiten** benennt es um oder ändert die Beschreibung.
+- Im Aufgabendialog ein Projekt auswählen oder **Kein Projekt** verwenden. Eine Zuordnung ist nie Pflicht. Bei Bedarf direkt im Dialog ein Projekt anlegen; die übrigen Eingaben bleiben erhalten.
+- Eine neue Aufgabe, die über **+ Aufgabe** in einem ausgewählten Projekt begonnen wird, erhält dieses Projekt als Vorschlag.
+- Vorlagen können eine Projektvorgabe enthalten. Eine explizite Projektvorgabe der Vorlage hat Vorrang. Hat sie keine, wird beim Erstellen aus der Projektansicht das dort ausgewählte Projekt vorgeschlagen und übernommen.
+- **Projekt entfernen** erfordert eine Bestätigung. Aufgaben werden nicht gelöscht; sie wechseln zu Kein Projekt. Vorlagen und künftige Serienaufgaben verlieren nur die Projektzuordnung.
+
+Bereits vorhandene Aufgaben aus älteren Versionen beginnen ohne Projekt. Die Projektzuordnung bleibt beim Archivieren und Wiederöffnen erhalten.
+
+## Wiederkehrende Aufgaben
+
+Im Aufgabendialog **Wiederholung** auf täglich, wöchentlich oder monatlich setzen. **Alle …** bestimmt das Intervall, beispielsweise alle 2 Wochen. Eine wiederkehrende Aufgabe braucht ein Fälligkeitsdatum; beim Aktivieren wird ohne vorhandenes Datum zunächst heute vorgeschlagen. Die erste Aufgabe wird beim Speichern angelegt. Nachfolgende Aufgaben entstehen automatisch an ihren jeweiligen Fälligkeitstagen, unabhängig davon, ob die vorige bereits erledigt ist.
+
+Monatliche Wiederholungen behalten ihren ursprünglichen Monatstag. Eine Serie vom 31. Januar fällt im Februar auf den letzten Tag und im März wieder auf den 31. Wochen- und Tagesintervalle arbeiten mit Kalendertagen. Vorlagen können bereits eine Wiederholung vorgeben; die Serie beginnt erst, wenn daraus eine Aufgabe erstellt wird.
+
+Jede Folgeaufgabe erhält eigene IDs, einen leeren Arbeitsverlauf und wieder offene Unteraufgaben. Projekt, Priorität und die Vorgaben werden übernommen. Unteraufgabentermine und Nachfragen behalten ihren relativen Abstand zur jeweiligen Hauptfälligkeit. Eine Folgeaufgabe startet nie in Done.
+
+Wenn Obsidian geschlossen war, werden verpasste Serientermine beim nächsten Laden nachgeholt. Pro automatischem Durchlauf werden höchstens 100 Termine verarbeitet; größere Rückstände folgen in weiteren minütlichen Durchläufen. Serien-ID und Termindatum verhindern doppelte Vorkommen. Die Speicherung von Folgeaufgaben und nächstem Serientermin erfolgt gemeinsam; bei Schreibfehlern wird beides zurückgenommen.
+
+Im Bearbeitungsdialog einer Serienaufgabe gelten Änderungen an Vorgaben und Wiederholung für künftige Aufgaben der Serie, nicht rückwirkend für bereits angelegte Aufgaben. Änderungen direkt auf einer Karte betreffen die jeweilige Aufgabe. Eine Änderung nur des Datums einer vorhandenen Aufgabe verschiebt nicht automatisch den übrigen Kalender der Serie. **Keine Wiederholung** pausiert die Serie.
+
+Unter **Heute → Wiederholungen** lassen sich alle Serien auch dann noch pausieren, fortsetzen oder auf einen neuen nächsten Termin setzen, wenn die ursprüngliche Aufgabe bereits im Archiv liegt. Beim Fortsetzen wird die bewusst pausierte Zeit übersprungen; normale Offline-Zeiten einer aktiven Serie werden weiterhin nachgeholt. Bestehende Aufgaben werden durch das Pausieren nicht gelöscht.
+
 ## Aufgaben und Unteraufgaben
 
-- **+ Aufgabe** öffnet einen Obsidian-Dialog für Titel, Priorität, Status, Fälligkeitsdatum, Beschreibung und Unteraufgaben.
+- **+ Aufgabe** öffnet einen Obsidian-Dialog für Titel, Priorität, Status, optionales Projekt, Fälligkeitsdatum, Wiederholung, Beschreibung und Unteraufgaben.
 - **Bearbeiten** ändert diese Angaben später. Über **Beschreibung bearbeiten** direkt auf jeder Karte lässt sich eine Beschreibung außerdem jederzeit ergänzen, ändern oder leeren; mit **Beschreibung speichern** übernehmen. Das funktioniert im Statusboard und in der Prioritätenübersicht identisch.
 - Kategorien in dieser Reihenfolge: **ToDo**, **In Progress**, **Waiting**, **Done**, **Anpassungen Planner**. Innerhalb jeder Statusspalte stehen Aufgaben nach Priorität: **immediately → high → mid → low → Anpassungen Planner**. Bei gleicher Priorität kommt das frühere Fälligkeitsdatum zuerst; Aufgaben ohne Datum folgen danach.
 - Zum Verschieben den Kartentitel ziehen oder die Status-Auswahl verwenden. Die Status-Auswahl funktioniert auch ohne Maus.
@@ -29,7 +82,7 @@ Für Updates in BRAT nach Plugin-Updates suchen. Danach den Tagesplaner deaktivi
 Oben neben **+ Aufgabe** steht **+ Vorlage**. Der Knopf öffnet einen taskähnlichen Editor mit:
 
 - einem eindeutigen **Namen der Vorlage** und einem optionalen Aufgabentitel;
-- Priorität, Startstatus (ToDo, In Progress, Waiting oder Anpassungen Planner), Beschreibung;
+- Priorität, Startstatus (ToDo, In Progress, Waiting oder Anpassungen Planner), Projekt, Wiederholung und Beschreibung;
 - Unteraufgaben, die für neue Aufgaben jeweils offen beginnen;
 - einer optionalen relativen Fälligkeit in Kalendertagen nach Erstellung: 0 = heute, 2 = zwei Tage später. Leer bedeutet ohne Fälligkeit; möglich sind 0 bis 3650 Tage.
 
@@ -105,15 +158,15 @@ Erneut geöffnete Aufgaben zählen bis zu ihrem nächsten Abschluss nicht als er
 
 Vorhandene Aufgaben und Vorlagen aus früheren Versionen werden automatisch übernommen. Fehlende Prioritäten werden auf mid gesetzt. Die bisherigen Kategorien werden zugeordnet: Offen → ToDo, In Bearbeitung → In Progress, Warten auf Person und Delayed → Waiting, Fertig → Done. Vorhandene Abschlussdaten und Archivtimer bleiben dabei erhalten. Titel, Status, Fälligkeitsdatum und Beschreibung bleiben erhalten. Neue Felder werden ergänzt.
 
-Alte Aufgaben im Status Done besitzen noch kein gespeichertes Abschlussdatum. Für sie beginnt der Archivtimer beim ersten Laden von Version 1.6.1. Sie werden als vor dem Update erledigt gekennzeichnet und nicht rückwirkend in 7-/30-Tage-Statistiken eingerechnet.
+Alte Aufgaben im Status Done besitzen noch kein gespeichertes Abschlussdatum. Für sie beginnt der Archivtimer beim ersten Laden von Version 1.7.0. Sie werden als vor dem Update erledigt gekennzeichnet und nicht rückwirkend in 7-/30-Tage-Statistiken eingerechnet.
 
 Alle Daten liegen lokal in `<Vault>/.obsidian/plugins/tagesplaner/data.json`; das Archiv ist Teil dieser Datei. Persönliche Aufgaben gehören nicht ins öffentliche GitHub-Repository. Vor einem späteren Downgrade auf eine ältere Plugin-Version die Datei sichern: Ältere Versionen kennen die neuen Kategorien beziehungsweise das neue Datenformat nicht.
 
-## Release 1.6.1 erstellen
+## Release 1.7.0 erstellen
 
 Repository: https://github.com/Janosch3000/Daily-Planner
 
-1. Ein neues Release mit neuem Tag **1.6.1**, Ziel **main**, Titel **Tagesplaner 1.6.1** erstellen.
+1. Ein neues Release mit neuem Tag **1.7.0**, Ziel **main**, Titel **Tagesplaner 1.7.0** erstellen.
 2. Die aktuellen Dateien **main.js**, **manifest.json** und **styles.css** aus dieser Version als drei einzelne Assets anhängen.
 3. Die Notizen aus `CHANGELOG.md` verwenden und das Release veröffentlichen. Nicht als Pre-release markieren, wenn BRAT es regulär als neueste Version beziehen soll.
 
@@ -123,4 +176,4 @@ Die Plugin-ID `tagesplaner` bleibt unverändert, damit BRAT vorhandene Installat
 
 ## Grenzen dieser Version
 
-Die Full-Calendar-Anbindung, die tägliche Übertragung unerledigter Aufgaben und eine Zeiterfassung sind nicht Bestandteil von 1.6.1. Das Archiv arbeitet mit abgeschlossenen Aufgaben und läuft, während das Plugin in Obsidian geladen ist.
+Die Full-Calendar-Anbindung, das automatische Verschieben alter Fälligkeiten auf den nächsten Tag und eine Zeiterfassung sind nicht Bestandteil von 1.7.0. Überfällige Aufgaben bleiben in Heute sichtbar; wiederkehrende Aufgaben werden als neue Vorkommen erstellt. Das Archiv arbeitet mit abgeschlossenen Aufgaben und läuft, während das Plugin in Obsidian geladen ist.
