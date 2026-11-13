@@ -1,5 +1,12 @@
 # Änderungen
 
+## 1.6.1
+
+- Statusspalten umgeordnet: ToDo, In Progress, Waiting, Done, Anpassungen Planner.
+- Anpassungen Planner steht damit ganz rechts.
+
+Release-Assets: `main.js`, `manifest.json` und `styles.css` einzeln anhängen. Tag: **1.6.1**, Zielbranch: **main**.
+
 ## 1.6.0
 
 - Anpassungen Planner als neuen Status und als zusätzliche Priorität ergänzt.

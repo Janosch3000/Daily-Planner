@@ -4,8 +4,8 @@ const DAY = 86400000;
 const COLS = [
   { name: 'ToDo', key: 'open', icon: 'square', glyph: '☐' }, { name: 'In Progress', key: 'progress', icon: 'construction', glyph: '🚧' },
   { name: 'Waiting', key: 'waiting', icon: 'clock', glyph: '◷' },
-  { name: 'Anpassungen Planner', key: 'planner', icon: 'sliders', glyph: '⚙' },
-  { name: 'Done', key: 'done', icon: 'square-check', glyph: '☑' }
+  { name: 'Done', key: 'done', icon: 'square-check', glyph: '☑' },
+  { name: 'Anpassungen Planner', key: 'planner', icon: 'sliders', glyph: '⚙' }
 ];
 const PRIORITIES = [
   { name: 'low', key: 'low', icon: 'arrow-down', glyph: '↓', rank: 1 }, { name: 'mid', key: 'mid', icon: 'arrow-right', glyph: '→', rank: 2 },
