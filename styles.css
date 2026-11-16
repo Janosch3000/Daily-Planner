@@ -319,3 +319,10 @@
 @container tagesplaner (max-width: 700px) { .tp-calendar-workspace { grid-template-columns: 1fr; } .tp-calendar-sidebar { order: -1; position: static; } .tp-unscheduled-zone { max-height: 230px; } }
 .tp-calendar-event.is-dragging { opacity: .55; cursor: grabbing; }
 .tp-calendar-drag-ghost { position: fixed; z-index: 10000; pointer-events: none; max-width: 240px; padding: 10px 14px; border-radius: 8px; background: var(--background-secondary); color: var(--text-normal); border: 1px solid var(--interactive-accent); box-shadow: 0 4px 15px #0003; font-size: 12px; font-weight: 600; }
+.tp-weekly-rule-fields { display: grid; grid-template-columns: repeat(auto-fit,minmax(130px,1fr)); gap: 12px; margin: 12px 0; }
+.tp-weekly-rule-fields .tp-field { margin: 0; }
+.tp-series-row .tp-inline-actions { flex-wrap: wrap; }
+.tp-modal [hidden] { display: none !important; }
+.tp-modal { color: var(--text-normal); }
+.tp-weekly-rule-fields .tp-field { min-width: 0; }
+.tp-weekly-rule-fields input,.tp-weekly-rule-fields select { width: 100%; min-width: 0; box-sizing: border-box; }

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.12.0
+
+- Select Monday–Sunday for Weekly recurrence and optionally repeat every N weeks.
+- Keep one continuously open weekly task, projecting its calendar entries indefinitely without generating weekly copies. Share edits, subtasks and activity across all entries.
+- Manage weekday, interval and first occurrence with Pause/Resume and Edit task. Pause before marking the shared task Done.
+- Move and resize weekly entries to update the shared schedule; preserve overnight ranges. Unscheduling pauses the rule, and scheduling again resumes it.
+- Count the task once, avoid permanent overdue flags from past weekly dates, and keep reminders distinct by occurrence date.
+- Preserve legacy weekly copies and completed history during schema-3 migration. Pause trashed weekly tasks, resume on restore, and remove the rule on permanent deletion. Retain daily/monthly independent occurrences.
+
+Release assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.12.0**.
+
+
 ## 1.11.0
 
 - Add draggable unscheduled tasks beside the calendar. Dropping into a time slot creates a one-hour range; all-day/Month drops assign a date without times.

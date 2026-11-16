@@ -70,7 +70,8 @@ function daysBetween(start, end) { return Math.round((Date.parse(end + 'T00:00:0
 function repeatRule(value = {}) {
   return {
     frequency: REPEAT_OPTIONS.some(r => r.value === value?.frequency) ? value.frequency : 'none',
-    interval: Number.isInteger(Number(value?.interval)) && Number(value.interval) >= 1 && Number(value.interval) <= 365 ? Number(value.interval) : 1
+    interval: Number.isInteger(Number(value?.interval)) && Number(value.interval) >= 1 && Number(value.interval) <= 365 ? Number(value.interval) : 1,
+    ...(value?.frequency==='weekly'?{weekday:Number.isInteger(value.weekday)&&value.weekday>=0&&value.weekday<7?value.weekday:null}:{})
   };
 }
 function nextOccurrence(key, rule, anchorDay = Number(key.slice(-2))) {
@@ -115,7 +116,9 @@ function resumeSeries(series, today = dayKey()) {
 }
 function configureRecurrence(data, task, rule, now = Date.now()) {
   const config = repeatRule(rule), existing = data.recurrences.find(s => s.id === task.recurrenceId);
-  if (config.frequency === 'none') { if (existing) existing.enabled = false; return; }
+  if (config.frequency === 'none') { if (existing) existing.enabled = false; syncWeeklyData(data,now); return; }
+  if (config.frequency === 'weekly') { configureWeekly(data,task,config,now); return; }
+  if(existing?.mode==='continuous-weekly'){existing.mode='instances';delete existing.taskId;delete task.weeklyRecurrence;}
   if (!dateKeyValid(task.due)) throw new Error("Recurring tasks need a due date.");
   if (existing) {
     const wasPaused = !existing.enabled;
@@ -132,6 +135,7 @@ function generateRecurring(data, now = Date.now(), limit = 100) {
   const today = dayKey(now), occupied = new Set([...(data.deletedOccurrences || []), ...data.tasks.filter(t => t.recurrenceId && t.occurrenceDate).map(t => t.recurrenceId + ':' + t.occurrenceDate)]);
   let generated = 0, steps = 0, changed = false;
   for (const series of data.recurrences) {
+    if(series.frequency==='weekly')continue;
     while (series.enabled && dateKeyValid(series.nextDate) && series.nextDate <= today && steps < limit) {
       steps++; const date = series.nextDate, key = series.id + ':' + date;
       if (!occupied.has(key)) { data.tasks.push(recurringTask(series, date, now)); occupied.add(key); generated++; }
@@ -144,9 +148,10 @@ function generateRecurring(data, now = Date.now(), limit = 100) {
 }
 const validTime = value => typeof value === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value) ? value : '';
 function entryOverdue(entry, now = Date.now()) {
+  if(entry.task?.weeklyRecurrence&&entry.date<dayKey(now))return false;
   return entry.date < dayKey(now) || (entry.date === dayKey(now) && !!validTime(entry.time) && new Date(entry.date + 'T' + entry.time + ':00').getTime() <= now);
 }
-function taskOverdue(task, now = Date.now()) { return !!task.due && entryOverdue({ date: task.due, time: task.dueTime }, now); }
+function taskOverdue(task, now = Date.now()) { return !task.weeklyRecurrence && !!task.due && entryOverdue({ date: task.due, time: task.dueTime }, now); }
 function compareCalendarEntries(a, b) {
   return (a.time || '').localeCompare(b.time || '') || (PRIORITIES.find(p => p.name === b.task.priority)?.rank || 0) - (PRIORITIES.find(p => p.name === a.task.priority)?.rank || 0) || a.task.title.localeCompare(b.task.title);
 }
@@ -196,13 +201,99 @@ function layoutTimedEvents(entries) {
   return groups.flatMap(items => { const ends = []; for (const item of items) { let col = ends.findIndex(end => end <= item.startMinute); if (col < 0) col = ends.length; ends[col] = item.layoutEnd; item.column = col; } return items.map(item => ({ ...item, columns: ends.length })); });
 }
 
-function attentionEntries(data) {
-  const entries = [];
-  for (const task of data.tasks) {
-    if (task.deletedAt || task.archivedAt || task.status === 'Done') continue;
-    if (task.due) entries.push({ task, kind: 'task', date: task.due, time: validTime(task.dueTime), label: "Task due", key: 'task:' + task.id + ':' + task.due + (task.dueTime ? ':' + task.dueTime : '') });
-    for (const s of task.subtasks) if (!s.done && s.due) entries.push({ task, kind: 'subtask', subtaskId: s.id, date: s.due, label: "Subtask: " + s.title, key: 'subtask:' + task.id + ':' + s.id + ':' + s.due });
-    if (task.status === 'Waiting' && task.followUpDate) entries.push({ task, kind: 'followup', date: task.followUpDate, label: "Follow up with " + (task.waitingFor || "pending response"), key: 'followup:' + task.id + ':' + task.followUpDate });
+const WEEKDAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+function weekdayOf(date) { return (new Date(date+'T12:00:00').getDay()+6)%7; }
+function weeklyRule(series) { return {weekday:Number.isInteger(series.weekday)&&series.weekday>=0&&series.weekday<7?series.weekday:weekdayOf(series.anchorDate||series.nextDate||dayKey()),interval:Math.max(1,Math.min(365,Number(series.interval)||1)),anchorDate:validDate(series.anchorDate)||validDate(series.nextDate)||dayKey(),enabled:!!series.enabled}; }
+function weeklyStarts(rule,from,to) {
+  const anchor=shiftDate(rule.anchorDate,(rule.weekday-weekdayOf(rule.anchorDate)+7)%7),step=rule.interval*7,result=[];
+  let date=shiftDate(anchor,Math.max(0,Math.ceil(daysBetween(anchor,from)/step))*step);
+  while(date<=to&&result.length<2000){result.push(date);date=shiftDate(date,step);}return result;
+}
+function continuousSeries(data,task) { return data.recurrences.find(s=>s.mode==='continuous-weekly'&&s.frequency==='weekly'&&s.taskId===task.id); }
+function alignWeeklyTask(task,series,date) {
+  const range=taskRange(task);if(!range)return;const delta=daysBetween(range.startDate,date);
+  task.startDate=shiftDate(range.startDate,delta);task.due=shiftDate(range.endDate,delta);series.anchorDate=date;
+}
+function configureWeekly(data,task,rule,now=Date.now()) {
+  let series=data.recurrences.find(s=>s.id===task.recurrenceId);
+  if(!series){series={id:uid(),createdAt:now};data.recurrences.push(series);}
+  const range=taskRange(task);if(!range)throw new Error('Set a date for the first weekly occurrence.');
+  const weekday=rule.weekday==null?weekdayOf(range.startDate):rule.weekday,date=shiftDate(range.startDate,(weekday-weekdayOf(range.startDate)+7)%7);
+  Object.assign(series,rule,{weekday,mode:'continuous-weekly',taskId:task.id,anchorDate:date,enabled:true,updatedAt:now});
+  task.recurrenceId=series.id;alignWeeklyTask(task,series,date);task.occurrenceDate='';
+  if(task.status==='Done'){task.status='ToDo';task.completedAt=null;task.archivedAt=null;}
+  syncWeeklyData(data,now);return series;
+}
+function syncWeeklyData(data,now=Date.now()) {
+  for(const series of data.recurrences){
+    if(series.frequency!=='weekly')continue;
+    if(series.mode!=='continuous-weekly'){
+      const related=data.tasks.filter(t=>t.recurrenceId===series.id),open=related.filter(t=>!t.deletedAt&&!t.archivedAt&&t.status!=='Done').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+      let owner=open[0];
+      if(!owner){
+        const deleted=related.find(t=>t.deletedAt);
+        if(deleted){owner=deleted;series.enabled=false;}
+        else {owner=recurringTask(series,validDate(series.nextDate)||dayKey(now),now);data.tasks.push(owner);}
+      }
+      const range=taskRange(owner),weekday=series.weekday==null?weekdayOf(range?.startDate||series.nextDate||dayKey(now)):series.weekday;
+      Object.assign(series,{mode:'continuous-weekly',taskId:owner.id,weekday,anchorDate:range?.startDate||series.nextDate||dayKey(now)});
+      if(range)alignWeeklyTask(owner,series,shiftDate(range.startDate,(weekday-weekdayOf(range.startDate)+7)%7));
+      for(const old of related)if(old.id!==owner.id){old.previousRecurrenceId=series.id;old.recurrenceId=null;delete old.weeklyRecurrence;}
+    }
+    const task=data.tasks.find(t=>t.id===series.taskId);if(!task){series.enabled=false;continue;}
+    task.recurrenceId=series.id;
+    if(task.deletedAt||!taskRange(task))series.enabled=false;
+    const rule=weeklyRule(series);Object.assign(series,rule);task.weeklyRecurrence=copy(rule);
+    if(series.enabled&&task.status==='Done'){task.status='ToDo';task.completedAt=null;task.archivedAt=null;}
+    if(taskRange(task))series.defaults=taskDefaults(task);
+    else {const old=series.defaults||{},base=shiftDate(series.anchorDate,-(old.startOffsetDays||0));series.defaults={...taskDefaults(task,base),startTime:old.startTime||'',dueTime:old.dueTime||'',startOffsetDays:old.startOffsetDays??null};}
+    series.nextDate=weeklyStarts(rule,dayKey(now),shiftDate(dayKey(now),series.interval*7+7))[0]||series.anchorDate;
+  }
+  for(const task of data.tasks)if(task.weeklyRecurrence&&!continuousSeries(data,task))delete task.weeklyRecurrence;
+}
+function changeWeeklyPattern(data,series,weekday,interval,anchor=null) {
+  const task=data.tasks.find(t=>t.id===series.taskId);if(!task||task.deletedAt)throw new Error('Restore this task from Trash before changing its recurrence.');
+  if(!Number.isInteger(weekday)||weekday<0||weekday>6||!Number.isInteger(interval)||interval<1||interval>365)throw new Error('Choose a weekday and a valid week interval.');
+  const base=anchor||shiftDate(series.anchorDate,-weekdayOf(series.anchorDate)),date=shiftDate(base,(weekday-weekdayOf(base)+7)%7);
+  Object.assign(series,{weekday,interval,anchorDate:date});alignWeeklyTask(task,series,date);syncWeeklyData(data);
+}
+function syncChangedWeeklyRange(data,task,previousRange) {
+  const series=continuousSeries(data,task);if(!series)return;
+  const range=taskRange(task);if(!range){series.enabled=false;syncWeeklyData(data);return;}
+  const weekday=weekdayOf(range.startDate),base=previousRange?shiftDate(series.anchorDate,-weekdayOf(series.anchorDate)):range.startDate,date=shiftDate(base,(weekday-weekdayOf(base)+7)%7);
+  series.weekday=weekday;series.enabled=true;alignWeeklyTask(task,series,date);syncWeeklyData(data);
+}
+function resumeWeekly(data,series) {
+  const task=data.tasks.find(t=>t.id===series.taskId);if(!task||task.deletedAt)throw new Error('Restore the weekly task before resuming.');
+  if(!taskRange(task)){
+    const d=series.defaults||{},date=shiftDate(series.anchorDate||dayKey(),-(d.startOffsetDays||0));
+    Object.assign(task,{due:date,dueTime:validTime(d.dueTime),startDate:d.startOffsetDays==null?'':shiftDate(date,d.startOffsetDays),startTime:validTime(d.startTime)});Object.assign(task,normaliseSchedule(task));
+  }
+  if(task.status==='Done'){task.status='ToDo';task.completedAt=null;task.archivedAt=null;}
+  series.enabled=true;syncWeeklyData(data);
+}
+function weeklyProjectedTasks(task,from,to) {
+  const rule=task.weeklyRecurrence,range=taskRange(task);if(!rule?.enabled||!range)return [];
+  const offsets=[0,daysBetween(range.startDate,range.endDate),...task.subtasks.filter(s=>s.due).map(s=>daysBetween(range.startDate,s.due)),...(task.followUpDate?[daysBetween(range.startDate,task.followUpDate)]:[])];
+  return weeklyStarts(rule,shiftDate(from,-Math.max(...offsets)),shiftDate(to,-Math.min(...offsets))).map(date=>{
+    const delta=daysBetween(range.startDate,date);return {...task,startDate:date,due:shiftDate(task.due,delta),subtasks:task.subtasks.map(s=>({...s,due:s.due?shiftDate(s.due,delta):''})),followUpDate:task.followUpDate?shiftDate(task.followUpDate,delta):''};
+  });
+}
+function calendarSourceTask(entry) { return entry.sourceTask||entry.task; }
+function attentionEntries(data,from=null,to=null) {
+  const entries=[],start=from||dayKey(),end=to||shiftDate(start,7),explicit=!!from;
+  const append=(task,sourceTask=null)=>{
+    const extra=sourceTask?{sourceTask}:{};
+    if(task.due)entries.push({task,...extra,kind:'task',date:task.due,time:validTime(task.dueTime),label:sourceTask?'Weekly task':'Task due',key:'task:'+task.id+':'+task.due+(task.dueTime?':'+task.dueTime:'')});
+    for(const s of task.subtasks)if(!s.done&&s.due)entries.push({task,...extra,kind:'subtask',subtaskId:s.id,date:s.due,label:'Subtask: '+s.title,key:'subtask:'+task.id+':'+s.id+':'+s.due});
+    if(task.status==='Waiting'&&task.followUpDate)entries.push({task,...extra,kind:'followup',date:task.followUpDate,label:'Follow up with '+(task.waitingFor||'pending response'),key:'followup:'+task.id+':'+task.followUpDate});
+  };
+  for(const task of data.tasks){
+    if(task.deletedAt||task.archivedAt||task.status==='Done')continue;
+    if(task.weeklyRecurrence){for(const projected of weeklyProjectedTasks(task,start,end)){
+      const first=entries.length;append(projected,task);
+      for(let i=entries.length-1;i>=first;i--){const e=entries[i],range=taskRange(projected),inRange=e.kind==='task'?range.end>wallValue(start)&&range.start<wallValue(shiftDate(end,1)):e.date>=start&&e.date<=end;if(!inRange||(!explicit&&e.date<start))entries.splice(i,1);}
+    }}else append(task);
   }
   return entries;
 }
@@ -214,7 +305,8 @@ function taskMatches(task, filters, data, now = Date.now()) {
   const words = String(filters.query || '').toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
   const text = [task.title, task.note, task.waitingFor, projectName(data, task.projectId), ...task.subtasks.map(s => s.title), ...task.worklog.map(e => e.text)].join(' ').toLocaleLowerCase();
   if (!words.every(word => text.includes(word))) return false;
-  const dates = [task.due, ...task.subtasks.filter(s => !s.done).map(s => s.due), task.status === 'Waiting' ? task.followUpDate : ''].filter(Boolean), today = dayKey(now);
+  const today = dayKey(now), dates = task.weeklyRecurrence ? attentionEntries(data,today,shiftDate(today,7)).filter(e=>e.task.id===task.id).map(e=>e.date) : [task.due, ...task.subtasks.filter(s => !s.done).map(s => s.due), task.status === 'Waiting' ? task.followUpDate : ''].filter(Boolean);
+  if(task.weeklyRecurrence&&filters.due==='overdue')return false;
   if (filters.due === 'today' && !dates.includes(today)) return false;
   if (filters.due === 'overdue' && !taskOverdue(task, now) && !task.subtasks.some(s => !s.done && s.due && s.due < today) && !(task.status === 'Waiting' && task.followUpDate && task.followUpDate < today)) return false;
   if (filters.due === 'week' && !dates.some(d => d >= today && d <= shiftDate(today, 7))) return false;
@@ -248,7 +340,7 @@ function templateFields(source = {}) {
   };
 }
 function normalize(raw, now = Date.now()) {
-  if (raw && !Array.isArray(raw) && raw.schemaVersion > 2) throw new Error("This data requires a newer Daily Planner version.");
+  if (raw && !Array.isArray(raw) && raw.schemaVersion > 3) throw new Error("This data requires a newer Daily Planner version.");
   const source = Array.isArray(raw) ? { tasks: raw } : raw || {};
   if (source.tasks != null && !Array.isArray(source.tasks)) throw new Error("Invalid saved task format.");
   if (source.templates != null && !Array.isArray(source.templates)) throw new Error("Invalid saved template format.");
@@ -288,13 +380,15 @@ function normalize(raw, now = Date.now()) {
     return { ...s, id: String(s.id || uid()), ...rule, enabled: !!s.enabled && rule.frequency !== 'none' && !!validDate(s.nextDate), nextDate: validDate(s.nextDate), anchorDay: Number(s.anchorDay) >= 1 && Number(s.anchorDay) <= 31 ? Number(s.anchorDay) : Number(String(s.nextDate || '').slice(-2)) || 1, defaults: { ...d, title: d.title || "Recurring task", projectId: projectIds.has(d.projectId) ? d.projectId : null } };
   });
   const reminders = source.reminderSettings || {};
-  return {
-    ...source, schemaVersion: 2, tasks, templates, projects, recurrences, deletedOccurrences: Array.isArray(source.deletedOccurrences) ? source.deletedOccurrences.filter(k => typeof k === 'string') : [], settings: { ...source.settings },
+  const data = {
+    ...source, schemaVersion: 3, tasks, templates, projects, recurrences, deletedOccurrences: Array.isArray(source.deletedOccurrences) ? source.deletedOccurrences.filter(k => typeof k === 'string') : [], settings: { ...source.settings },
     reminderSettings: { enabled: reminders.enabled !== false, leadDays: [0, 1, 3, 7].includes(Number(reminders.leadDays)) ? Number(reminders.leadDays) : 1 },
     reminderState: { day: validDate(source.reminderState?.day), seen: Array.isArray(source.reminderState?.seen) ? source.reminderState.seen.filter(k => typeof k === 'string') : [] }
   };
+  syncWeeklyData(data,now);return data;
 }
 function setStatus(task, status, now = Date.now()) {
+  if(status==='Done'&&task.weeklyRecurrence?.enabled)throw new Error('Pause the weekly recurrence before completing this task.');
   if (!COLS.some(c => c.name === status)) throw new Error("Unknown status.");
   if (task.status !== status) { task.completedAt = status === 'Done' ? now : null; task.completionDateEstimated = false; }
   task.status = status; task.archivedAt = null; task.updatedAt = now;
@@ -302,12 +396,13 @@ function setStatus(task, status, now = Date.now()) {
 function archiveDue(data, now = Date.now()) {
   let changed = false;
   for (const task of data.tasks) {
-    if (!task.deletedAt && task.status === 'Done' && !task.archivedAt && task.completedAt && now - task.completedAt >= DAY) { task.archivedAt = now; changed = true; }
+    if (!task.deletedAt && !task.weeklyRecurrence?.enabled && task.status === 'Done' && !task.archivedAt && task.completedAt && now - task.completedAt >= DAY) { task.archivedAt = now; changed = true; }
   }
   return changed;
 }
 function metrics(data, now = Date.now()) {
   const today = dayKey(now);
+  const weeklyDueToday = new Set(attentionEntries(data,today,today).filter(e=>e.sourceTask&&e.kind==='task'&&e.date===today).map(e=>e.task.id));
   const tasks = data.tasks.filter(t => !t.deletedAt), active = tasks.filter(t => !t.archivedAt && t.status !== 'Done'), done = tasks.filter(t => t.status === 'Done');
   const week = Array.from({ length: 7 }, (_, i) => {
     const key = dayKey(shiftDay(now, i - 6));
@@ -315,7 +410,7 @@ function metrics(data, now = Date.now()) {
   });
   return {
     today, active, done, week,
-    overdue: active.filter(t => taskOverdue(t, now)), dueToday: active.filter(t => t.due === today),
+    overdue: active.filter(t => taskOverdue(t, now)), dueToday: active.filter(t => t.weeklyRecurrence ? weeklyDueToday.has(t.id) : t.due === today),
     inProgress: active.filter(t => t.status === 'In Progress'), waiting: active.filter(t => t.status === 'Waiting'),
     done7: week.reduce((n, d) => n + d.count, 0),
     done30: done.filter(t => !t.completionDateEstimated && t.completedAt && dayKey(t.completedAt) >= dayKey(shiftDay(now, -29)) && t.completedAt <= now).length,
@@ -356,7 +451,7 @@ class TaskModal extends Modal {
     this.priorityInput = field("Priority", 'select', null, '');
     PRIORITIES.forEach(p => this.priorityInput.createEl('option', { text: p.glyph + ' ' + p.name, value: p.name })); this.priorityInput.value = task?.priority || 'mid';
     this.statusInput = field(this.taskId ? 'Status' : "Initial status", 'select', null, '');
-    const statusOptions = this.taskId && !this.isTemplate ? COLS : COLS.filter(c => c.name !== 'Done');
+    const statusOptions = this.taskId && !this.isTemplate && !task?.weeklyRecurrence?.enabled ? COLS : COLS.filter(c => c.name !== 'Done');
     statusOptions.forEach(c => this.statusInput.createEl('option', { text: c.glyph + ' ' + c.name, value: c.name }));
     this.statusInput.value = statusOptions.some(c => c.name === task?.status) ? task.status : 'ToDo';
     this.projectInput = field("Project · optional", 'select', null, '');
@@ -382,14 +477,15 @@ class TaskModal extends Modal {
     this.originalRule=copy(rule);this.originalDue=task?.due||'';
     this.repeatInput = field("Recurrence", 'select', null, '');
     REPEAT_OPTIONS.forEach(r => this.repeatInput.createEl('option', { text: r.label, value: r.value })); this.repeatInput.value = rule.frequency;
+    this.weekdayInput=field('Weekly weekday','select',null,'');WEEKDAYS.forEach((name,i)=>this.weekdayInput.createEl('option',{text:name,value:String(i)}));this.weekdayInput.value=String(rule.weekday??series?.weekday??weekdayOf(task?.startDate||task?.due||dayKey()));
     this.repeatIntervalInput = field("Every … days / weeks / months", 'input', 'number', rule.interval);
     this.repeatIntervalInput.min = '1'; this.repeatIntervalInput.max = '365'; this.repeatIntervalInput.step = '1';
-    form.createDiv({ text: "Recurrences create new tasks on each due date. Changes to defaults apply to future tasks in this recurrence. No recurrence pauses the series.", cls: 'tp-help' });
+    form.createDiv({ text: "Weekly repeats keep one task open and show it on the selected weekday forever. Editing any weekly entry changes the same task everywhere. Dates define the first event, not a series end. Daily/monthly repeats create separate tasks. No recurrence pauses the series.", cls: 'tp-help' });
     this.repeatInput.onchange = () => {
-      const enabled = this.repeatInput.value !== 'none'; this.repeatIntervalInput.disabled = !enabled;
+      const enabled = this.repeatInput.value !== 'none'; this.repeatIntervalInput.disabled = !enabled;this.weekdayInput.parentElement.hidden=this.repeatInput.value!=='weekly';
       if (enabled && this.dueInput && !this.dueInput.value) this.dueInput.value = dayKey();
       if (enabled && this.offsetInput && this.offsetInput.value === '') this.offsetInput.value = '0';
-    }; this.repeatIntervalInput.disabled = rule.frequency === 'none';
+    }; this.repeatIntervalInput.disabled = rule.frequency === 'none';this.weekdayInput.parentElement.hidden=rule.frequency!=='weekly';
     this.waitingSection = form.createDiv('tp-waiting-fields');
     const waitingLabel = this.waitingSection.createEl('label', { cls: 'tp-field', text: "Waiting for · Person or team" });
     this.waitingForInput = waitingLabel.createEl('input', { type: 'text', attr: { placeholder: "e.g. Anna or the IT team" } }); this.waitingForInput.value = task?.waitingFor || '';
@@ -527,7 +623,7 @@ class TaskModal extends Modal {
     this.priorityInput.value = values.priority; this.statusInput.value = values.status; this.dueTimeInput.value = values.dueTime; this.startTimeInput.value = values.startTime;
     this.refreshProjects(values.projectId || ''); this.waitingForInput.value = values.waitingFor;
     this.followUpInput.value = values.followUpInDays == null ? '' : shiftDate(dayKey(), values.followUpInDays);
-    this.repeatInput.value = values.repeat.frequency; this.repeatIntervalInput.value = String(values.repeat.interval); this.repeatInput.onchange(); this.statusInput.onchange();
+    this.repeatInput.value = values.repeat.frequency; this.weekdayInput.value=String(values.repeat.weekday??weekdayOf(dayKey())); this.repeatIntervalInput.value = String(values.repeat.interval); this.repeatInput.onchange(); this.statusInput.onchange();
     this.dueInput.value = values.dueInDays == null ? '' : dayKey(shiftDay(Date.now(), values.dueInDays)); this.startDateInput.value = values.startInDays == null ? '' : shiftDate(dayKey(),values.startInDays); if (values.dueTime && !this.startDateInput.value && !this.startTimeInput.value) this.dueTimeInput.onchange();
     this.subtaskRows = values.subtasks.map(s => ({ id: uid(), title: s.title, done: false, due: s.dueInDays == null ? '' : shiftDate(dayKey(), s.dueInDays), dueInDays: null })); this.renderSubtasks(); return true;
   }
@@ -553,7 +649,7 @@ class TaskModal extends Modal {
     if (!this.followUpInput.checkValidity()) { this.followUpInput.reportValidity(); return; }
     const frequency = this.repeatInput.value, interval = Number(this.repeatIntervalInput.value);
     if (!REPEAT_OPTIONS.some(r => r.value === frequency) || (frequency !== 'none' && (!Number.isInteger(interval) || interval < 1 || interval > 365))) { new Notice("Enter a valid recurrence interval."); return; }
-    const rule = repeatRule({ frequency, interval });
+    const rule = repeatRule({ frequency, interval,weekday:Number(this.weekdayInput.value) });
     const keepUnscheduledSeries = !this.isTemplate && !!this.taskId && !this.originalDue && frequency !== 'none' && frequency === this.originalRule.frequency && interval === this.originalRule.interval;
     if (!this.isTemplate && frequency !== 'none' && !validDate(this.dueInput.value) && !keepUnscheduledSeries) { new Notice("Set a due date for this recurring task."); return; }
     const dueInDays = this.offsetInput && this.offsetInput.value !== '' ? Number(this.offsetInput.value) : (this.isTemplate && (frequency !== 'none' || this.dueTimeInput.value) ? 0 : null);
@@ -568,7 +664,7 @@ class TaskModal extends Modal {
     let scheduleValues;
     try { scheduleValues = resolveSchedule({due:endDate,dueTime:this.dueTimeInput.value,startDate:rawStartDate,startTime:this.startTimeInput.value}); } catch(error) { new Notice(error.message);return; }
     if (!PRIORITIES.some(p => p.name === this.priorityInput.value)) return;
-    const status = this.statusInput.value;
+    const status = frequency==='weekly'&&this.statusInput.value==='Done'?'ToDo':this.statusInput.value;
     if (!COLS.some(c => c.name === status) || ((!this.taskId || this.isTemplate) && status === 'Done')) return;
     this.saving = true; this.saveButton.disabled = true; if (this.deleteTaskButton) this.deleteTaskButton.disabled = true; this.setSubtaskSaving(true);
     const subtasks = this.subtaskRows.filter(s => s.title.trim()).map(s => this.isTemplate ? { title: s.title.trim(), dueInDays: s.dueInDays ?? null } : { id: s.id, title: s.title.trim(), done: !!s.done, due: s.due || '' });
@@ -586,6 +682,7 @@ class TaskModal extends Modal {
         const subtasksChanged = JSON.stringify(subtasks) !== JSON.stringify(this.originalSubtasks);
         if (subtasksChanged && JSON.stringify(task.subtasks) !== JSON.stringify(this.originalSubtasks)) throw new Error("Subtasks have changed. Reopen the dialog before saving.");
         Object.assign(task, values, { due: this.dueInput.value }); if (subtasksChanged) task.subtasks = subtasks;
+        if(rule.frequency!=='weekly'&&task.weeklyRecurrence){const s=continuousSeries(data,task);if(s)s.enabled=false;task.weeklyRecurrence.enabled=false;}
         if (status !== this.originalStatus) setStatus(task, status);
         if (this.logInput?.value.trim()) task.worklog.push({ id: uid(), text: this.logInput.value.trim(), at: Date.now() });
         if(task.due || rule.frequency==='none') configureRecurrence(data, task, rule);
@@ -746,30 +843,29 @@ class ReminderSettingsModal extends Modal {
   onClose() { this.contentEl.empty(); }
 }
 class SeriesManagerModal extends Modal {
-  constructor(app, plugin) { super(app); this.plugin = plugin; this.busy = false; }
-  onOpen() {
-    this.contentEl.setAttribute('lang', 'en-GB');
-    this.contentEl.createEl('h2', { text: "Manage recurrences" });
-    this.contentEl.createEl('p', { text: "Recurrences remain available after their tasks are archived or deleted. Resume skips paused periods; active offline periods are still caught up.", cls: 'tp-help' });
-    this.list = this.contentEl.createDiv('tp-series-list'); this.renderList(); button(this.contentEl, "Close", () => this.close());
-  }
-  renderList() {
-    this.list.empty();
-    if (!this.plugin.data.recurrences.length) this.list.createDiv({ text: "No recurring tasks yet. Choose a recurrence in the task dialog.", cls: 'tp-empty' });
-    for (const series of this.plugin.data.recurrences) {
-      const row = this.list.createDiv('tp-series-row'); row.createEl('h3', { text: series.defaults.title });
-      row.createDiv({ text: (series.enabled ? "Active" : "Paused") + " · " + REPEAT_OPTIONS.find(r => r.value === series.frequency)?.label + " · Interval " + series.interval + " · " + projectName(this.plugin.data, series.defaults.projectId), cls: 'tp-muted' });
-      const actions = row.createDiv('tp-inline-actions'); const next = actions.createEl('input', { type: 'date', attr: { 'aria-label': "Next date for " + series.defaults.title } }); next.value = series.nextDate;
-      button(actions, "Save date", () => this.change(series.id, s => { if (!dateKeyValid(next.value)) throw new Error("Invalid date."); s.nextDate = next.value; s.anchorDay = Number(next.value.slice(-2)); }));
-      button(actions, series.enabled ? "Pause" : "Resume", () => this.change(series.id, s => { if (s.enabled) s.enabled = false; else resumeSeries(s); }));
+  constructor(app,plugin){super(app);this.plugin=plugin;this.busy=false;}
+  onOpen(){this.contentEl.addClass('tp-modal');this.contentEl.setAttribute('lang','en-GB');this.contentEl.createEl('h2',{text:'Manage recurrences'});this.contentEl.createEl('p',{text:'Weekly repeats use one continuously open task. Pick its weekday below; every calendar entry shares the same task, subtasks and activity. Daily and monthly recurrences still create separate tasks.',cls:'tp-help'});this.list=this.contentEl.createDiv('tp-series-list');this.renderList();button(this.contentEl,'Close',()=>this.close());}
+  renderList(){
+    this.list.empty();if(!this.plugin.data.recurrences.length)this.list.createDiv({text:'No recurring tasks yet. Choose a recurrence in the task dialog.',cls:'tp-empty'});
+    for(const series of this.plugin.data.recurrences){
+      const owner=this.plugin.data.tasks.find(t=>t.id===series.taskId),row=this.list.createDiv('tp-series-row');row.createEl('h3',{text:owner?.title||series.defaults.title});
+      if(series.mode==='continuous-weekly'){
+        row.createDiv({text:(series.enabled?'Active':'Paused')+' · One shared task · '+(series.interval===1?'Every '+WEEKDAYS[series.weekday]:'Every '+series.interval+' weeks on '+WEEKDAYS[series.weekday]),cls:'tp-muted'});
+        const fields=row.createDiv('tp-weekly-rule-fields'),dayLabel=fields.createEl('label',{text:'Weekday',cls:'tp-field'}),day=dayLabel.createEl('select',{attr:{'aria-label':'Weekday for '+series.id}});WEEKDAYS.forEach((name,i)=>day.createEl('option',{text:name,value:String(i)}));day.value=String(series.weekday);
+        const everyLabel=fields.createEl('label',{text:'Every … weeks',cls:'tp-field'}),every=everyLabel.createEl('input',{type:'number'});every.min='1';every.max='365';every.step='1';every.value=String(series.interval);
+        const dateLabel=fields.createEl('label',{text:'First occurrence',cls:'tp-field'}),date=dateLabel.createEl('input',{type:'date'});date.value=series.anchorDate;
+        const actions=row.createDiv('tp-inline-actions');button(actions,'Save weekly rule',()=>this.change(series.id,(s,data)=>{if(!validDate(date.value))throw new Error('Choose a first occurrence date.');changeWeeklyPattern(data,s,Number(day.value),Number(every.value),date.value);}));
+        button(actions,series.enabled?'Pause':'Resume',()=>this.change(series.id,(s,data)=>{if(s.enabled)s.enabled=false;else resumeWeekly(data,s);}));
+        if(owner&&!owner.deletedAt)button(actions,'Edit task',()=>new TaskModal(this.app,this.plugin,owner.id).open());
+      }else{
+        row.createDiv({text:(series.enabled?'Active':'Paused')+' · '+REPEAT_OPTIONS.find(r=>r.value===series.frequency)?.label+' · Interval '+series.interval+' · '+projectName(this.plugin.data,series.defaults.projectId),cls:'tp-muted'});
+        const actions=row.createDiv('tp-inline-actions'),next=actions.createEl('input',{type:'date',attr:{'aria-label':'Next date for '+series.defaults.title}});next.value=series.nextDate;
+        button(actions,'Save date',()=>this.change(series.id,s=>{if(!validDate(next.value))throw new Error('Invalid date.');s.nextDate=next.value;s.anchorDay=Number(next.value.slice(-2));}));button(actions,series.enabled?'Pause':'Resume',()=>this.change(series.id,s=>{if(s.enabled)s.enabled=false;else resumeSeries(s);}));
+      }
     }
   }
-  async change(id, action) {
-    if (this.busy) return false; this.busy = true;
-    const ok = await this.plugin.mutate(data => { const series = data.recurrences.find(s => s.id === id); if (!series) throw new Error("Recurrence not found."); action(series); });
-    this.busy = false; this.renderList(); return ok;
-  }
-  onClose() { this.contentEl.empty(); }
+  async change(id,action){if(this.busy)return false;this.busy=true;const ok=await this.plugin.mutate(data=>{const series=data.recurrences.find(s=>s.id===id);if(!series)throw new Error('Recurrence not found.');action(series,data);});this.busy=false;this.renderList();return ok;}
+  onClose(){this.contentEl.empty();}
 }
 
 class PlannerView extends ItemView {
@@ -876,7 +972,7 @@ class PlannerView extends ItemView {
     const draw = () => {
       target.empty(); const range = calendarRange(this.calendarDate, this.calendarMode);
       const allowed = new Set(this.plugin.data.tasks.filter(t => !t.deletedAt && !projectOnlyTask(this.plugin.data, t) && taskMatches(t, { ...this.filters, due: 'all' }, this.plugin.data)).map(t => t.id));
-      const entries = attentionEntries(this.plugin.data).filter(e => allowed.has(e.task.id));
+      const entries = attentionEntries(this.plugin.data,range.start,shiftDate(range.start,range.days-1)).filter(e => allowed.has(e.task.id));
       const label = this.calendarMode === 'month' ? new Date(this.calendarDate + 'T12:00:00').toLocaleDateString("en-GB", { month: 'long', year: 'numeric' }) : shortDate(range.start) + ' – ' + shortDate(shiftDate(range.start, 6));
       target.createEl('h3', { text: label, cls: 'tp-calendar-period' });
       const workspace=target.createDiv('tp-calendar-workspace'),calendarHost=workspace.createDiv('tp-calendar-main'),sidebar=workspace.createDiv('tp-calendar-sidebar');
@@ -921,7 +1017,7 @@ class PlannerView extends ItemView {
       e.preventDefault(); day.removeClass('tp-over');
       try {
         const resize = e.dataTransfer?.getData('application/x-tagesplaner-range-edge');
-        if (resize) { const payload = JSON.parse(resize); void this.plugin.setScheduleEdgeDate(payload.id, payload.edge, date, payload.expected); return; }
+        if (resize) { const payload = JSON.parse(resize); void this.plugin.setScheduleEdgeDate(payload.id, payload.edge, date, payload.expected, payload.occurrenceStart); return; }
         const value = JSON.parse(e.dataTransfer?.getData('application/x-tagesplaner-date') || 'null'); if (!value) return;
         if (timed && value.kind === 'task') { const box = day.getBoundingClientRect(), minute = Math.max(0, Math.min(1425, Math.round((e.clientY - box.top) / CALENDAR_PX_PER_MINUTE / 15) * 15)); void this.plugin.moveTimedTask(value.id, date, minute); }
         else void this.plugin.reschedule(value.id, value.kind, value.subtaskId, date);
@@ -997,11 +1093,11 @@ class PlannerView extends ItemView {
       const handle=button(box,'',()=>{},'tp-resize-handle tp-resize-'+edge);handle.setAttribute('aria-label','Resize '+edge+' of '+entry.task.title);handle.title='Drag to resize '+edge+' · 15-minute steps. Arrow keys adjust by 15 minutes.';handle.draggable=false;
       let drag=null;
       const cancel=()=>{if(!drag)return;drag=null;box.removeClass('is-resizing');paint(entry.startMinute,entry.endMinute);const time=item.querySelector('.tp-calendar-event-time');if(time)time.textContent=label;item.title=entry.task.title+'\n'+label;};
-      handle.onpointerdown=e=>{if(e.button!=null&&e.button!==0)return;e.preventDefault();e.stopPropagation();drag={y:e.clientY,delta:0,expected:scheduleKey(entry.task),id:e.pointerId};try{handle.setPointerCapture?.(e.pointerId);}catch{cancel();return;}box.addClass('is-resizing');};
+      handle.onpointerdown=e=>{if(e.button!=null&&e.button!==0)return;e.preventDefault();e.stopPropagation();drag={y:e.clientY,delta:0,expected:scheduleKey(calendarSourceTask(entry)),id:e.pointerId};try{handle.setPointerCapture?.(e.pointerId);}catch{cancel();return;}box.addClass('is-resizing');};
       handle.onpointermove=e=>{if(!drag)return;e.preventDefault();drag.delta=Math.round((e.clientY-drag.y)/CALENDAR_PX_PER_MINUTE/15)*15;const updated=resizeRange(entry.task,edge,drag.delta),current=calendarEntriesForDate([{...entry,task:{...entry.task,...updated}}],entry.date)[0];if(current)paint(current.startMinute,current.endMinute);const time=item.querySelector('.tp-calendar-event-time');if(time)time.textContent=updated.startTime+' – '+updated.dueTime;item.title=updated.startDate+' '+updated.startTime+' – '+updated.due+' '+updated.dueTime;};
       handle.onpointerup=async e=>{if(!drag)return;e.preventDefault();e.stopPropagation();const change=drag;drag=null;box.removeClass('is-resizing');try{handle.releasePointerCapture?.(change.id);}catch{}this.suppressCalendarClickUntil=Date.now()+300;if(change.delta)await this.plugin.resizeTask(entry.task.id,edge,change.delta,change.expected);else paint(entry.startMinute,entry.endMinute);};
       handle.onpointercancel=cancel;handle.onlostpointercapture=cancel;
-      handle.onkeydown=e=>{if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();void this.plugin.resizeTask(entry.task.id,edge,e.key==='ArrowUp'?-15:15,scheduleKey(entry.task));}};
+      handle.onkeydown=e=>{if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();void this.plugin.resizeTask(entry.task.id,edge,e.key==='ArrowUp'?-15:15,scheduleKey(calendarSourceTask(entry)));}};
     }
   }
   renderCalendarEvent(parent, entry, showDate = false) {
@@ -1010,7 +1106,7 @@ class PlannerView extends ItemView {
     const span=range&&range.startDate!==range.endDate;
     const label=(showDate?shortDate(entry.date)+' · ':'')+(range?.timed?(span?shortDate(range.startDate)+' ':'')+range.startTime+' – '+(span?shortDate(range.endDate)+' ':'')+range.endTime:'All day'+(span?' · '+shortDate(range.startDate)+' – '+shortDate(range.endDate):''))+' · '+entry.label;
     this.eventText(item,entry,label);
-    if(range){for(const edge of ['start','end']){const handle=button(wrap,edge==='end'?'↔':'',()=>new TaskModal(this.app,this.plugin,entry.task.id).open(),'tp-date-resize tp-date-resize-'+edge);handle.setAttribute('aria-label','Resize '+edge+' date of '+entry.task.title);handle.title='Drag to another day to change the '+edge+' date';handle.draggable=true;handle.ondragstart=e=>{e.stopPropagation();e.dataTransfer.setData('application/x-tagesplaner-range-edge',JSON.stringify({id:entry.task.id,edge,expected:scheduleKey(entry.task)}));};}}
+    if(range){for(const edge of ['start','end']){const handle=button(wrap,edge==='end'?'↔':'',()=>new TaskModal(this.app,this.plugin,entry.task.id).open(),'tp-date-resize tp-date-resize-'+edge);handle.setAttribute('aria-label','Resize '+edge+' date of '+entry.task.title);handle.title='Drag to another day to change the '+edge+' date';handle.draggable=true;handle.ondragstart=e=>{e.stopPropagation();e.dataTransfer.setData('application/x-tagesplaner-range-edge',JSON.stringify({id:entry.task.id,edge,expected:scheduleKey(calendarSourceTask(entry)),occurrenceStart:entry.sourceTask?entry.task.startDate:null}));};}}
   }
   renderTrash(parent) {
     const title = parent.createDiv('tp-page-heading'); title.createEl('h3', { text: "Trash" });
@@ -1142,9 +1238,9 @@ class PlannerView extends ItemView {
     }
     const meta = card.createDiv('tp-meta'); priorityBadge(meta, task.priority); statusBadge(meta, task.status);
     meta.createSpan({ text: projectName(this.plugin.data, task.projectId), cls: 'tp-badge tp-project-badge' });
-    if (task.due) meta.createSpan({ text: shortDate(task.due) + (task.dueTime ? " · " + task.dueTime : ''), cls: 'tp-badge' + (!archived && task.status !== 'Done' && taskOverdue(task) ? ' tp-overdue' : '') });
+    if (task.due && !task.weeklyRecurrence) meta.createSpan({ text: shortDate(task.due) + (task.dueTime ? " · " + task.dueTime : ''), cls: 'tp-badge' + (!archived && task.status !== 'Done' && taskOverdue(task) ? ' tp-overdue' : '') });
     const series = this.plugin.data.recurrences.find(s => s.id === task.recurrenceId);
-    if (series) meta.createSpan({ text: series.enabled ? '↻ Recurring' : '↻ Paused', cls: 'tp-badge' });
+    if (series) meta.createSpan({ text: series.enabled ? (series.mode==='continuous-weekly'?'↻ '+WEEKDAYS[series.weekday]:'↻ Recurring') : '↻ Paused', cls: 'tp-badge' });
     const description = card.createDiv('tp-description-section'); description.createDiv({ text: task.note || 'No description yet.', cls: 'tp-description' });
     const sub = card.createDiv('tp-compact-subtasks');
     if (task.subtasks.length) {
@@ -1260,7 +1356,7 @@ module.exports = class TagesplanerPlugin extends Plugin {
   mutate(change) {
     const operation = this.queue.then(async () => {
       const before = copy(this.data);
-      try { change(this.data); await this.saveData(copy(this.data)); }
+      try { change(this.data); syncWeeklyData(this.data); await this.saveData(copy(this.data)); }
       catch (error) { this.data = before; console.error("Daily Planner: Save failed", error); new Notice("Change not saved. Please try again."); this.refreshViews(); return false; }
       this.refreshViews(); return true;
     });
@@ -1291,7 +1387,7 @@ module.exports = class TagesplanerPlugin extends Plugin {
       if (!this.data.reminderSettings.enabled) { if (force) new Notice("Due date reminders are disabled."); return false; }
       const today = dayKey(now), lastDate = shiftDate(today, this.data.reminderSettings.leadDays);
       const seen = new Set(this.data.reminderState.day === today ? this.data.reminderState.seen : []);
-      const eligible = attentionEntries(this.data).filter(e => e.date <= lastDate && (!e.time || this.data.reminderSettings.leadDays > 0 || entryOverdue(e, now)) && this.data.projects.find(p => p.id === e.task.projectId)?.remindersEnabled !== false);
+      const eligible = attentionEntries(this.data,today,lastDate).filter(e => e.date <= lastDate && (!e.time || this.data.reminderSettings.leadDays > 0 || entryOverdue(e, now)) && this.data.projects.find(p => p.id === e.task.projectId)?.remindersEnabled !== false);
       const fresh = force ? eligible : eligible.filter(e => !seen.has(reminderKey(e, now)));
       if (!fresh.length) { if (force) new Notice("No upcoming or overdue items."); return false; }
       const before = copy(this.data.reminderState); fresh.forEach(e => seen.add(reminderKey(e, now)));
@@ -1311,19 +1407,19 @@ module.exports = class TagesplanerPlugin extends Plugin {
     this.lastDay = today; this.lastMinute = minute;
   }
   trashTask(id) {
-    return this.mutate(data => { const task = data.tasks.find(t => t.id === id); if (!task || task.deletedAt) throw new Error("Task not found."); task.deletedAt = Date.now(); task.updatedAt = task.deletedAt; });
+    return this.mutate(data => { const task = data.tasks.find(t => t.id === id); if (!task || task.deletedAt) throw new Error("Task not found."); const s=continuousSeries(data,task);if(s){task.weeklyWasEnabled=!!s.enabled;s.enabled=false;}task.deletedAt = Date.now(); task.updatedAt = task.deletedAt; });
   }
   restoreTask(id) {
-    return this.mutate(data => { const task = data.tasks.find(t => t.id === id && t.deletedAt); if (!task) throw new Error("Task is not in Trash."); task.deletedAt = null; task.updatedAt = Date.now(); });
+    return this.mutate(data => { const task = data.tasks.find(t => t.id === id && t.deletedAt); if (!task) throw new Error("Task is not in Trash."); task.deletedAt = null; task.updatedAt = Date.now();const s=continuousSeries(data,task);if(s&&task.weeklyWasEnabled)s.enabled=true;delete task.weeklyWasEnabled; });
   }
   deleteTaskForever(id) {
-    return this.mutate(data => { const task = data.tasks.find(t => t.id === id && t.deletedAt); if (!task) throw new Error("Task is not in Trash."); if (task.recurrenceId && task.occurrenceDate) { const key = task.recurrenceId + ':' + task.occurrenceDate; if (!data.deletedOccurrences.includes(key)) data.deletedOccurrences.push(key); } data.tasks = data.tasks.filter(t => t.id !== id); });
+    return this.mutate(data => { const task = data.tasks.find(t => t.id === id && t.deletedAt); if (!task) throw new Error("Task is not in Trash."); if (task.recurrenceId && task.occurrenceDate) { const key = task.recurrenceId + ':' + task.occurrenceDate; if (!data.deletedOccurrences.includes(key)) data.deletedOccurrences.push(key); } data.tasks = data.tasks.filter(t => t.id !== id);data.recurrences=data.recurrences.filter(s=>!(s.mode==='continuous-weekly'&&s.taskId===id)); });
   }
   reschedule(id, kind, subtaskId, date) {
     return this.mutate(data => {
       if (!validDate(date)) throw new Error("Invalid date.");
       const task = data.tasks.find(t => t.id === id); if (!task || task.deletedAt || task.archivedAt || task.status === 'Done') throw new Error("Task is no longer open.");
-      if (kind === 'task') { const range=taskRange(task),delta=range?daysBetween(range.startDate,date):0; task.startDate=range?shiftDate(range.startDate,delta):'';task.due=range?shiftDate(range.endDate,delta):date; }
+      if (kind === 'task') { const range=taskRange(task),delta=range?daysBetween(range.startDate,date):0; task.startDate=range?shiftDate(range.startDate,delta):'';task.due=range?shiftDate(range.endDate,delta):date;syncChangedWeeklyRange(data,task,range); }
       else if (kind === 'followup' && task.status === 'Waiting') task.followUpDate = date;
       else if (kind === 'subtask') { const sub = task.subtasks.find(s => s.id === subtaskId && !s.done); if (!sub) throw new Error("Subtask is no longer open."); sub.due = date; }
       else throw new Error("Unknown date type.");
@@ -1333,7 +1429,7 @@ module.exports = class TagesplanerPlugin extends Plugin {
   clearCalendarDate(id,kind='task',subtaskId=null) {
     return this.mutate(data=>{
       const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done')throw new Error('This event is no longer editable.');
-      if(kind==='task') Object.assign(task,{startDate:'',startTime:'',due:'',dueTime:''});
+      if(kind==='task') {Object.assign(task,{startDate:'',startTime:'',due:'',dueTime:''});const s=continuousSeries(data,task);if(s)s.enabled=false;}
       else if(kind==='subtask'){const sub=task.subtasks.find(s=>s.id===subtaskId&&!s.done);if(!sub)throw new Error('Subtask is no longer open.');sub.due='';}
       else if(kind==='followup'&&task.status==='Waiting')task.followUpDate='';
       else throw new Error('Unknown date type.');
@@ -1341,15 +1437,15 @@ module.exports = class TagesplanerPlugin extends Plugin {
     });
   }
   resizeTask(id, edge, delta, expected = null) {
-    return this.mutate(data=>{const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done')throw new Error('This event is no longer editable.');if(expected&&scheduleKey(task)!==expected)throw new Error('This schedule has changed. Please try again.');Object.assign(task,resizeRange(task,edge,delta),{updatedAt:Date.now()});});
+    return this.mutate(data=>{const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done')throw new Error('This event is no longer editable.');if(expected&&scheduleKey(task)!==expected)throw new Error('This schedule has changed. Please try again.');const previous=taskRange(task);Object.assign(task,resizeRange(task,edge,delta),{updatedAt:Date.now()});syncChangedWeeklyRange(data,task,previous);});
   }
-  setScheduleEdgeDate(id, edge, date, expected = null) {
-    return this.mutate(data=>{const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done'||!validDate(date)||!['start','end'].includes(edge))throw new Error('This event cannot be resized.');if(expected&&scheduleKey(task)!==expected)throw new Error('This schedule has changed.');const range=taskRange(task);if(!range)throw new Error('An end date is required.');const next={...task,startDate:range.startDate,...(edge==='start'?{startDate:date}:{due:date})};Object.assign(task,resolveSchedule(next),edge==='start'?{startDate:date}:{due:date},{updatedAt:Date.now()});});
+  setScheduleEdgeDate(id, edge, date, expected = null, occurrenceStart = null) {
+    return this.mutate(data=>{const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done'||!validDate(date)||!['start','end'].includes(edge))throw new Error('This event cannot be resized.');if(expected&&scheduleKey(task)!==expected)throw new Error('This schedule has changed.');const range=taskRange(task);if(!range)throw new Error('An end date is required.');if(task.weeklyRecurrence&&validDate(occurrenceStart))date=shiftDate(date,-daysBetween(range.startDate,occurrenceStart));const next={...task,startDate:range.startDate,...(edge==='start'?{startDate:date}:{due:date})};Object.assign(task,resolveSchedule(next),edge==='start'?{startDate:date}:{due:date},{updatedAt:Date.now()});syncChangedWeeklyRange(data,task,range);});
   }
   moveTimedTask(id,date,minute) {
-    return this.mutate(data=>{const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done'||!validDate(date)||!Number.isInteger(minute)||minute<0||minute>1425)throw new Error('This event cannot be moved.');const range=taskRange(task),start=wallValue(date)+minute,end=start+(range?.timed?range.end-range.start:60),a=wallParts(start),b=wallParts(end);Object.assign(task,{startDate:a.date,startTime:a.time,due:b.date,dueTime:b.time,updatedAt:Date.now()});});
+    return this.mutate(data=>{const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done'||!validDate(date)||!Number.isInteger(minute)||minute<0||minute>1425)throw new Error('This event cannot be moved.');const range=taskRange(task),start=wallValue(date)+minute,end=start+(range?.timed?range.end-range.start:60),a=wallParts(start),b=wallParts(end);Object.assign(task,{startDate:a.date,startTime:a.time,due:b.date,dueTime:b.time,updatedAt:Date.now()});syncChangedWeeklyRange(data,task,range);});
   }
-  changeStatus(id, status) { return this.mutate(data => { const task = data.tasks.find(t => t.id === id); if (!task || task.deletedAt) throw new Error("Task not found."); setStatus(task, status); }); }
+  changeStatus(id, status) { if(status==='Done'&&this.data.tasks.find(t=>t.id===id)?.weeklyRecurrence?.enabled){new Notice('Weekly tasks stay open. Pause the recurrence before completing this task.');return Promise.resolve(false);}return this.mutate(data => { const task = data.tasks.find(t => t.id === id); if (!task || task.deletedAt) throw new Error("Task not found."); setStatus(task, status); }); }
   changePriority(id, priority) {
     return this.mutate(data => {
       if (!PRIORITIES.some(p => p.name === priority)) throw new Error("Unknown priority.");

@@ -1,6 +1,6 @@
 # Daily Planner for Obsidian
 
-Version **1.11.0** · Tasks and projects with start/end schedules, resizable weekly time blocks, a roomier month calendar, templates, recurring tasks and Trash.
+Version **1.12.0** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
 
 ## Install or update with BRAT
 
@@ -29,7 +29,7 @@ Statuses are **ToDo**, **In Progress**, **Waiting**, **Done**. Priorities are **
 
 The zone remains available when empty. During calendar-event dragging the valid target is highlighted. Releasing outside a valid target cancels the move. Clicking an entry still opens Edit; the dialog is also the alternative for assigning or clearing dates without dragging. On narrow panels the unscheduled list appears above the calendar.
 
-Unscheduling one recurring occurrence does not pause the series or change its future defaults. The unscheduled occurrence remains editable without requiring a new date when the recurrence settings are unchanged. Assign a date to change its recurrence settings, or manage the series under Calendar → Recurrences.
+For a weekly task, removing its main schedule pauses all weekly calendar entries. Scheduling the task again resumes the same shared task on the selected weekday. For daily and monthly recurrences, unscheduling one occurrence does not pause the series or change future defaults. Manage rules under Calendar → Recurrences.
 
 ## Start and end dates
 
@@ -41,7 +41,7 @@ Existing due dates and due times become end dates/times without changing the dea
 
 **The end remains the deadline** for overdue indicators, filters, dashboard dates and reminders. Start and end are scheduling boundaries, not work-effort estimates. Times follow the device's local timezone and daylight-saving rules rather than representing fixed UTC appointments.
 
-Templates store relative start/end dates and both times. Recurrence defaults preserve the start's offset from the end, including negative offsets for overnight ranges. New occurrences inherit these values. Editing a recurring task in its dialog updates future defaults; moving or resizing an existing calendar event changes only that occurrence.
+Templates store relative start/end dates and both times. Recurrence defaults preserve the start's offset from the end, including negative offsets for overnight ranges. Moving or resizing any weekly calendar entry changes the shared weekly schedule, including its weekday and duration. Daily/monthly entries remain independent; editing one in its dialog updates future defaults, while moving or resizing it changes only that occurrence.
 
 ## Weekly timeline and month calendar
 
@@ -82,7 +82,7 @@ Removing a project preserves tasks, templates and future recurrence defaults, ch
 
 Trash shows every deleted task, including hidden projects, regardless of task filters. **Restore** restores the previous values. Previously archived tasks remain archived; hidden-project tasks remain in project views. A restored Done task retains its completion time and may therefore qualify for automatic archiving.
 
-**Delete permanently** opens a confirmation. Only confirming it removes the task's contents permanently. Trash is not emptied automatically. Deleting one recurring occurrence does not pause the series. Manage the series under **Calendar → Recurrences**. A minimal series/date key remains after permanent deletion to prevent recreating that occurrence; it contains no task content.
+**Delete permanently** opens a confirmation. Only confirming it removes the task's contents permanently. Trash is not emptied automatically. Deleting a shared weekly task pauses its rule and removes every projected entry. Restore resumes it if it was active before deletion; permanent deletion also removes its weekly rule. Deleting one daily/monthly occurrence does not pause that series. A minimal series/date key remains after permanent deletion of a daily/monthly occurrence to prevent recreating it; it contains no task content.
 
 Done tasks enter **Archive** after 24 elapsed hours, with their subtasks and activity. **Reopen** returns them to ToDo. Historical Done tasks without completion dates receive an estimated date when first loaded and are excluded from retrospective completion charts.
 
@@ -100,9 +100,23 @@ Use **+ Template** next to **+ Task** to create a named template. Templates stor
 
 Use **+ Task → Create task from template** to choose a template. An independent task is created and immediately opened for editing. Cancelling that edit dialog keeps the already-created task; use Delete if it was created accidentally. Editing or deleting templates does not change tasks already created from them.
 
-Recurrences can be daily, weekly or monthly, with an interval of 1–365 and a required due date. Each occurrence has independent IDs, open subtasks and an empty activity history. Monthly recurrences handle short months and restore the original day in later months.
+### Continuous weekly tasks
 
-Manage series under **Calendar → Recurrences**, even after their source tasks are archived or deleted. Pausing stops generation; resuming skips paused periods. Active offline periods are caught up, up to 100 steps per maintenance pass. Tasks and recurrence progress are saved together, with retry on failure.
+In the task dialog, choose **Recurrence → Weekly**, then select **Weekly weekday**, for example **Friday**. Set the interval to 1 for every week, or a larger number for every N weeks. The first start is aligned to that weekday on or after the entered start date. Optional start/end times and overnight durations repeat with it.
+
+Weekly recurrence uses **one continuously open task**. It appears on the selected weekday in every future week, including months viewed far ahead, without creating task copies. There is no end date for the series. The end date in Edit describes the first scheduled range, not the end of the series.
+
+All calendar entries share the same title, description, priority, project, subtasks and activity. Completing a subtask changes it everywhere; it does not reset next week. The Tasks board and dashboard count the shared task once. Old weekly dates do not make it permanently overdue. Reminders distinguish individual upcoming weekly dates.
+
+Under **Calendar → Recurrences**, edit **Weekday**, **Every … weeks** and **First occurrence**, then choose **Save weekly rule**. You can also pause/resume the rule or open its task. Moving or resizing a weekly calendar entry changes the shared rule. To mark the task Done, pause its weekly recurrence first; active weekly tasks stay open.
+
+Existing weekly series migrate to this shared model. The newest open task becomes its owner; older copies and completed history are preserved as independent tasks. If only completed history exists, one open owner is created without changing those completed tasks. Deleted-only series remain paused.
+
+### Daily and monthly tasks
+
+Daily and monthly recurrences retain independent occurrences with their own IDs, open subtasks and empty activity history. Both require an initial date and support intervals of 1–365. Monthly recurrences handle short months and restore the original day later.
+
+Manage these series under **Calendar → Recurrences**, even after source tasks are archived or deleted. Pausing stops generation; resuming skips paused periods. Active offline periods are caught up, up to 100 steps per maintenance pass. Tasks and recurrence progress are saved together, with retry on failure.
 
 ## Language, search and data
 
@@ -110,11 +124,11 @@ All plugin-owned interface text, commands, dialogs, reminders and errors are Eng
 
 Search matches task titles, descriptions, subtasks, activity, waiting people and project names. Multiple words must all match. Combine status, priority, date and project filters. **Reset filters** clears them.
 
-Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Back up that file before downgrading; older versions do not understand Trash, visibility options or times.
+Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.12.0 uses data schema 3 for shared weekly tasks. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
 
-## Create release 1.11.0
+## Create release 1.12.0
 
-Create a GitHub release with tag **1.11.0**, target **main**, title **Daily Planner 1.11.0**. Attach these files individually:
+Create a GitHub release with tag **1.12.0**, target **main**, title **Daily Planner 1.12.0**. Attach these files individually:
 
 - `main.js`
 - `manifest.json`
