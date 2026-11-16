@@ -1,9 +1,9 @@
 {
   "id": "tagesplaner",
-  "name": "Tagesplaner",
-  "version": "1.8.0",
+  "name": "Daily Planner",
+  "version": "1.9.0",
   "minAppVersion": "1.4.0",
-  "description": "Aufgabenplanung mit Projekten, Wochen- und Monatskalender, Papierkorb, kompakten Karten, Serien und Vorlagen.",
+  "description": "Task and project planning with a calendar, due times, expandable cards, subtasks, templates, recurring tasks and Trash.",
   "author": "Janosch",
   "isDesktopOnly": false
 }

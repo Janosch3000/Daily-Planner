@@ -56,12 +56,12 @@ function dayKey(value = Date.now()) {
 function dateKeyValid(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value || '') && dayKey(new Date(value + 'T12:00:00').getTime()) === value;
 }
-function shortDate(key) { return new Date(key + 'T12:00:00').toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit' }); }
-function timeText(value) { return new Date(value).toLocaleString('de-CH', { dateStyle: 'short', timeStyle: 'short' }); }
+function shortDate(key) { return new Date(key + 'T12:00:00').toLocaleDateString("en-GB", { day: '2-digit', month: '2-digit' }); }
+function timeText(value) { return new Date(value).toLocaleString("en-GB", { dateStyle: 'short', timeStyle: 'short' }); }
 function shiftDay(value, days) { const d = new Date(value); d.setDate(d.getDate() + days); return d.getTime(); }
 const REPEAT_OPTIONS = [
-  { value: 'none', label: 'Keine Wiederholung' }, { value: 'daily', label: 'Täglich' },
-  { value: 'weekly', label: 'Wöchentlich' }, { value: 'monthly', label: 'Monatlich' }
+  { value: 'none', label: "No recurrence" }, { value: 'daily', label: "Daily" },
+  { value: 'weekly', label: "Weekly" }, { value: 'monthly', label: "Monthly" }
 ];
 const validDate = value => dateKeyValid(value) ? value : '';
 const offsetDays = value => value !== '' && value != null && Number.isInteger(Number(value)) && Math.abs(Number(value)) <= 3650 ? Number(value) : null;
@@ -80,11 +80,11 @@ function nextOccurrence(key, rule, anchorDay = Number(key.slice(-2))) {
   const last = new Date(target.getFullYear(), target.getMonth() + 1, 0, 12).getDate();
   target.setDate(Math.min(anchorDay, last)); return dayKey(target.getTime());
 }
-function projectName(data, id) { return data.projects.find(p => p.id === id)?.name || 'Kein Projekt'; }
+function projectName(data, id) { return data.projects.find(p => p.id === id)?.name || "No project"; }
 function taskDefaults(task, baseDate = task.due || dayKey()) {
   return {
     title: task.title, note: task.note || '', status: task.status === 'Done' ? 'ToDo' : task.status,
-    priority: task.priority, projectId: task.projectId || null, waitingFor: task.waitingFor || '',
+    dueTime: validTime(task.dueTime), priority: task.priority, projectId: task.projectId || null, waitingFor: task.waitingFor || '',
     followUpInDays: validDate(task.followUpDate) ? daysBetween(baseDate, task.followUpDate) : null,
     subtasks: task.subtasks.map(s => ({ title: s.title, dueInDays: validDate(s.due) ? daysBetween(baseDate, s.due) : null }))
   };
@@ -93,21 +93,21 @@ function recurringTask(series, date, now) {
   const d = series.defaults;
   return {
     id: uid(), title: d.title, note: d.note, status: d.status, priority: d.priority, projectId: d.projectId,
-    due: date, waitingFor: d.waitingFor, followUpDate: d.followUpInDays == null ? '' : shiftDate(date, d.followUpInDays),
+    due: date, dueTime: validTime(d.dueTime), waitingFor: d.waitingFor, followUpDate: d.followUpInDays == null ? '' : shiftDate(date, d.followUpInDays),
     subtasks: d.subtasks.map(s => ({ id: uid(), title: s.title, done: false, due: s.dueInDays == null ? '' : shiftDate(date, s.dueInDays) })),
     worklog: [], recurrenceId: series.id, occurrenceDate: date,
     createdAt: now, updatedAt: now, completedAt: null, archivedAt: null, completionDateEstimated: false
   };
 }
 function resumeSeries(series, today = dayKey()) {
-  if (!dateKeyValid(series.nextDate)) throw new Error('Bitte zuerst einen nächsten Serientermin setzen.');
+  if (!dateKeyValid(series.nextDate)) throw new Error("Set the next recurrence date first.");
   if (series.nextDate < today && series.frequency !== 'monthly') {
     const step = series.interval * (series.frequency === 'weekly' ? 7 : 1);
     series.nextDate = shiftDate(series.nextDate, Math.ceil(daysBetween(series.nextDate, today) / step) * step);
   } else {
     while (series.nextDate < today) {
       const next = nextOccurrence(series.nextDate, series, series.anchorDay);
-      if (!dateKeyValid(next) || next <= series.nextDate) throw new Error('Die Wiederholung benötigt einen gültigen Termin.');
+      if (!dateKeyValid(next) || next <= series.nextDate) throw new Error("The recurrence needs a valid date.");
       series.nextDate = next;
     }
   }
@@ -116,7 +116,7 @@ function resumeSeries(series, today = dayKey()) {
 function configureRecurrence(data, task, rule, now = Date.now()) {
   const config = repeatRule(rule), existing = data.recurrences.find(s => s.id === task.recurrenceId);
   if (config.frequency === 'none') { if (existing) existing.enabled = false; return; }
-  if (!dateKeyValid(task.due)) throw new Error('Wiederholende Aufgaben benötigen ein Fälligkeitsdatum.');
+  if (!dateKeyValid(task.due)) throw new Error("Recurring tasks need a due date.");
   if (existing) {
     const wasPaused = !existing.enabled;
     const changed = existing.frequency !== config.frequency || existing.interval !== config.interval;
@@ -142,13 +142,22 @@ function generateRecurring(data, now = Date.now(), limit = 100) {
   }
   return { generated, changed };
 }
+const validTime = value => typeof value === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value) ? value : '';
+function entryOverdue(entry, now = Date.now()) {
+  return entry.date < dayKey(now) || (entry.date === dayKey(now) && !!validTime(entry.time) && new Date(entry.date + 'T' + entry.time + ':00').getTime() <= now);
+}
+function taskOverdue(task, now = Date.now()) { return !!task.due && entryOverdue({ date: task.due, time: task.dueTime }, now); }
+function compareCalendarEntries(a, b) {
+  return (a.time || '').localeCompare(b.time || '') || (PRIORITIES.find(p => p.name === b.task.priority)?.rank || 0) - (PRIORITIES.find(p => p.name === a.task.priority)?.rank || 0) || a.task.title.localeCompare(b.task.title);
+}
+function reminderKey(entry, now) { return entry.time ? (entryOverdue(entry, now) ? 'due:' : 'upcoming:') + entry.key : entry.key; }
 function attentionEntries(data) {
   const entries = [];
   for (const task of data.tasks) {
     if (task.deletedAt || task.archivedAt || task.status === 'Done') continue;
-    if (task.due) entries.push({ task, kind: 'task', date: task.due, label: 'Aufgabe fällig', key: 'task:' + task.id + ':' + task.due });
-    for (const s of task.subtasks) if (!s.done && s.due) entries.push({ task, kind: 'subtask', subtaskId: s.id, date: s.due, label: 'Unteraufgabe: ' + s.title, key: 'subtask:' + task.id + ':' + s.id + ':' + s.due });
-    if (task.status === 'Waiting' && task.followUpDate) entries.push({ task, kind: 'followup', date: task.followUpDate, label: 'Nachfragen bei ' + (task.waitingFor || 'offener Rückmeldung'), key: 'followup:' + task.id + ':' + task.followUpDate });
+    if (task.due) entries.push({ task, kind: 'task', date: task.due, time: validTime(task.dueTime), label: "Task due", key: 'task:' + task.id + ':' + task.due + (task.dueTime ? ':' + task.dueTime : '') });
+    for (const s of task.subtasks) if (!s.done && s.due) entries.push({ task, kind: 'subtask', subtaskId: s.id, date: s.due, label: "Subtask: " + s.title, key: 'subtask:' + task.id + ':' + s.id + ':' + s.due });
+    if (task.status === 'Waiting' && task.followUpDate) entries.push({ task, kind: 'followup', date: task.followUpDate, label: "Follow up with " + (task.waitingFor || "pending response"), key: 'followup:' + task.id + ':' + task.followUpDate });
   }
   return entries;
 }
@@ -162,7 +171,7 @@ function taskMatches(task, filters, data, now = Date.now()) {
   if (!words.every(word => text.includes(word))) return false;
   const dates = [task.due, ...task.subtasks.filter(s => !s.done).map(s => s.due), task.status === 'Waiting' ? task.followUpDate : ''].filter(Boolean), today = dayKey(now);
   if (filters.due === 'today' && !dates.includes(today)) return false;
-  if (filters.due === 'overdue' && !dates.some(d => d < today)) return false;
+  if (filters.due === 'overdue' && !taskOverdue(task, now) && !task.subtasks.some(s => !s.done && s.due && s.due < today) && !(task.status === 'Waiting' && task.followUpDate && task.followUpDate < today)) return false;
   if (filters.due === 'week' && !dates.some(d => d >= today && d <= shiftDate(today, 7))) return false;
   if (filters.due === 'none' && dates.length) return false;
   return true;
@@ -184,7 +193,7 @@ function shiftMonth(date, amount) {
 function templateFields(source = {}) {
   const offset = source.dueInDays;
   return {
-    title: String(source.title || ''), note: String(source.note || ''),
+    title: String(source.title || ''), note: String(source.note || ''), dueTime: validTime(source.dueTime),
     priority: PRIORITIES.some(p => p.name === source.priority) ? source.priority : source.priority === 'Anpassungen Planner' ? 'low' : 'mid',
     status: COLS.some(c => c.name === source.status && c.name !== 'Done') ? source.status : 'ToDo',
     projectId: source.projectId || null, waitingFor: String(source.waitingFor || ''),
@@ -194,28 +203,28 @@ function templateFields(source = {}) {
   };
 }
 function normalize(raw, now = Date.now()) {
-  if (raw && !Array.isArray(raw) && raw.schemaVersion > 2) throw new Error('Diese Daten benötigen eine neuere Tagesplaner-Version.');
+  if (raw && !Array.isArray(raw) && raw.schemaVersion > 2) throw new Error("This data requires a newer Daily Planner version.");
   const source = Array.isArray(raw) ? { tasks: raw } : raw || {};
-  if (source.tasks != null && !Array.isArray(source.tasks)) throw new Error('Das gespeicherte Aufgabenformat ist ungültig.');
-  if (source.templates != null && !Array.isArray(source.templates)) throw new Error('Das gespeicherte Vorlagenformat ist ungültig.');
-  if (source.projects != null && !Array.isArray(source.projects)) throw new Error('Das gespeicherte Projektformat ist ungültig.');
-  if (source.recurrences != null && !Array.isArray(source.recurrences)) throw new Error('Das gespeicherte Wiederholungsformat ist ungültig.');
+  if (source.tasks != null && !Array.isArray(source.tasks)) throw new Error("Invalid saved task format.");
+  if (source.templates != null && !Array.isArray(source.templates)) throw new Error("Invalid saved template format.");
+  if (source.projects != null && !Array.isArray(source.projects)) throw new Error("Invalid saved project format.");
+  if (source.recurrences != null && !Array.isArray(source.recurrences)) throw new Error("Invalid saved recurrence format.");
   const projects = (source.projects || []).map(p => {
-    if (!p || typeof p !== 'object' || !String(p.name || '').trim()) throw new Error('Ein gespeichertes Projekt ist ungültig.');
+    if (!p || typeof p !== 'object' || !String(p.name || '').trim()) throw new Error("Invalid saved project.");
     const legacyHidden = String(p.name).trim().replace(/\s+/g, ' ').toLocaleLowerCase() === 'anpassungen planer';
     return { ...p, id: String(p.id || uid()), name: String(p.name).trim(), note: String(p.note || ''), onlyInProjects: typeof p.onlyInProjects === 'boolean' ? p.onlyInProjects : legacyHidden, includeInDashboard: typeof p.includeInDashboard === 'boolean' ? p.includeInDashboard : !legacyHidden, remindersEnabled: p.remindersEnabled !== false };
   });
   const projectIds = new Set(projects.map(p => p.id));
   const tasks = (source.tasks || []).map(t => {
-    if (!t || typeof t !== 'object') throw new Error('Eine gespeicherte Aufgabe ist ungültig.');
+    if (!t || typeof t !== 'object') throw new Error("Invalid saved task.");
     const incomingStatus = Object.prototype.hasOwnProperty.call(LEGACY_STATUS, t.status) ? LEGACY_STATUS[t.status] : t.status;
     const status = COLS.some(c => c.name === incomingStatus) ? incomingStatus : 'ToDo';
     return {
-      ...t, deletedAt: stamp(t.deletedAt), id: String(t.id || uid()), title: String(t.title || 'Ohne Titel'), status,
+      ...t, deletedAt: stamp(t.deletedAt), id: String(t.id || uid()), title: String(t.title || "Untitled task"), status,
       priority: PRIORITIES.some(p => p.name === t.priority) ? t.priority : t.priority === 'Anpassungen Planner' ? 'low' : 'mid',
       projectId: projectIds.has(t.projectId) ? t.projectId : null, waitingFor: String(t.waitingFor || ''), followUpDate: validDate(t.followUpDate),
       recurrenceId: t.recurrenceId ? String(t.recurrenceId) : null, occurrenceDate: validDate(t.occurrenceDate),
-      due: dateKeyValid(t.due) ? t.due : '', note: String(t.note || ''),
+      due: dateKeyValid(t.due) ? t.due : '', dueTime: dateKeyValid(t.due) ? validTime(t.dueTime) : '', note: String(t.note || ''),
       createdAt: stamp(t.createdAt), updatedAt: stamp(t.updatedAt),
       completedAt: status === 'Done' ? stamp(t.completedAt) || now : null,
       completionDateEstimated: status === 'Done' && (!!t.completionDateEstimated || !stamp(t.completedAt)),
@@ -225,13 +234,13 @@ function normalize(raw, now = Date.now()) {
     };
   });
   const templates = (source.templates || []).map(t => {
-    if (!t || typeof t !== 'object') throw new Error('Eine gespeicherte Vorlage ist ungültig.');
-    return { id: String(t.id || uid()), name: String(t.name || 'Ohne Namen'), ...templateFields(t), projectId: projectIds.has(t.projectId) ? t.projectId : null, createdAt: stamp(t.createdAt), updatedAt: stamp(t.updatedAt) };
+    if (!t || typeof t !== 'object') throw new Error("Invalid saved template.");
+    return { id: String(t.id || uid()), name: String(t.name || "Untitled"), ...templateFields(t), projectId: projectIds.has(t.projectId) ? t.projectId : null, createdAt: stamp(t.createdAt), updatedAt: stamp(t.updatedAt) };
   });
   const recurrences = (source.recurrences || []).map(s => {
-    if (!s || typeof s !== 'object') throw new Error('Eine gespeicherte Wiederholung ist ungültig.');
+    if (!s || typeof s !== 'object') throw new Error("Invalid saved recurrence.");
     const rule = repeatRule(s), d = templateFields(s.defaults || {});
-    return { ...s, id: String(s.id || uid()), ...rule, enabled: !!s.enabled && rule.frequency !== 'none' && !!validDate(s.nextDate), nextDate: validDate(s.nextDate), anchorDay: Number(s.anchorDay) >= 1 && Number(s.anchorDay) <= 31 ? Number(s.anchorDay) : Number(String(s.nextDate || '').slice(-2)) || 1, defaults: { ...d, title: d.title || 'Wiederkehrende Aufgabe', projectId: projectIds.has(d.projectId) ? d.projectId : null } };
+    return { ...s, id: String(s.id || uid()), ...rule, enabled: !!s.enabled && rule.frequency !== 'none' && !!validDate(s.nextDate), nextDate: validDate(s.nextDate), anchorDay: Number(s.anchorDay) >= 1 && Number(s.anchorDay) <= 31 ? Number(s.anchorDay) : Number(String(s.nextDate || '').slice(-2)) || 1, defaults: { ...d, title: d.title || "Recurring task", projectId: projectIds.has(d.projectId) ? d.projectId : null } };
   });
   const reminders = source.reminderSettings || {};
   return {
@@ -241,7 +250,7 @@ function normalize(raw, now = Date.now()) {
   };
 }
 function setStatus(task, status, now = Date.now()) {
-  if (!COLS.some(c => c.name === status)) throw new Error('Unbekannter Status.');
+  if (!COLS.some(c => c.name === status)) throw new Error("Unknown status.");
   if (task.status !== status) { task.completedAt = status === 'Done' ? now : null; task.completionDateEstimated = false; }
   task.status = status; task.archivedAt = null; task.updatedAt = now;
 }
@@ -261,7 +270,7 @@ function metrics(data, now = Date.now()) {
   });
   return {
     today, active, done, week,
-    overdue: active.filter(t => t.due && t.due < today), dueToday: active.filter(t => t.due === today),
+    overdue: active.filter(t => taskOverdue(t, now)), dueToday: active.filter(t => t.due === today),
     inProgress: active.filter(t => t.status === 'In Progress'), waiting: active.filter(t => t.status === 'Waiting'),
     done7: week.reduce((n, d) => n + d.count, 0),
     done30: done.filter(t => !t.completionDateEstimated && t.completedAt && dayKey(t.completedAt) >= dayKey(shiftDay(now, -29)) && t.completedAt <= now).length,
@@ -283,11 +292,12 @@ class TaskModal extends Modal {
     this.isTemplate = options.mode === 'template'; this.saving = false; this.subtaskRows = []; this.subtaskElements = new Map();
   }
   onOpen() {
+    this.contentEl.setAttribute('lang', 'en-GB');
     this.contentEl.empty(); this.contentEl.addClass('tp-modal');
     const savedTemplate = this.isTemplate ? this.plugin.data.templates.find(t => t.id === this.options.templateId) : null;
     const task = this.isTemplate ? savedTemplate || this.options.seedTask : this.plugin.data.tasks.find(t => t.id === this.taskId);
     this.originalStatus = task?.status || 'ToDo';
-    const heading = this.isTemplate ? (savedTemplate ? 'Vorlage bearbeiten' : 'Neue Vorlage') : (task ? 'Aufgabe bearbeiten' : 'Neue Aufgabe');
+    const heading = this.isTemplate ? (savedTemplate ? "Edit template" : "New template") : (task ? "Edit task" : "New task");
     this.contentEl.createEl('h2', { text: heading });
     const form = this.contentEl.createEl('form');
     const field = (text, tag, type, value) => {
@@ -295,65 +305,68 @@ class TaskModal extends Modal {
       const input = label.createEl(tag, type ? { type } : {}); input.value = value == null ? '' : String(value); return input;
     };
     if (this.isTemplate) {
-      this.nameInput = field('Name der Vorlage', 'input', 'text', savedTemplate?.name || task?.title || ''); this.nameInput.required = true;
+      this.nameInput = field("Template name", 'input', 'text', savedTemplate?.name || task?.title || ''); this.nameInput.required = true;
     }
-    this.titleInput = field(this.isTemplate ? 'Vorgabe für den Aufgabentitel · optional' : 'Aufgabe', 'input', 'text', task?.title); this.titleInput.required = !this.isTemplate;
-    this.priorityInput = field('Priorität', 'select', null, '');
+    this.titleInput = field(this.isTemplate ? "Default task title · optional" : "Task", 'input', 'text', task?.title); this.titleInput.required = !this.isTemplate;
+    this.priorityInput = field("Priority", 'select', null, '');
     PRIORITIES.forEach(p => this.priorityInput.createEl('option', { text: p.glyph + ' ' + p.name, value: p.name })); this.priorityInput.value = task?.priority || 'mid';
-    this.statusInput = field(this.taskId ? 'Status' : 'Startstatus', 'select', null, '');
+    this.statusInput = field(this.taskId ? 'Status' : "Initial status", 'select', null, '');
     const statusOptions = this.taskId && !this.isTemplate ? COLS : COLS.filter(c => c.name !== 'Done');
     statusOptions.forEach(c => this.statusInput.createEl('option', { text: c.glyph + ' ' + c.name, value: c.name }));
     this.statusInput.value = statusOptions.some(c => c.name === task?.status) ? task.status : 'ToDo';
-    this.projectInput = field('Projekt · optional', 'select', null, '');
+    this.projectInput = field("Project · optional", 'select', null, '');
     this.refreshProjects(task?.projectId || this.options.defaultProjectId || '');
-    button(this.projectInput.parentElement, '+ Projekt anlegen', () => new ProjectModal(this.app, this.plugin, null, id => this.refreshProjects(id)).open(), 'tp-small-button');
+    button(this.projectInput.parentElement, "+ Create project", () => new ProjectModal(this.app, this.plugin, null, id => this.refreshProjects(id)).open(), 'tp-small-button');
     if (this.isTemplate) {
       const offset = savedTemplate ? savedTemplate.dueInDays : (dateKeyValid(task?.due) ? Math.max(0, Math.round((Date.parse(task.due + 'T00:00:00Z') - Date.parse(dayKey() + 'T00:00:00Z')) / DAY)) : null);
-      this.offsetInput = field('Fällig in Tagen ab Erstellung · optional', 'input', 'number', offset);
-      this.offsetInput.min = '0'; this.offsetInput.max = '3650'; this.offsetInput.step = '1'; this.offsetInput.placeholder = '0 = am Tag der Erstellung';
-    } else this.dueInput = field('Fällig am · optional', 'input', 'date', task?.due);
+      this.offsetInput = field("Days until due from creation · optional", 'input', 'number', offset);
+      this.offsetInput.min = '0'; this.offsetInput.max = '3650'; this.offsetInput.step = '1'; this.offsetInput.placeholder = "0 = creation day";
+    } else this.dueInput = field("Due date · optional", 'input', 'date', task?.due);
+    this.dueTimeInput = field('Due time · optional (24-hour)', 'input', 'time', validTime(task?.dueTime)); this.dueTimeInput.step = '60';
+    form.createDiv({ text: 'Local time. Leave empty for an all-day task.', cls: 'tp-help' });
+    this.dueTimeInput.onchange = () => { if (this.dueTimeInput.value) { if (this.dueInput && !this.dueInput.value) this.dueInput.value = dayKey(); if (this.offsetInput && this.offsetInput.value === '') this.offsetInput.value = '0'; } };
     const series = this.plugin.data.recurrences.find(s => s.id === task?.recurrenceId);
     const rule = repeatRule(this.isTemplate ? task?.repeat : (series?.enabled ? series : {}));
-    this.repeatInput = field('Wiederholung', 'select', null, '');
+    this.repeatInput = field("Recurrence", 'select', null, '');
     REPEAT_OPTIONS.forEach(r => this.repeatInput.createEl('option', { text: r.label, value: r.value })); this.repeatInput.value = rule.frequency;
-    this.repeatIntervalInput = field('Alle … Tage / Wochen / Monate', 'input', 'number', rule.interval);
+    this.repeatIntervalInput = field("Every … days / weeks / months", 'input', 'number', rule.interval);
     this.repeatIntervalInput.min = '1'; this.repeatIntervalInput.max = '365'; this.repeatIntervalInput.step = '1';
-    form.createDiv({ text: 'Wiederholungen erzeugen neue Aufgaben am jeweiligen Fälligkeitstag. Änderungen an den Vorgaben gelten für künftige Aufgaben dieser Serie. Keine Wiederholung stoppt die Serie.', cls: 'tp-help' });
+    form.createDiv({ text: "Recurrences create new tasks on each due date. Changes to defaults apply to future tasks in this recurrence. No recurrence pauses the series.", cls: 'tp-help' });
     this.repeatInput.onchange = () => {
       const enabled = this.repeatInput.value !== 'none'; this.repeatIntervalInput.disabled = !enabled;
       if (enabled && this.dueInput && !this.dueInput.value) this.dueInput.value = dayKey();
       if (enabled && this.offsetInput && this.offsetInput.value === '') this.offsetInput.value = '0';
     }; this.repeatIntervalInput.disabled = rule.frequency === 'none';
     this.waitingSection = form.createDiv('tp-waiting-fields');
-    const waitingLabel = this.waitingSection.createEl('label', { cls: 'tp-field', text: 'Warten auf · Person oder Team' });
-    this.waitingForInput = waitingLabel.createEl('input', { type: 'text', attr: { placeholder: 'z. B. Anna oder IT-Team' } }); this.waitingForInput.value = task?.waitingFor || '';
-    const followLabel = this.waitingSection.createEl('label', { cls: 'tp-field', text: this.isTemplate ? 'Nachfragen nach Tagen · optional' : 'Nachfragen am · optional' });
+    const waitingLabel = this.waitingSection.createEl('label', { cls: 'tp-field', text: "Waiting for · Person or team" });
+    this.waitingForInput = waitingLabel.createEl('input', { type: 'text', attr: { placeholder: "e.g. Anna or the IT team" } }); this.waitingForInput.value = task?.waitingFor || '';
+    const followLabel = this.waitingSection.createEl('label', { cls: 'tp-field', text: this.isTemplate ? "Follow up after days · optional" : "Follow-up date · optional" });
     this.followUpInput = followLabel.createEl('input', { type: this.isTemplate ? 'number' : 'date' });
     if (this.isTemplate) {
       const offset = savedTemplate?.followUpInDays ?? (validDate(task?.followUpDate) ? daysBetween(dayKey(), task.followUpDate) : null);
       this.followUpInput.value = offset == null ? '' : String(offset); this.followUpInput.min = '0'; this.followUpInput.max = '3650'; this.followUpInput.step = '1';
     } else this.followUpInput.value = task?.followUpDate || '';
     this.statusInput.onchange = () => { this.waitingSection.hidden = this.statusInput.value !== 'Waiting'; }; this.statusInput.onchange();
-    this.noteInput = field('Beschreibung · optional', 'textarea', null, task?.note); this.noteInput.rows = 3;
-    const subSection = form.createDiv('tp-modal-subtasks'); subSection.createEl('h3', { text: 'Unteraufgaben' });
+    this.noteInput = field("Description · optional", 'textarea', null, task?.note); this.noteInput.rows = 3;
+    const subSection = form.createDiv('tp-modal-subtasks'); subSection.createEl('h3', { text: "Subtasks" });
     this.subtaskList = subSection.createDiv('tp-modal-subtask-list');
     this.subtaskElements = new Map();
     this.originalSubtasks = copy(task?.subtasks || []);
     this.subtaskRows = copy(task?.subtasks || []).map(s => ({ id: s.id || uid(), title: s.title, done: !this.isTemplate && !!s.done, due: validDate(s.due), dueInDays: offsetDays(s.dueInDays) ?? (this.isTemplate && validDate(s.due) ? daysBetween(dayKey(), s.due) : null) }));
     if (this.isTemplate && !this.subtaskRows.length) this.subtaskRows.push({ id: uid(), title: '', done: false, due: '', dueInDays: null });
-    subSection.createDiv({ text: 'Unteraufgaben direkt eingeben. Enter ergänzt die nächste Zeile; gespeichert wird über den Speichern-Knopf unten.', cls: 'tp-help' });
+    subSection.createDiv({ text: "Enter subtasks directly. Press Enter to add a row; use the Save button below to save.", cls: 'tp-help' });
     this.renderSubtasks();
-    this.addSubtaskButton = button(subSection, '+ Unteraufgabe', () => this.addSubtask());
+    this.addSubtaskButton = button(subSection, "+ Subtask", () => this.addSubtask());
     if (!this.isTemplate) {
-      const log = form.createDiv('tp-modal-worklog'); log.createEl('h3', { text: 'Was wurde gemacht?' });
+      const log = form.createDiv('tp-modal-worklog'); log.createEl('h3', { text: "Activity history" });
       for (const entry of [...(task?.worklog || [])].reverse()) { const row = log.createDiv('tp-log-entry'); row.createDiv({ text: entry.text, cls: 'tp-log-text' }); row.createDiv({ text: timeText(entry.at), cls: 'tp-muted' }); }
-      const label = log.createEl('label', { text: 'Neuer Arbeitsschritt · optional', cls: 'tp-field' }); this.logInput = label.createEl('textarea'); this.logInput.rows = 2;
+      const label = log.createEl('label', { text: "New activity entry · optional", cls: 'tp-field' }); this.logInput = label.createEl('textarea'); this.logInput.rows = 2;
     }
     const actions = form.createDiv('tp-inline-actions');
-    this.saveButton = actions.createEl('button', { text: this.isTemplate ? 'Vorlage speichern' : (task ? 'Änderungen speichern' : 'Aufgabe erstellen'), cls: 'mod-cta', type: 'submit' });
-    if (!this.isTemplate && !this.taskId) this.fromTemplateButton = button(actions, 'Aufgabe nach Vorlage erstellen', () => new TemplatePickerModal(this.app, this.plugin, this).open());
-    button(actions, 'Abbrechen', () => this.close());
-    if (!this.isTemplate && task && !task.deletedAt && !task.archivedAt) this.deleteTaskButton = button(actions, 'Löschen', async () => {
+    this.saveButton = actions.createEl('button', { text: this.isTemplate ? "Save template" : (task ? "Save changes" : "Create task"), cls: 'mod-cta', type: 'submit' });
+    if (!this.isTemplate && !this.taskId) this.fromTemplateButton = button(actions, "Create task from template", () => new TemplatePickerModal(this.app, this.plugin, this).open());
+    button(actions, "Cancel", () => this.close());
+    if (!this.isTemplate && task && !task.deletedAt && !task.archivedAt) this.deleteTaskButton = button(actions, "Delete", async () => {
       if (this.saving) return; this.saving = true; this.saveButton.disabled = true; this.deleteTaskButton.disabled = true; this.setSubtaskSaving(true);
       const ok = await this.plugin.trashTask(task.id);
       if (ok) this.close(); else { this.saving = false; this.saveButton.disabled = false; this.deleteTaskButton.disabled = false; this.setSubtaskSaving(false); }
@@ -383,16 +396,16 @@ class TaskModal extends Modal {
       if (!entry) {
         const row = this.subtaskList.createDiv('tp-modal-subtask'); entry = { row, item };
         if (!this.isTemplate) {
-          entry.check = row.createEl('input', { type: 'checkbox', attr: { 'aria-label': 'Unteraufgabe erledigt' } });
+          entry.check = row.createEl('input', { type: 'checkbox', attr: { 'aria-label': "Subtask completed" } });
           entry.check.onchange = () => { entry.item.done = entry.check.checked; entry.lastDone = entry.check.checked; };
         }
-        entry.input = row.createEl('input', { type: 'text', attr: { placeholder: 'Titel der Unteraufgabe' } });
+        entry.input = row.createEl('input', { type: 'text', attr: { placeholder: "Subtask title" } });
         entry.input.oninput = () => { entry.item.title = entry.input.value; entry.lastTitle = entry.input.value; };
         entry.input.onkeydown = e => {
           if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229) return;
           e.preventDefault(); e.stopPropagation(); this.addSubtask(entry.item.id);
         };
-        entry.date = row.createEl('input', { type: this.isTemplate ? 'number' : 'date', cls: 'tp-subtask-date', attr: { 'aria-label': this.isTemplate ? 'Fälligkeit der Unteraufgabe in Tagen ab Erstellung' : 'Fälligkeitsdatum der Unteraufgabe', placeholder: this.isTemplate ? 'Fällig in Tagen' : '' } });
+        entry.date = row.createEl('input', { type: this.isTemplate ? 'number' : 'date', cls: 'tp-subtask-date', attr: { 'aria-label': this.isTemplate ? "Subtask due in days from creation" : "Subtask due date", placeholder: this.isTemplate ? "Due in days" : '' } });
         if (this.isTemplate) { entry.date.min = '0'; entry.date.max = '3650'; entry.date.step = '1'; }
         entry.date.oninput = () => {
           if (this.isTemplate) entry.item.dueInDays = entry.date.value === '' ? null : Number(entry.date.value); else entry.item.due = entry.date.value;
@@ -403,10 +416,10 @@ class TaskModal extends Modal {
       }
       entry.item = item;
       if (entry.input.value !== item.title) entry.input.value = item.title;
-      entry.lastTitle = item.title; entry.input.setAttribute('aria-label', 'Titel der Unteraufgabe ' + (index + 1));
+      entry.lastTitle = item.title; entry.input.setAttribute('aria-label', "Subtask title " + (index + 1));
       const dueValue = this.isTemplate ? (item.dueInDays == null ? '' : String(item.dueInDays)) : (item.due || '');
       if (entry.date.value !== dueValue) entry.date.value = dueValue; entry.lastDate = dueValue;
-      entry.remove.setAttribute('aria-label', 'Unteraufgabe ' + (index + 1) + ' entfernen');
+      entry.remove.setAttribute('aria-label', "Subtask " + (index + 1) + ' — remove');
       if (entry.check) { entry.check.checked = item.done; entry.lastDone = item.done; }
       const atPosition = this.subtaskList.children[index];
       if (atPosition !== entry.row) this.subtaskList.insertBefore(entry.row, atPosition || null);
@@ -455,10 +468,10 @@ class TaskModal extends Modal {
   }
   applyTemplate(id) {
     const source = this.plugin.data.templates.find(t => t.id === id);
-    if (!source) { new Notice('Diese Vorlage ist nicht mehr vorhanden.'); return false; }
+    if (!source) { new Notice("This template no longer exists."); return false; }
     const values = templateFields(source);
     this.titleInput.value = values.title; this.noteInput.value = values.note;
-    this.priorityInput.value = values.priority; this.statusInput.value = values.status;
+    this.priorityInput.value = values.priority; this.statusInput.value = values.status; this.dueTimeInput.value = values.dueTime;
     this.refreshProjects(values.projectId || ''); this.waitingForInput.value = values.waitingFor;
     this.followUpInput.value = values.followUpInDays == null ? '' : shiftDate(dayKey(), values.followUpInDays);
     this.repeatInput.value = values.repeat.frequency; this.repeatIntervalInput.value = String(values.repeat.interval); this.repeatInput.onchange(); this.statusInput.onchange();
@@ -466,7 +479,7 @@ class TaskModal extends Modal {
     this.subtaskRows = values.subtasks.map(s => ({ id: uid(), title: s.title, done: false, due: s.dueInDays == null ? '' : shiftDate(dayKey(), s.dueInDays), dueInDays: null })); this.renderSubtasks(); return true;
   }
   refreshProjects(selected) {
-    this.projectInput.empty(); this.projectInput.createEl('option', { text: 'Kein Projekt', value: '' }).value = '';
+    this.projectInput.empty(); this.projectInput.createEl('option', { text: "No project", value: '' }).value = '';
     [...this.plugin.data.projects].sort((a, b) => a.name.localeCompare(b.name)).forEach(p => this.projectInput.createEl('option', { text: p.name, value: p.id }));
     this.projectInput.value = this.plugin.data.projects.some(p => p.id === selected) ? selected : '';
   }
@@ -474,40 +487,42 @@ class TaskModal extends Modal {
     if (this.saving) return;
     this.captureSubtasks();
     const title = this.titleInput.value.trim(), name = this.nameInput?.value.trim();
-    if (this.isTemplate ? !name : !title) { new Notice(this.isTemplate ? 'Bitte gib der Vorlage einen Namen.' : 'Bitte gib einen Aufgabentitel ein.'); (this.nameInput || this.titleInput).focus(); return; }
-    if (this.isTemplate && this.plugin.data.templates.some(t => t.id !== this.options.templateId && t.name.toLocaleLowerCase() === name.toLocaleLowerCase())) { new Notice('Eine Vorlage mit diesem Namen existiert bereits. Bitte wähle einen anderen Namen.'); return; }
+    if (this.isTemplate ? !name : !title) { new Notice(this.isTemplate ? "Enter a template name." : "Enter a task title."); (this.nameInput || this.titleInput).focus(); return; }
+    if (this.isTemplate && this.plugin.data.templates.some(t => t.id !== this.options.templateId && t.name.toLocaleLowerCase() === name.toLocaleLowerCase())) { new Notice("A template with this name already exists. Choose a different name."); return; }
     if (this.dueInput && (!this.dueInput.checkValidity() || (this.dueInput.value && !dateKeyValid(this.dueInput.value)))) { this.dueInput.reportValidity(); return; }
+    if (!this.dueTimeInput.checkValidity() || (this.dueTimeInput.value && !validTime(this.dueTimeInput.value))) { new Notice('Enter a valid time in HH:mm format.'); return; }
+    if (!this.isTemplate && this.dueTimeInput.value && !validDate(this.dueInput.value)) { new Notice('Set a due date before assigning a time.'); return; }
     if (this.offsetInput && !this.offsetInput.checkValidity()) { this.offsetInput.reportValidity(); return; }
     if (!this.followUpInput.checkValidity()) { this.followUpInput.reportValidity(); return; }
     const frequency = this.repeatInput.value, interval = Number(this.repeatIntervalInput.value);
-    if (!REPEAT_OPTIONS.some(r => r.value === frequency) || (frequency !== 'none' && (!Number.isInteger(interval) || interval < 1 || interval > 365))) { new Notice('Bitte ein gültiges Wiederholungsintervall eingeben.'); return; }
+    if (!REPEAT_OPTIONS.some(r => r.value === frequency) || (frequency !== 'none' && (!Number.isInteger(interval) || interval < 1 || interval > 365))) { new Notice("Enter a valid recurrence interval."); return; }
     const rule = repeatRule({ frequency, interval });
-    if (!this.isTemplate && frequency !== 'none' && !validDate(this.dueInput.value)) { new Notice('Bitte ein Fälligkeitsdatum für die Wiederholung setzen.'); return; }
-    const dueInDays = this.offsetInput && this.offsetInput.value !== '' ? Number(this.offsetInput.value) : (this.isTemplate && frequency !== 'none' ? 0 : null);
+    if (!this.isTemplate && frequency !== 'none' && !validDate(this.dueInput.value)) { new Notice("Set a due date for this recurring task."); return; }
+    const dueInDays = this.offsetInput && this.offsetInput.value !== '' ? Number(this.offsetInput.value) : (this.isTemplate && (frequency !== 'none' || this.dueTimeInput.value) ? 0 : null);
     if (dueInDays != null && (!Number.isInteger(dueInDays) || dueInDays < 0 || dueInDays > 3650)) return;
     const followUpInDays = this.isTemplate && this.followUpInput.value !== '' ? Number(this.followUpInput.value) : null;
     if (this.isTemplate ? followUpInDays != null && (!Number.isInteger(followUpInDays) || followUpInDays < 0 || followUpInDays > 3650) : this.followUpInput.value && !dateKeyValid(this.followUpInput.value)) return;
     for (const item of this.subtaskRows.filter(s => s.title.trim())) {
-      if (this.isTemplate ? item.dueInDays != null && (!Number.isInteger(item.dueInDays) || item.dueInDays < 0 || item.dueInDays > 3650) : item.due && !dateKeyValid(item.due)) { new Notice('Bitte einen gültigen Termin für jede Unteraufgabe eingeben.'); return; }
+      if (this.isTemplate ? item.dueInDays != null && (!Number.isInteger(item.dueInDays) || item.dueInDays < 0 || item.dueInDays > 3650) : item.due && !dateKeyValid(item.due)) { new Notice("Enter a valid date for each subtask."); return; }
     }
     if (!PRIORITIES.some(p => p.name === this.priorityInput.value)) return;
     const status = this.statusInput.value;
     if (!COLS.some(c => c.name === status) || ((!this.taskId || this.isTemplate) && status === 'Done')) return;
     this.saving = true; this.saveButton.disabled = true; if (this.deleteTaskButton) this.deleteTaskButton.disabled = true; this.setSubtaskSaving(true);
     const subtasks = this.subtaskRows.filter(s => s.title.trim()).map(s => this.isTemplate ? { title: s.title.trim(), dueInDays: s.dueInDays ?? null } : { id: s.id, title: s.title.trim(), done: !!s.done, due: s.due || '' });
-    const values = { title, note: this.noteInput.value.trim(), priority: this.priorityInput.value, projectId: this.projectInput.value || null, waitingFor: this.waitingForInput.value.trim(), followUpDate: this.isTemplate ? '' : this.followUpInput.value, updatedAt: Date.now() };
+    const values = { title, dueTime: validTime(this.dueTimeInput.value), note: this.noteInput.value.trim(), priority: this.priorityInput.value, projectId: this.projectInput.value || null, waitingFor: this.waitingForInput.value.trim(), followUpDate: this.isTemplate ? '' : this.followUpInput.value, updatedAt: Date.now() };
     const ok = await this.plugin.mutate(data => {
-      if (values.projectId && !data.projects.some(p => p.id === values.projectId)) throw new Error('Dieses Projekt wurde inzwischen entfernt.');
+      if (values.projectId && !data.projects.some(p => p.id === values.projectId)) throw new Error("This project has been removed.");
       if (this.isTemplate) {
-        if (data.templates.some(t => t.id !== this.options.templateId && t.name.toLocaleLowerCase() === name.toLocaleLowerCase())) throw new Error('Eine Vorlage mit diesem Namen existiert bereits.');
+        if (data.templates.some(t => t.id !== this.options.templateId && t.name.toLocaleLowerCase() === name.toLocaleLowerCase())) throw new Error("A template with this name already exists.");
         const fields = { name, ...templateFields({ ...values, status, dueInDays, followUpInDays, repeat: rule, subtasks }), updatedAt: Date.now() };
         if (this.options.templateId) {
-          const template = data.templates.find(t => t.id === this.options.templateId); if (!template) throw new Error('Vorlage nicht gefunden.'); Object.assign(template, fields);
+          const template = data.templates.find(t => t.id === this.options.templateId); if (!template) throw new Error("Template not found."); Object.assign(template, fields);
         } else data.templates.push({ id: uid(), ...fields, createdAt: Date.now() });
       } else if (this.taskId) {
-        const task = data.tasks.find(t => t.id === this.taskId); if (!task || task.deletedAt || task.archivedAt) throw new Error('Diese Aufgabe ist nicht mehr bearbeitbar.');
+        const task = data.tasks.find(t => t.id === this.taskId); if (!task || task.deletedAt || task.archivedAt) throw new Error("This task can no longer be edited.");
         const subtasksChanged = JSON.stringify(subtasks) !== JSON.stringify(this.originalSubtasks);
-        if (subtasksChanged && JSON.stringify(task.subtasks) !== JSON.stringify(this.originalSubtasks)) throw new Error('Unteraufgaben wurden inzwischen geändert. Bitte den Dialog erneut öffnen.');
+        if (subtasksChanged && JSON.stringify(task.subtasks) !== JSON.stringify(this.originalSubtasks)) throw new Error("Subtasks have changed. Reopen the dialog before saving.");
         Object.assign(task, values, { due: this.dueInput.value }); if (subtasksChanged) task.subtasks = subtasks;
         if (status !== this.originalStatus) setStatus(task, status);
         if (this.logInput?.value.trim()) task.worklog.push({ id: uid(), text: this.logInput.value.trim(), at: Date.now() });
@@ -528,13 +543,14 @@ class TemplateModal extends TaskModal {
 class TemplatePickerModal extends Modal {
   constructor(app, plugin, taskModal = null) { super(app); this.plugin = plugin; this.taskModal = taskModal; this.creating = false; this.templateButtons = []; }
   onOpen() {
+    this.contentEl.setAttribute('lang', 'en-GB');
     this.contentEl.empty(); this.contentEl.addClass('tp-template-picker');
-    this.contentEl.createEl('h2', { text: 'Aufgabe nach Vorlage erstellen' });
-    this.contentEl.createEl('p', { text: 'Wähle eine Vorlage aus. Die neue Aufgabe öffnet sich direkt zum Bearbeiten.', cls: 'tp-muted' });
-    this.searchInput = this.contentEl.createEl('input', { type: 'search', attr: { placeholder: 'Vorlage suchen …', 'aria-label': 'Vorlagen durchsuchen' } });
+    this.contentEl.createEl('h2', { text: "Create task from template" });
+    this.contentEl.createEl('p', { text: "Choose a template. The new task opens immediately for editing.", cls: 'tp-muted' });
+    this.searchInput = this.contentEl.createEl('input', { type: 'search', attr: { placeholder: "Search templates …", 'aria-label': "Search templates" } });
     this.list = this.contentEl.createDiv('tp-template-picker-list');
     this.searchInput.oninput = () => this.renderOptions();
-    this.cancelButton = button(this.contentEl, 'Abbrechen', () => { if (!this.creating) this.close(); });
+    this.cancelButton = button(this.contentEl, "Cancel", () => { if (!this.creating) this.close(); });
     this.renderOptions(); this.searchInput.focus();
   }
   renderOptions() {
@@ -544,12 +560,12 @@ class TemplatePickerModal extends Modal {
     for (const t of templates) {
       const row = this.list.createDiv('tp-template-picker-option'); row.setAttribute('data-template-id', t.id);
       const choose = button(row, t.name, () => this.choose(t.id), 'tp-template-choice');
-      choose.setAttribute('aria-label', 'Aufgabe aus Vorlage ' + t.name + ' erstellen'); choose.disabled = this.creating; this.templateButtons.push(choose);
+      choose.setAttribute('aria-label', "Task from template " + t.name + ' — create'); choose.disabled = this.creating; this.templateButtons.push(choose);
       const meta = row.createDiv('tp-meta'); priorityBadge(meta, t.priority); statusBadge(meta, t.status);
-      meta.createSpan({ text: t.subtasks.length + ' Unteraufgaben', cls: 'tp-muted' });
+      meta.createSpan({ text: t.subtasks.length + " subtasks", cls: 'tp-muted' });
       if (t.title) row.createDiv({ text: t.title, cls: 'tp-template-title' });
     }
-    if (!templates.length) this.list.createDiv({ text: search ? 'Keine passenden Vorlagen.' : 'Noch keine Vorlagen. Erstelle zuerst eine über + Vorlage neben + Aufgabe.', cls: 'tp-empty' });
+    if (!templates.length) this.list.createDiv({ text: search ? "No matching templates." : "No templates yet. Create one using + Template next to + Task.", cls: 'tp-empty' });
   }
   async choose(id) {
     if (this.creating) return false;
@@ -564,10 +580,11 @@ class TemplatePickerModal extends Modal {
 class DeleteTemplateModal extends Modal {
   constructor(app, plugin, templateId) { super(app); this.plugin = plugin; this.templateId = templateId; this.saving = false; }
   onOpen() {
-    this.contentEl.createEl('h2', { text: 'Vorlage löschen?' });
-    this.contentEl.createEl('p', { text: 'Die Vorlage wird entfernt. Bereits daraus erstellte Aufgaben bleiben erhalten.' });
+    this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.createEl('h2', { text: "Delete template?" });
+    this.contentEl.createEl('p', { text: "The template will be removed. Tasks already created from it are kept." });
     const actions = this.contentEl.createDiv('tp-inline-actions');
-    this.deleteButton = button(actions, 'Vorlage löschen', () => this.confirm(), 'mod-warning'); button(actions, 'Abbrechen', () => this.close());
+    this.deleteButton = button(actions, "Delete template", () => this.confirm(), 'mod-warning'); button(actions, "Cancel", () => this.close());
   }
   async confirm() {
     if (this.saving) return; this.saving = true; this.deleteButton.disabled = true;
@@ -579,10 +596,11 @@ class DeleteTemplateModal extends Modal {
 class DeleteTaskForeverModal extends Modal {
   constructor(app, plugin, taskId) { super(app); this.plugin = plugin; this.taskId = taskId; this.saving = false; }
   onOpen() {
-    this.contentEl.createEl('h2', { text: 'Aufgabe endgültig löschen?' });
+    this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.createEl('h2', { text: "Permanently delete task?" });
     const task = this.plugin.data.tasks.find(t => t.id === this.taskId && t.deletedAt);
-    this.contentEl.createEl('p', { text: task ? '„' + task.title + '“ mit Unteraufgaben und Arbeitsverlauf dauerhaft entfernen? Dies kann nicht rückgängig gemacht werden.' : 'Die Aufgabe ist nicht mehr im Papierkorb.' });
-    const actions = this.contentEl.createDiv('tp-inline-actions'); this.deleteButton = button(actions, 'Endgültig löschen', () => this.confirm(), 'mod-warning'); this.deleteButton.disabled = !task; button(actions, 'Abbrechen', () => this.close());
+    this.contentEl.createEl('p', { text: task ? '„' + task.title + "” and all its subtasks and activity will be permanently removed. This cannot be undone." : "This task is no longer in Trash." });
+    const actions = this.contentEl.createDiv('tp-inline-actions'); this.deleteButton = button(actions, "Delete permanently", () => this.confirm(), 'mod-warning'); this.deleteButton.disabled = !task; button(actions, "Cancel", () => this.close());
   }
   async confirm() {
     if (this.saving) return; this.saving = true; this.deleteButton.disabled = true;
@@ -595,29 +613,30 @@ class DeleteTaskForeverModal extends Modal {
 class ProjectModal extends Modal {
   constructor(app, plugin, projectId = null, onSaved = null) { super(app); this.plugin = plugin; this.projectId = projectId; this.onSaved = onSaved; this.saving = false; }
   onOpen() {
+    this.contentEl.setAttribute('lang', 'en-GB');
     const project = this.plugin.data.projects.find(p => p.id === this.projectId);
-    this.contentEl.createEl('h2', { text: project ? 'Projekt bearbeiten' : 'Neues Projekt' });
+    this.contentEl.createEl('h2', { text: project ? "Edit project" : "New project" });
     const form = this.contentEl.createEl('form');
-    const label = form.createEl('label', { text: 'Projektname', cls: 'tp-field' }); this.nameInput = label.createEl('input', { type: 'text' }); this.nameInput.required = true; this.nameInput.value = project?.name || '';
-    const noteLabel = form.createEl('label', { text: 'Beschreibung · optional', cls: 'tp-field' }); this.noteInput = noteLabel.createEl('textarea'); this.noteInput.value = project?.note || '';
-    const visibility = form.createDiv('tp-project-visibility'); visibility.createEl('h3', { text: 'Sichtbarkeit' });
+    const label = form.createEl('label', { text: "Project name", cls: 'tp-field' }); this.nameInput = label.createEl('input', { type: 'text' }); this.nameInput.required = true; this.nameInput.value = project?.name || '';
+    const noteLabel = form.createEl('label', { text: "Description · optional", cls: 'tp-field' }); this.noteInput = noteLabel.createEl('textarea'); this.noteInput.value = project?.note || '';
+    const visibility = form.createDiv('tp-project-visibility'); visibility.createEl('h3', { text: "Visibility" });
     const toggle = (text, checked) => { const label = visibility.createEl('label', { cls: 'tp-reminder-toggle' }); const input = label.createEl('input', { type: 'checkbox' }); input.checked = checked; label.createSpan({ text }); return input; };
-    this.onlyInput = toggle('Nur in Projektansicht anzeigen', !!project?.onlyInProjects);
-    this.dashboardInput = toggle('Im Dashboard berücksichtigen', project?.includeInDashboard !== false);
-    this.remindersInput = toggle('Erinnerungen für dieses Projekt aktivieren', project?.remindersEnabled !== false);
-    visibility.createDiv({ text: 'Ausgeblendete Projekte fehlen in Aufgabenboards, Kalender und allgemeinem Archiv. Dashboard und Erinnerungen lassen sich unabhängig davon einstellen. Der Papierkorb zeigt alle gelöschten Aufgaben.', cls: 'tp-help' });
-    const actions = form.createDiv('tp-inline-actions'); this.saveButton = actions.createEl('button', { text: 'Projekt speichern', cls: 'mod-cta', type: 'submit' }); button(actions, 'Abbrechen', () => this.close());
+    this.onlyInput = toggle("Show only in project view", !!project?.onlyInProjects);
+    this.dashboardInput = toggle("Include in dashboard", project?.includeInDashboard !== false);
+    this.remindersInput = toggle("Enable reminders for this project", project?.remindersEnabled !== false);
+    visibility.createDiv({ text: "Hidden projects are excluded from task boards, Calendar and the general archive. Dashboard and reminders can be configured independently. Trash shows all deleted tasks.", cls: 'tp-help' });
+    const actions = form.createDiv('tp-inline-actions'); this.saveButton = actions.createEl('button', { text: "Save project", cls: 'mod-cta', type: 'submit' }); button(actions, "Cancel", () => this.close());
     form.onsubmit = e => { e.preventDefault(); void this.submit(); }; this.nameInput.focus();
   }
   async submit() {
     if (this.saving) return;
     const name = this.nameInput.value.trim(), note = this.noteInput.value.trim(), visibility = { onlyInProjects: this.onlyInput.checked, includeInDashboard: this.dashboardInput.checked, remindersEnabled: this.remindersInput.checked };
-    if (!name) { new Notice('Bitte einen Projektnamen eingeben.'); return; }
-    if (this.plugin.data.projects.some(p => p.id !== this.projectId && p.name.toLocaleLowerCase() === name.toLocaleLowerCase())) { new Notice('Ein Projekt mit diesem Namen existiert bereits.'); return; }
+    if (!name) { new Notice("Enter a project name."); return; }
+    if (this.plugin.data.projects.some(p => p.id !== this.projectId && p.name.toLocaleLowerCase() === name.toLocaleLowerCase())) { new Notice("A project with this name already exists."); return; }
     this.saving = true; this.saveButton.disabled = true; let id = this.projectId;
     const ok = await this.plugin.mutate(data => {
-      if (data.projects.some(p => p.id !== id && p.name.toLocaleLowerCase() === name.toLocaleLowerCase())) throw new Error('Projektname bereits vorhanden.');
-      if (id) { const project = data.projects.find(p => p.id === id); if (!project) throw new Error('Projekt wurde entfernt.'); Object.assign(project, { name, note, ...visibility }); }
+      if (data.projects.some(p => p.id !== id && p.name.toLocaleLowerCase() === name.toLocaleLowerCase())) throw new Error("Project name already exists.");
+      if (id) { const project = data.projects.find(p => p.id === id); if (!project) throw new Error("Project has been removed."); Object.assign(project, { name, note, ...visibility }); }
       else { id = uid(); data.projects.push({ id, name, note, ...visibility, createdAt: Date.now() }); }
     });
     if (ok) { this.close(); this.onSaved?.(id); } else { this.saving = false; this.saveButton.disabled = false; }
@@ -627,9 +646,10 @@ class ProjectModal extends Modal {
 class DeleteProjectModal extends Modal {
   constructor(app, plugin, projectId, onDeleted = null) { super(app); this.plugin = plugin; this.projectId = projectId; this.onDeleted = onDeleted; this.saving = false; }
   onOpen() {
-    this.contentEl.createEl('h2', { text: 'Projekt entfernen?' });
-    this.contentEl.createEl('p', { text: 'Die Aufgaben bleiben erhalten und werden Kein Projekt zugeordnet. Auch Vorlagen und künftige Serienaufgaben verlieren nur die Projektzuordnung.' });
-    const actions = this.contentEl.createDiv('tp-inline-actions'); this.removeButton = button(actions, 'Projekt entfernen', () => this.confirm(), 'mod-warning'); button(actions, 'Abbrechen', () => this.close());
+    this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.createEl('h2', { text: "Remove project?" });
+    this.contentEl.createEl('p', { text: "Tasks are kept and assigned to No project. Templates and future recurring tasks also keep their contents and lose only the project assignment." });
+    const actions = this.contentEl.createDiv('tp-inline-actions'); this.removeButton = button(actions, "Remove project", () => this.confirm(), 'mod-warning'); button(actions, "Cancel", () => this.close());
   }
   async confirm() {
     if (this.saving) return; this.saving = true; this.removeButton.disabled = true;
@@ -646,12 +666,13 @@ class DeleteProjectModal extends Modal {
 class ReminderSettingsModal extends Modal {
   constructor(app, plugin) { super(app); this.plugin = plugin; this.saving = false; }
   onOpen() {
-    this.contentEl.createEl('h2', { text: 'Fälligkeits-Erinnerungen' });
-    const label = this.contentEl.createEl('label', { cls: 'tp-reminder-toggle' }); this.enabledInput = label.createEl('input', { type: 'checkbox' }); this.enabledInput.checked = this.plugin.data.reminderSettings.enabled; label.createSpan({ text: 'Erinnerungen in Obsidian anzeigen' });
-    const lead = this.contentEl.createEl('label', { text: 'Vorlauf', cls: 'tp-field' }); this.leadInput = lead.createEl('select');
-    for (const days of [0, 1, 3, 7]) this.leadInput.createEl('option', { text: days === 0 ? 'Am Fälligkeitstag' : days + ' Tag(e) vorher', value: String(days) }); this.leadInput.value = String(this.plugin.data.reminderSettings.leadDays);
-    this.contentEl.createEl('p', { text: 'Aufgaben, offene Unteraufgaben und Nachfragen werden berücksichtigt. Jede Fälligkeit wird automatisch höchstens einmal pro Tag gemeldet. Erinnerungen laufen nur, solange das Plugin in Obsidian geladen ist.', cls: 'tp-help' });
-    const actions = this.contentEl.createDiv('tp-inline-actions'); this.saveButton = button(actions, 'Speichern', () => this.submit(), 'mod-cta'); button(actions, 'Abbrechen', () => this.close());
+    this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.createEl('h2', { text: "Due date reminders" });
+    const label = this.contentEl.createEl('label', { cls: 'tp-reminder-toggle' }); this.enabledInput = label.createEl('input', { type: 'checkbox' }); this.enabledInput.checked = this.plugin.data.reminderSettings.enabled; label.createSpan({ text: "Show reminders in Obsidian" });
+    const lead = this.contentEl.createEl('label', { text: "Advance notice", cls: 'tp-field' }); this.leadInput = lead.createEl('select');
+    for (const days of [0, 1, 3, 7]) this.leadInput.createEl('option', { text: days === 0 ? "On the due date" : days + " day(s) before", value: String(days) }); this.leadInput.value = String(this.plugin.data.reminderSettings.leadDays);
+    this.contentEl.createEl('p', { text: "Includes tasks, open subtasks and follow-ups. Each date is announced at most once a day. Timed tasks can also notify when their due time arrives. Reminders work while the plugin is loaded in Obsidian.", cls: 'tp-help' });
+    const actions = this.contentEl.createDiv('tp-inline-actions'); this.saveButton = button(actions, "Save", () => this.submit(), 'mod-cta'); button(actions, "Cancel", () => this.close());
   }
   async submit() {
     if (this.saving) return; const leadDays = Number(this.leadInput.value); if (![0, 1, 3, 7].includes(leadDays)) return;
@@ -665,24 +686,25 @@ class ReminderSettingsModal extends Modal {
 class SeriesManagerModal extends Modal {
   constructor(app, plugin) { super(app); this.plugin = plugin; this.busy = false; }
   onOpen() {
-    this.contentEl.createEl('h2', { text: 'Wiederholungen verwalten' });
-    this.contentEl.createEl('p', { text: 'Serien bleiben auch nach dem Archivieren ihrer Aufgaben hier erreichbar. Fortsetzen überspringt die pausierte Zeit; normale Offline-Zeiten werden weiterhin nachgeholt.', cls: 'tp-help' });
-    this.list = this.contentEl.createDiv('tp-series-list'); this.renderList(); button(this.contentEl, 'Schließen', () => this.close());
+    this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.createEl('h2', { text: "Manage recurrences" });
+    this.contentEl.createEl('p', { text: "Recurrences remain available after their tasks are archived or deleted. Resume skips paused periods; active offline periods are still caught up.", cls: 'tp-help' });
+    this.list = this.contentEl.createDiv('tp-series-list'); this.renderList(); button(this.contentEl, "Close", () => this.close());
   }
   renderList() {
     this.list.empty();
-    if (!this.plugin.data.recurrences.length) this.list.createDiv({ text: 'Noch keine wiederkehrenden Aufgaben. Im Aufgabendialog eine Wiederholung wählen.', cls: 'tp-empty' });
+    if (!this.plugin.data.recurrences.length) this.list.createDiv({ text: "No recurring tasks yet. Choose a recurrence in the task dialog.", cls: 'tp-empty' });
     for (const series of this.plugin.data.recurrences) {
       const row = this.list.createDiv('tp-series-row'); row.createEl('h3', { text: series.defaults.title });
-      row.createDiv({ text: (series.enabled ? 'Aktiv' : 'Pausiert') + ' · ' + REPEAT_OPTIONS.find(r => r.value === series.frequency)?.label + ' · Intervall ' + series.interval + ' · ' + projectName(this.plugin.data, series.defaults.projectId), cls: 'tp-muted' });
-      const actions = row.createDiv('tp-inline-actions'); const next = actions.createEl('input', { type: 'date', attr: { 'aria-label': 'Nächster Termin für ' + series.defaults.title } }); next.value = series.nextDate;
-      button(actions, 'Termin speichern', () => this.change(series.id, s => { if (!dateKeyValid(next.value)) throw new Error('Ungültiger Termin.'); s.nextDate = next.value; s.anchorDay = Number(next.value.slice(-2)); }));
-      button(actions, series.enabled ? 'Pausieren' : 'Fortsetzen', () => this.change(series.id, s => { if (s.enabled) s.enabled = false; else resumeSeries(s); }));
+      row.createDiv({ text: (series.enabled ? "Active" : "Paused") + " · " + REPEAT_OPTIONS.find(r => r.value === series.frequency)?.label + " · Interval " + series.interval + " · " + projectName(this.plugin.data, series.defaults.projectId), cls: 'tp-muted' });
+      const actions = row.createDiv('tp-inline-actions'); const next = actions.createEl('input', { type: 'date', attr: { 'aria-label': "Next date for " + series.defaults.title } }); next.value = series.nextDate;
+      button(actions, "Save date", () => this.change(series.id, s => { if (!dateKeyValid(next.value)) throw new Error("Invalid date."); s.nextDate = next.value; s.anchorDay = Number(next.value.slice(-2)); }));
+      button(actions, series.enabled ? "Pause" : "Resume", () => this.change(series.id, s => { if (s.enabled) s.enabled = false; else resumeSeries(s); }));
     }
   }
   async change(id, action) {
     if (this.busy) return false; this.busy = true;
-    const ok = await this.plugin.mutate(data => { const series = data.recurrences.find(s => s.id === id); if (!series) throw new Error('Serie nicht gefunden.'); action(series); });
+    const ok = await this.plugin.mutate(data => { const series = data.recurrences.find(s => s.id === id); if (!series) throw new Error("Recurrence not found."); action(series); });
     this.busy = false; this.renderList(); return ok;
   }
   onClose() { this.contentEl.empty(); }
@@ -697,7 +719,7 @@ class PlannerView extends ItemView {
     this.selectedProject = 'all'; this.projectBoard = 'status'; this.calendarMode = 'week'; this.calendarDate = dayKey();
   }
   getViewType() { return VIEW; }
-  getDisplayText() { return 'Tagesplaner'; }
+  getDisplayText() { return "Daily Planner"; }
   getIcon() { return 'layout-dashboard'; }
   async onOpen() { await this.plugin.runMaintenance(); await this.plugin.checkReminders(); this.render(); }
   async onClose() { this.drafts.clear(); }
@@ -711,22 +733,22 @@ class PlannerView extends ItemView {
       for (const group of root.querySelectorAll('[data-board]')) boards[group.getAttribute('data-board')] = group.querySelector('.tp-board-scroll')?.scrollLeft || 0;
       this.scrollPositions.set(this.renderedTab, { top: previousBody.scrollTop, boards });
     }
-    root.empty(); root.addClass('tp-root');
-    const head = root.createDiv('tp-head'), heading = head.createDiv(); heading.createEl('h2', { text: 'Tagesplaner' });
-    heading.createDiv({ text: 'Fokus für heute. Überblick für die Woche.', cls: 'tp-muted' });
+    root.empty(); root.addClass('tp-root'); root.setAttribute('lang', 'en-GB');
+    const head = root.createDiv('tp-head'), heading = head.createDiv(); heading.createEl('h2', { text: "Daily Planner" });
+    heading.createDiv({ text: "Focus for today. An overview of your week.", cls: 'tp-muted' });
     const headActions = head.createDiv('tp-head-actions');
-    button(headActions, '+ Aufgabe', () => new TaskModal(this.app, this.plugin, null, { defaultProjectId: this.tab === 'projects' && this.plugin.data.projects.some(p => p.id === this.selectedProject) ? this.selectedProject : null }).open(), 'mod-cta');
-    button(headActions, '+ Vorlage', () => new TemplateModal(this.app, this.plugin).open());
-    const nav = root.createDiv('tp-tabs'); nav.setAttribute('aria-label', 'Planner-Ansichten');
+    button(headActions, "+ Task", () => new TaskModal(this.app, this.plugin, null, { defaultProjectId: this.tab === 'projects' && this.plugin.data.projects.some(p => p.id === this.selectedProject) ? this.selectedProject : null }).open(), 'mod-cta');
+    button(headActions, "+ Template", () => new TemplateModal(this.app, this.plugin).open());
+    const nav = root.createDiv('tp-tabs'); nav.setAttribute('aria-label', "Planner views");
     const archiveCount = this.plugin.data.tasks.filter(t => !t.deletedAt && !projectOnlyTask(this.plugin.data, t) && t.archivedAt).length;
-    for (const [id, label] of [['board', 'Aufgaben'], ['calendar', 'Kalender'], ['projects', 'Projekte'], ['dashboard', 'Dashboard'], ['templates', 'Vorlagenverwaltung'], ['archive', 'Archiv · ' + archiveCount], ['trash', 'Papierkorb · ' + this.plugin.data.tasks.filter(t => t.deletedAt).length]]) {
+    for (const [id, label] of [['board', "Tasks"], ['calendar', "Calendar"], ['projects', "Projects"], ['dashboard', 'Dashboard'], ['templates', "Templates"], ['archive', "Archive · " + archiveCount], ['trash', "Trash · " + this.plugin.data.tasks.filter(t => t.deletedAt).length]]) {
       const b = button(nav, label, () => { this.tab = id; this.render(); }, this.tab === id ? 'tp-tab is-active' : 'tp-tab'); b.setAttribute('aria-pressed', String(this.tab === id));
     }
     if (this.tab === 'board') {
-      const taskNav = root.createDiv('tp-task-navigation'); taskNav.setAttribute('aria-label', 'Ansichten innerhalb von Aufgaben');
-      taskNav.createSpan({ text: 'Aufgaben', cls: 'tp-task-group-label' });
-      const segments = taskNav.createDiv('tp-task-segments'); segments.setAttribute('role', 'group'); segments.setAttribute('aria-label', 'Aufgabenübersicht wählen');
-      for (const [id, label] of [['status', 'Status'], ['priority', 'Prioritäten']]) {
+      const taskNav = root.createDiv('tp-task-navigation'); taskNav.setAttribute('aria-label', "Views within Tasks");
+      taskNav.createSpan({ text: "Tasks", cls: 'tp-task-group-label' });
+      const segments = taskNav.createDiv('tp-task-segments'); segments.setAttribute('role', 'group'); segments.setAttribute('aria-label', "Choose task view");
+      for (const [id, label] of [['status', 'Status'], ['priority', "Priorities"]]) {
         const b = button(segments, label, () => this.switchTaskBoard(id), this.taskBoard === id ? 'tp-task-segment is-active' : 'tp-task-segment');
         b.setAttribute('aria-pressed', String(this.taskBoard === id)); b.setAttribute('data-task-board', id);
       }
@@ -749,74 +771,74 @@ class PlannerView extends ItemView {
     const target = parent.createDiv('tp-filter-results');
     const draw = () => {
       target.empty(); this.draftInputs = new Map(); this.draftControls = new Map();
-      if (this.taskBoard === 'priority') this.renderTaskBoard(target, 'Prioritäten', 'Nicht abgeschlossene Aufgaben nach Dringlichkeit · Teil deiner Aufgaben', 'priority', PRIORITIES);
-      else this.renderTaskBoard(target, 'Status', 'Nach Arbeitsstand verschieben · Teil deiner Aufgaben', 'status', COLS);
+      if (this.taskBoard === 'priority') this.renderTaskBoard(target, "Priorities", "Unfinished tasks by urgency · Part of Tasks", 'priority', PRIORITIES);
+      else this.renderTaskBoard(target, 'Status', "Organise by status · Part of Tasks", 'status', COLS);
     };
     const filters = parent.createDiv('tp-filter-slot'); parent.insertBefore(filters, target); this.renderFilters(filters, draw); draw();
   }
   renderFilters(parent, onUpdate, options = {}) {
     const bar = parent.createDiv('tp-filters');
-    const query = bar.createEl('input', { type: 'search', attr: { placeholder: 'Aufgaben, Unteraufgaben oder Arbeitsverlauf suchen …', 'aria-label': 'Aufgaben durchsuchen' } }); query.value = this.filters.query;
+    const query = bar.createEl('input', { type: 'search', attr: { placeholder: "Search tasks, subtasks or activity …", 'aria-label': "Search tasks" } }); query.value = this.filters.query;
     query.oninput = () => { this.filters.query = query.value; onUpdate(); };
     const select = (label, key, entries) => {
       const field = bar.createEl('select', { attr: { 'aria-label': label } }); entries.forEach(([value, text]) => { field.createEl('option', { text, value }).value = value; }); field.value = this.filters[key];
       field.onchange = () => { this.filters[key] = field.value; onUpdate(); };
     };
-    select('Nach Status filtern', 'status', [['', 'Alle Status'], ...COLS.map(c => [c.name, c.name])]);
-    select('Nach Priorität filtern', 'priority', [['', 'Alle Prioritäten'], ...PRIORITIES.map(p => [p.name, p.name])]);
-    if (!options.hideDate) select('Nach Fälligkeit filtern', 'due', [['all', 'Alle Termine'], ['today', 'Heute fällig'], ['overdue', 'Überfällig'], ['week', 'Nächste 7 Tage'], ['none', 'Ohne Termin']]);
-    if (!options.hideProject) select('Nach Projekt filtern', 'project', [['all', 'Alle Projekte'], ['none', 'Kein Projekt'], ...this.plugin.data.projects.map(p => [p.id, p.name])]);
-    button(bar, 'Filter zurücksetzen', () => { this.filters = { query: '', status: '', priority: '', due: 'all', project: 'all' }; this.render(); }, 'tp-small-button');
+    select("Filter by status", 'status', [['', "All statuses"], ...COLS.map(c => [c.name, c.name])]);
+    select("Filter by priority", 'priority', [['', "All priorities"], ...PRIORITIES.map(p => [p.name, p.name])]);
+    if (!options.hideDate) select("Filter by due date", 'due', [['all', "All dates"], ['today', "Due today"], ['overdue', "Overdue"], ['week', "Next 7 days"], ['none', "No due date"]]);
+    if (!options.hideProject) select("Filter by project", 'project', [['all', "All projects"], ['none', "No project"], ...this.plugin.data.projects.map(p => [p.id, p.name])]);
+    button(bar, "Reset filters", () => { this.filters = { query: '', status: '', priority: '', due: 'all', project: 'all' }; this.render(); }, 'tp-small-button');
   }
   visibleTasks(scope = null, archived = false) {
     const filters = { ...this.filters, project: scope == null ? this.filters.project : scope };
     return this.plugin.data.tasks.filter(t => !t.deletedAt && !!t.archivedAt === archived && (scope != null || !projectOnlyTask(this.plugin.data, t)) && taskMatches(t, filters, this.plugin.data));
   }
   renderCalendar(parent) {
-    const head = parent.createDiv('tp-page-heading'), title = head.createDiv(); title.createEl('h3', { text: 'Wochen- und Kalenderübersicht' });
-    title.createDiv({ text: 'Aufgaben, Unteraufgaben und Nachfragen. Termine ziehen oder zum Bearbeiten anklicken.', cls: 'tp-muted' });
+    const head = parent.createDiv('tp-page-heading'), title = head.createDiv(); title.createEl('h3', { text: "Week and calendar view" });
+    title.createDiv({ text: "Tasks, subtasks and follow-ups. Drag dates to reschedule or click to edit.", cls: 'tp-muted' });
     const actions = head.createDiv('tp-inline-actions');
-    button(actions, 'Wiederholungen', () => new SeriesManagerModal(this.app, this.plugin).open());
-    button(actions, 'Erinnerungen', () => new ReminderSettingsModal(this.app, this.plugin).open());
-    button(actions, 'Jetzt prüfen', () => this.plugin.checkReminders(Date.now(), true));
+    button(actions, "Recurrences", () => new SeriesManagerModal(this.app, this.plugin).open());
+    button(actions, "Reminders", () => new ReminderSettingsModal(this.app, this.plugin).open());
+    button(actions, "Check now", () => this.plugin.checkReminders(Date.now(), true));
     const nav = parent.createDiv('tp-calendar-toolbar');
-    for (const [mode, label] of [['week', 'Woche'], ['month', 'Monat']]) {
+    for (const [mode, label] of [['week', "Week"], ['month', "Month"]]) {
       const b = button(nav, label, () => { this.calendarMode = mode; this.render(); }, this.calendarMode === mode ? 'mod-cta' : ''); b.setAttribute('aria-pressed', String(this.calendarMode === mode));
     }
-    button(nav, '‹', () => this.moveCalendar(-1)).setAttribute('aria-label', 'Vorheriger Zeitraum');
-    button(nav, 'Heute', () => { this.calendarDate = dayKey(); this.render(); });
-    button(nav, '›', () => this.moveCalendar(1)).setAttribute('aria-label', 'Nächster Zeitraum');
-    const jump = nav.createEl('input', { type: 'date', attr: { 'aria-label': 'Kalenderdatum wählen' } }); jump.value = this.calendarDate;
+    button(nav, '‹', () => this.moveCalendar(-1)).setAttribute('aria-label', "Previous period");
+    button(nav, "Today", () => { this.calendarDate = dayKey(); this.render(); });
+    button(nav, '›', () => this.moveCalendar(1)).setAttribute('aria-label', "Next period");
+    const jump = nav.createEl('input', { type: 'date', attr: { 'aria-label': "Choose calendar date" } }); jump.value = this.calendarDate;
     jump.onchange = () => { if (validDate(jump.value)) { this.calendarDate = jump.value; this.render(); } };
     const filters = parent.createDiv(), target = parent.createDiv();
     const draw = () => {
       target.empty(); const range = calendarRange(this.calendarDate, this.calendarMode);
       const allowed = new Set(this.plugin.data.tasks.filter(t => !t.deletedAt && !projectOnlyTask(this.plugin.data, t) && taskMatches(t, { ...this.filters, due: 'all' }, this.plugin.data)).map(t => t.id));
       const entries = attentionEntries(this.plugin.data).filter(e => allowed.has(e.task.id));
-      const label = this.calendarMode === 'month' ? new Date(this.calendarDate + 'T12:00:00').toLocaleDateString('de-CH', { month: 'long', year: 'numeric' }) : shortDate(range.start) + ' – ' + shortDate(shiftDate(range.start, 6));
+      const label = this.calendarMode === 'month' ? new Date(this.calendarDate + 'T12:00:00').toLocaleDateString("en-GB", { month: 'long', year: 'numeric' }) : shortDate(range.start) + ' – ' + shortDate(shiftDate(range.start, 6));
       target.createEl('h3', { text: label, cls: 'tp-calendar-period' });
       const scroll = target.createDiv('tp-calendar-scroll'), grid = scroll.createDiv('tp-calendar-grid tp-calendar-' + this.calendarMode); grid.setAttribute('aria-label', label);
-      for (const weekday of ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']) grid.createDiv({ text: weekday, cls: 'tp-calendar-weekday' });
+      for (const weekday of ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]) grid.createDiv({ text: weekday, cls: 'tp-calendar-weekday' });
       for (let i = 0; i < range.days; i++) {
         const date = shiftDate(range.start, i), day = grid.createDiv('tp-calendar-day' + (date === dayKey() ? ' is-today' : '') + (date.slice(0, 7) !== this.calendarDate.slice(0, 7) && this.calendarMode === 'month' ? ' is-other-month' : ''));
-        day.setAttribute('data-calendar-date', date); day.createDiv({ text: new Date(date + 'T12:00:00').toLocaleDateString('de-CH', { day: 'numeric', month: 'short' }), cls: 'tp-calendar-day-label' });
+        day.setAttribute('data-calendar-date', date); day.createDiv({ text: new Date(date + 'T12:00:00').toLocaleDateString("en-GB", { day: 'numeric', month: 'short' }), cls: 'tp-calendar-day-label' });
         day.ondragover = e => { if (e.dataTransfer?.types.includes('application/x-tagesplaner-date')) { e.preventDefault(); day.addClass('tp-over'); } };
         day.ondragleave = () => day.removeClass('tp-over');
         day.ondrop = e => {
           e.preventDefault(); day.removeClass('tp-over');
-          try { const value = JSON.parse(e.dataTransfer?.getData('application/x-tagesplaner-date') || 'null'); if (value) void this.plugin.reschedule(value.id, value.kind, value.subtaskId, date); } catch { new Notice('Dieser Termin konnte nicht verschoben werden.'); }
+          try { const value = JSON.parse(e.dataTransfer?.getData('application/x-tagesplaner-date') || 'null'); if (value) void this.plugin.reschedule(value.id, value.kind, value.subtaskId, date); } catch { new Notice("Could not reschedule this date."); }
         };
-        for (const entry of entries.filter(e => e.date === date).sort((a, b) => (PRIORITIES.find(p => p.name === b.task.priority)?.rank || 0) - (PRIORITIES.find(p => p.name === a.task.priority)?.rank || 0))) this.renderCalendarEvent(day, entry);
+        for (const entry of entries.filter(e => e.date === date).sort(compareCalendarEntries)) this.renderCalendarEvent(day, entry);
       }
       const extras = target.createDiv('tp-calendar-extras');
-      const overdue = entries.filter(e => e.date < dayKey());
-      const over = extras.createDiv('tp-panel'); over.createEl('h4', { text: 'Überfällig · ' + overdue.length });
-      for (const entry of overdue.sort((a,b) => a.date.localeCompare(b.date))) this.renderCalendarEvent(over, entry, true);
-      if (!overdue.length) over.createDiv({ text: 'Keine überfälligen Termine.', cls: 'tp-muted' });
+      const overdue = entries.filter(e => entryOverdue(e));
+      const over = extras.createDiv('tp-panel'); over.createEl('h4', { text: "Overdue · " + overdue.length });
+      for (const entry of overdue.sort((a,b) => a.date.localeCompare(b.date) || compareCalendarEntries(a,b))) this.renderCalendarEvent(over, entry, true);
+      if (!overdue.length) over.createDiv({ text: "No overdue items.", cls: 'tp-muted' });
       const dated = new Set(entries.map(e => e.task.id)), undated = this.plugin.data.tasks.filter(t => allowed.has(t.id) && !t.archivedAt && t.status !== 'Done' && !dated.has(t.id));
-      const none = extras.createDiv('tp-panel'); none.createEl('h4', { text: 'Ohne Termin · ' + undated.length });
+      const none = extras.createDiv('tp-panel'); none.createEl('h4', { text: "No due date · " + undated.length });
       for (const task of undated) button(none, task.title, () => new TaskModal(this.app, this.plugin, task.id).open(), 'tp-calendar-undated');
-      if (!undated.length) none.createDiv({ text: 'Alle offenen Aufgaben haben einen Termin.', cls: 'tp-muted' });
+      if (!undated.length) none.createDiv({ text: "All open tasks have a date.", cls: 'tp-muted' });
     };
     this.renderFilters(filters, draw, { hideDate: true }); draw();
   }
@@ -825,73 +847,73 @@ class PlannerView extends ItemView {
     this.render();
   }
   renderCalendarEvent(parent, entry, showDate = false) {
-    const item = button(parent, '', () => new TaskModal(this.app, this.plugin, entry.task.id).open(), 'tp-calendar-event tp-priority-' + (PRIORITIES.find(p => p.name === entry.task.priority)?.key || 'mid'));
+    const item = button(parent, '', () => new TaskModal(this.app, this.plugin, entry.task.id).open(), 'tp-calendar-event tp-priority-' + (PRIORITIES.find(p => p.name === entry.task.priority)?.key || 'mid') + (entryOverdue(entry) ? ' is-overdue' : ''));
     item.createDiv({ text: entry.task.title, cls: 'tp-calendar-event-title' });
-    item.createDiv({ text: (showDate ? shortDate(entry.date) + ' · ' : '') + entry.label, cls: 'tp-calendar-event-detail' });
-    item.createDiv({ text: entry.task.priority + ' · ' + entry.task.status + ' · ' + projectName(this.plugin.data, entry.task.projectId), cls: 'tp-calendar-event-detail' });
-    item.setAttribute('data-event-task', entry.task.id); item.setAttribute('data-event-kind', entry.kind); item.draggable = true;
+    item.createDiv({ text: (showDate ? shortDate(entry.date) + " · " : '') + (entry.time || 'All day') + " · " + entry.label, cls: 'tp-calendar-event-detail' });
+    item.createDiv({ text: entry.task.priority + " · " + entry.task.status + " · " + projectName(this.plugin.data, entry.task.projectId), cls: 'tp-calendar-event-detail' });
+    item.setAttribute('data-event-time', entry.time || ''); item.setAttribute('data-event-task', entry.task.id); item.setAttribute('data-event-kind', entry.kind); item.draggable = true;
     item.ondragstart = e => { e.dataTransfer.setData('application/x-tagesplaner-date', JSON.stringify({ id: entry.task.id, kind: entry.kind, subtaskId: entry.subtaskId })); e.dataTransfer.effectAllowed = 'move'; };
   }
   renderTrash(parent) {
-    const title = parent.createDiv('tp-page-heading'); title.createEl('h3', { text: 'Papierkorb' });
-    parent.createDiv({ text: 'Gelöschte Aufgaben bleiben hier, bis du sie wiederherstellst oder endgültig löschst. Projektfilter gelten hier nicht. Serien laufen weiter, bis du sie unter Kalender → Wiederholungen pausierst.', cls: 'tp-help' });
+    const title = parent.createDiv('tp-page-heading'); title.createEl('h3', { text: "Trash" });
+    parent.createDiv({ text: "Deleted tasks stay here until restored or permanently deleted. Project filters do not apply. Recurrences continue until paused under Calendar → Recurrences.", cls: 'tp-help' });
     const tasks = this.plugin.data.tasks.filter(t => t.deletedAt).sort((a,b) => b.deletedAt - a.deletedAt), grid = parent.createDiv('tp-archive-grid');
     for (const task of tasks) {
       const card = grid.createDiv('tp-card tp-trash-card'); card.setAttribute('data-trash-id', task.id);
       card.createEl('h4', { text: task.title }); const meta = card.createDiv('tp-meta'); priorityBadge(meta, task.priority); statusBadge(meta, task.status); meta.createSpan({ text: projectName(this.plugin.data, task.projectId), cls: 'tp-badge' });
-      card.createDiv({ text: 'Gelöscht ' + timeText(task.deletedAt), cls: 'tp-muted' });
+      card.createDiv({ text: "Deleted " + timeText(task.deletedAt), cls: 'tp-muted' });
       if (task.note) card.createDiv({ text: task.note, cls: 'tp-description' });
-      const actions = card.createDiv('tp-inline-actions'); button(actions, 'Wiederherstellen', () => this.plugin.restoreTask(task.id));
-      button(actions, 'Endgültig löschen', () => new DeleteTaskForeverModal(this.app, this.plugin, task.id).open(), 'mod-warning');
+      const actions = card.createDiv('tp-inline-actions'); button(actions, "Restore", () => this.plugin.restoreTask(task.id));
+      button(actions, "Delete permanently", () => new DeleteTaskForeverModal(this.app, this.plugin, task.id).open(), 'mod-warning');
     }
-    if (!tasks.length) grid.createDiv({ text: 'Der Papierkorb ist leer.', cls: 'tp-empty' });
+    if (!tasks.length) grid.createDiv({ text: "Trash is empty.", cls: 'tp-empty' });
   }
   renderProjects(parent) {
     if (this.selectedProject !== 'all' && this.selectedProject !== 'none' && !this.plugin.data.projects.some(p => p.id === this.selectedProject)) this.selectedProject = 'none';
-    const head = parent.createDiv('tp-page-heading'), title = head.createDiv(); title.createEl('h3', { text: 'Projektansicht' }); title.createDiv({ text: 'Projekt auswählen oder Aufgaben ohne Projekt anzeigen.', cls: 'tp-muted' });
-    const actions = head.createDiv('tp-inline-actions'); button(actions, '+ Projekt', () => new ProjectModal(this.app, this.plugin, null, id => { this.selectedProject = id; this.render(); }).open(), 'mod-cta');
-    const select = parent.createEl('select', { cls: 'tp-project-picker', attr: { 'aria-label': 'Angezeigtes Projekt auswählen' } });
-    [['all', 'Alle Projekte'], ['none', 'Kein Projekt'], ...this.plugin.data.projects.map(p => [p.id, p.name])].forEach(([value, text]) => select.createEl('option', { text, value })); select.value = this.selectedProject; select.onchange = () => { this.selectedProject = select.value; this.render(); };
+    const head = parent.createDiv('tp-page-heading'), title = head.createDiv(); title.createEl('h3', { text: "Project view" }); title.createDiv({ text: "Select a project or view tasks without a project.", cls: 'tp-muted' });
+    const actions = head.createDiv('tp-inline-actions'); button(actions, "+ Project", () => new ProjectModal(this.app, this.plugin, null, id => { this.selectedProject = id; this.render(); }).open(), 'mod-cta');
+    const select = parent.createEl('select', { cls: 'tp-project-picker', attr: { 'aria-label': "Select project to display" } });
+    [['all', "All projects"], ['none', "No project"], ...this.plugin.data.projects.map(p => [p.id, p.name])].forEach(([value, text]) => select.createEl('option', { text, value })); select.value = this.selectedProject; select.onchange = () => { this.selectedProject = select.value; this.render(); };
     const project = this.plugin.data.projects.find(p => p.id === this.selectedProject);
     if (project) {
       if (project.note) parent.createDiv({ text: project.note, cls: 'tp-description' });
-      button(actions, 'Projekt bearbeiten', () => new ProjectModal(this.app, this.plugin, project.id).open());
-      button(actions, 'Projekt entfernen', () => new DeleteProjectModal(this.app, this.plugin, project.id, () => { this.selectedProject = 'none'; this.render(); }).open());
+      button(actions, "Edit project", () => new ProjectModal(this.app, this.plugin, project.id).open());
+      button(actions, "Remove project", () => new DeleteProjectModal(this.app, this.plugin, project.id, () => { this.selectedProject = 'none'; this.render(); }).open());
     }
     const scopeTasks = this.plugin.data.tasks.filter(t => !t.deletedAt && (this.selectedProject === 'all' || (this.selectedProject === 'none' ? !t.projectId : t.projectId === this.selectedProject)));
-    const summary = parent.createDiv('tp-brief-stats'); summary.createSpan({ text: scopeTasks.filter(t => t.status !== 'Done').length + ' offen' }); summary.createSpan({ text: scopeTasks.filter(t => t.status === 'Done').length + ' erledigt (inkl. Archiv)' });
-    const total = scopeTasks.length, done = scopeTasks.filter(t => t.status === 'Done').length; progress(parent, done / Math.max(1, total) * 100, 'Projektfortschritt');
-    const nav = parent.createDiv('tp-task-segments'); for (const [key, label] of [['status', 'Status'], ['priority', 'Prioritäten']]) button(nav, label, () => { this.projectBoard = key; this.render(); }, 'tp-task-segment' + (this.projectBoard === key ? ' is-active' : ''));
+    const summary = parent.createDiv('tp-brief-stats'); summary.createSpan({ text: scopeTasks.filter(t => t.status !== 'Done').length + ' open' }); summary.createSpan({ text: scopeTasks.filter(t => t.status === 'Done').length + " completed (including archive)" });
+    const total = scopeTasks.length, done = scopeTasks.filter(t => t.status === 'Done').length; progress(parent, done / Math.max(1, total) * 100, "Project progress");
+    const nav = parent.createDiv('tp-task-segments'); for (const [key, label] of [['status', 'Status'], ['priority', "Priorities"]]) button(nav, label, () => { this.projectBoard = key; this.render(); }, 'tp-task-segment' + (this.projectBoard === key ? ' is-active' : ''));
     const filters = parent.createDiv(), target = parent.createDiv();
     const draw = () => {
-      target.empty(); this.draftInputs = new Map(); this.draftControls = new Map(); this.renderTaskBoard(target, this.projectBoard === 'status' ? 'Projektaufgaben nach Status' : 'Projektaufgaben nach Priorität', project?.name || (this.selectedProject === 'none' ? 'Kein Projekt' : 'Alle Projekte'), this.projectBoard, this.projectBoard === 'status' ? COLS : PRIORITIES, this.selectedProject);
+      target.empty(); this.draftInputs = new Map(); this.draftControls = new Map(); this.renderTaskBoard(target, this.projectBoard === 'status' ? "Project tasks by status" : "Project tasks by priority", project?.name || (this.selectedProject === 'none' ? "No project" : "All projects"), this.projectBoard, this.projectBoard === 'status' ? COLS : PRIORITIES, this.selectedProject);
       const archived = this.visibleTasks(this.selectedProject, true);
-      if (archived.length) { const details = target.createEl('details', { cls: 'tp-project-archive' }); details.createEl('summary', { text: archived.length + ' archivierte Aufgaben dieses Projekts' }); const list = details.createDiv('tp-list-grid'); archived.sort((a, b) => b.archivedAt - a.archivedAt).forEach(t => this.renderCard(list, t, true)); }
+      if (archived.length) { const details = target.createEl('details', { cls: 'tp-project-archive' }); details.createEl('summary', { text: archived.length + " archived tasks in this project" }); const list = details.createDiv('tp-list-grid'); archived.sort((a, b) => b.archivedAt - a.archivedAt).forEach(t => this.renderCard(list, t, true)); }
     };
     this.renderFilters(filters, draw, { hideProject: true }); draw();
   }
   renderTemplates(parent) {
     const head = parent.createDiv('tp-template-heading');
-    const heading = head.createDiv(); heading.createEl('h3', { text: 'Deine Aufgabenvorlagen' });
-    heading.createDiv({ text: 'Wiederkehrende Abläufe vorbereiten. Jede neue Aufgabe bleibt frei anpassbar.', cls: 'tp-muted' });
+    const heading = head.createDiv(); heading.createEl('h3', { text: "Task templates" });
+    heading.createDiv({ text: "Prepare recurring workflows. Each new task remains fully editable.", cls: 'tp-muted' });
     const grid = parent.createDiv('tp-template-grid');
     const templates = [...this.plugin.data.templates].sort((a, b) => a.name.localeCompare(b.name));
-    if (!templates.length) grid.createDiv({ text: 'Noch keine Vorlagen. Erstelle eine mit + Vorlage neben + Aufgabe.', cls: 'tp-empty' });
+    if (!templates.length) grid.createDiv({ text: "No templates yet. Use + Template next to + Task to create one.", cls: 'tp-empty' });
     for (const template of templates) {
       const card = grid.createDiv('tp-template-card'); card.setAttribute('data-template-id', template.id);
       card.createEl('h4', { text: template.name });
       const meta = card.createDiv('tp-meta'); priorityBadge(meta, template.priority); statusBadge(meta, template.status);
-      if (template.dueInDays != null) meta.createSpan({ text: template.dueInDays === 0 ? 'Fällig am Erstellungstag' : 'Fällig nach ' + template.dueInDays + ' Tagen', cls: 'tp-badge' });
+      if (template.dueInDays != null) meta.createSpan({ text: template.dueInDays === 0 ? "Due on creation day" : "Due after " + template.dueInDays + " days", cls: 'tp-badge' });
       if (template.title) card.createDiv({ text: template.title, cls: 'tp-template-title' });
       if (template.note) card.createDiv({ text: template.note, cls: 'tp-description' });
       if (template.subtasks.length) {
-        card.createDiv({ text: template.subtasks.length + ' Unteraufgaben', cls: 'tp-section-title' });
+        card.createDiv({ text: template.subtasks.length + " subtasks", cls: 'tp-section-title' });
         const list = card.createEl('ul', { cls: 'tp-template-subtasks' }); template.subtasks.forEach(s => list.createEl('li', { text: s.title }));
       }
       const actions = card.createDiv('tp-template-actions');
-      button(actions, 'Bearbeiten', () => new TemplateModal(this.app, this.plugin, template.id).open());
-      button(actions, 'Umbenennen', () => new TemplateModal(this.app, this.plugin, template.id).open());
-      button(actions, 'Löschen', () => new DeleteTemplateModal(this.app, this.plugin, template.id).open());
+      button(actions, "Edit", () => new TemplateModal(this.app, this.plugin, template.id).open());
+      button(actions, "Rename", () => new TemplateModal(this.app, this.plugin, template.id).open());
+      button(actions, "Delete", () => new DeleteTemplateModal(this.app, this.plugin, template.id).open());
     }
   }
   renderTaskBoard(parent, heading, hint, field, columns, scope = null) {
@@ -904,20 +926,20 @@ class PlannerView extends ItemView {
       const lane = board.createDiv('tp-lane ' + (field === 'priority' ? 'tp-priority-' : 'tp-') + col.key);
       lane.setAttribute('data-value', col.name);
       const head = lane.createDiv('tp-lane-head'); symbolLabel(head.createEl('h3'), col); head.createSpan({ text: String(tasks.length), cls: 'tp-count' });
-      if (field === 'status' && col.key === 'done') lane.createDiv({ text: 'Nach 24 Stunden automatisch im Archiv', cls: 'tp-lane-hint' });
+      if (field === 'status' && col.key === 'done') lane.createDiv({ text: "Automatically archived after 24 hours", cls: 'tp-lane-hint' });
       lane.ondragover = e => { if (e.dataTransfer?.types.includes('application/x-tagesplaner')) { e.preventDefault(); lane.addClass('tp-over'); } };
       lane.ondragleave = e => { if (!lane.contains(e.relatedTarget)) lane.removeClass('tp-over'); };
       lane.ondrop = e => {
         e.preventDefault(); lane.removeClass('tp-over'); const id = e.dataTransfer?.getData('application/x-tagesplaner');
         if (id) void (field === 'priority' ? this.plugin.changePriority(id, col.name) : this.plugin.changeStatus(id, col.name));
       };
-      if (!tasks.length) lane.createDiv({ text: 'Hier ist gerade Platz.', cls: 'tp-empty-lane' });
+      if (!tasks.length) lane.createDiv({ text: "No tasks here yet.", cls: 'tp-empty-lane' });
       tasks.sort((a, b) => {
         if (field === 'status') {
           const priorityDifference = (PRIORITIES.find(p => p.name === b.priority)?.rank ?? 2) - (PRIORITIES.find(p => p.name === a.priority)?.rank ?? 2);
           if (priorityDifference) return priorityDifference;
         }
-        return (a.due || '9999').localeCompare(b.due || '9999');
+        return (a.due || '9999').localeCompare(b.due || '9999') || (a.dueTime || '').localeCompare(b.dueTime || '');
       }).forEach(t => this.renderCard(lane, t, false));
     }
   }
@@ -948,97 +970,115 @@ class PlannerView extends ItemView {
   }
   async editTask(id, change) {
     return this.plugin.mutate(data => {
-      const task = data.tasks.find(t => t.id === id); if (!task || task.deletedAt || task.archivedAt) throw new Error('Die Aufgabe wurde inzwischen archiviert.');
+      const task = data.tasks.find(t => t.id === id); if (!task || task.deletedAt || task.archivedAt) throw new Error("This task is no longer available for editing.");
       change(task); task.updatedAt = Date.now();
     });
   }
   renderCard(parent, task, archived) {
-    const card = parent.createDiv('tp-card tp-card-compact'), title = card.createDiv('tp-card-head'); title.createEl('h4', { text: task.title, cls: 'tp-title' });
+    const expanded = this.expanded.has(task.id), card = parent.createDiv('tp-card tp-card-compact' + (expanded ? ' is-expanded' : ' is-collapsed'));
     card.setAttribute('data-task-id', task.id);
+    const title = card.createDiv('tp-card-head'); title.createEl('h4', { text: task.title, cls: 'tp-title' });
     if (!archived) {
-      title.draggable = true; title.title = 'Am Titel ziehen, um Status oder Priorität zu ändern';
+      title.draggable = true; title.title = 'Drag the title to change status or priority';
       title.ondragstart = e => { e.dataTransfer.setData('application/x-tagesplaner', task.id); e.dataTransfer.effectAllowed = 'move'; };
     }
     const meta = card.createDiv('tp-meta'); priorityBadge(meta, task.priority); statusBadge(meta, task.status);
     meta.createSpan({ text: projectName(this.plugin.data, task.projectId), cls: 'tp-badge tp-project-badge' });
-    if (task.due) meta.createSpan({ text: shortDate(task.due), cls: 'tp-badge' + (!archived && task.status !== 'Done' && task.due < dayKey() ? ' tp-overdue' : '') });
+    if (task.due) meta.createSpan({ text: shortDate(task.due) + (task.dueTime ? " · " + task.dueTime : ''), cls: 'tp-badge' + (!archived && task.status !== 'Done' && taskOverdue(task) ? ' tp-overdue' : '') });
     const series = this.plugin.data.recurrences.find(s => s.id === task.recurrenceId);
-    if (series) meta.createSpan({ text: series.enabled ? '↻ Serie' : '↻ pausiert', cls: 'tp-badge' });
-    const description = card.createDiv('tp-description-section'); description.createDiv({ text: task.note || 'Noch keine Beschreibung.', cls: 'tp-description' });
-    if (task.status === 'Waiting' && (task.waitingFor || task.followUpDate)) card.createDiv({ text: '◷ ' + (task.waitingFor || 'Rückmeldung') + (task.followUpDate ? ' · Nachfrage ' + shortDate(task.followUpDate) : ''), cls: 'tp-muted tp-card-waiting' });
+    if (series) meta.createSpan({ text: series.enabled ? '↻ Recurring' : '↻ Paused', cls: 'tp-badge' });
+    const description = card.createDiv('tp-description-section'); description.createDiv({ text: task.note || 'No description yet.', cls: 'tp-description' });
     const sub = card.createDiv('tp-compact-subtasks');
     if (task.subtasks.length) {
-      sub.createDiv({ text: 'Unteraufgaben · ' + task.subtasks.filter(s => s.done).length + '/' + task.subtasks.length, cls: 'tp-section-title' });
+      sub.createDiv({ text: 'Subtasks · ' + task.subtasks.filter(s => s.done).length + '/' + task.subtasks.length, cls: 'tp-section-title' });
       for (const item of task.subtasks) {
-        const row = sub.createDiv('tp-subtask'); row.createSpan({ text: (item.done ? '☑ ' : '☐ ') + item.title, cls: item.done ? 'tp-sub-done' : '' });
+        const row = sub.createDiv('tp-subtask'), label = row.createEl('label'), check = label.createEl('input', { type: 'checkbox', attr: { 'aria-label': 'Complete subtask: ' + item.title } });
+        check.checked = item.done; check.disabled = archived;
+        label.createSpan({ text: item.title, cls: item.done ? 'tp-sub-done' : '' });
+        check.onchange = async () => {
+          check.disabled = true;
+          await this.editTask(task.id, current => { const child = current.subtasks.find(s => s.id === item.id); if (!child) throw new Error('Subtask no longer exists.'); child.done = check.checked; });
+        };
         if (item.due) row.createSpan({ text: shortDate(item.due), cls: 'tp-badge' + (!archived && !item.done && item.due < dayKey() ? ' tp-overdue' : '') });
       }
-    } else sub.createDiv({ text: 'Keine Unteraufgaben.', cls: 'tp-muted' });
+    } else sub.createDiv({ text: 'No subtasks.', cls: 'tp-muted' });
+    if (expanded) {
+      const details = card.createDiv('tp-card-details'); details.setAttribute('id', 'tp-details-' + task.id);
+      if (task.status === 'Waiting') details.createDiv({ text: 'Waiting for: ' + (task.waitingFor || 'Pending response') + (task.followUpDate ? ' · Follow up ' + shortDate(task.followUpDate) : ''), cls: 'tp-muted' });
+      if (task.createdAt) details.createDiv({ text: 'Created ' + timeText(task.createdAt), cls: 'tp-muted' });
+      if (task.completedAt) details.createDiv({ text: task.completionDateEstimated ? 'Completed before the update' : 'Completed ' + timeText(task.completedAt), cls: 'tp-muted' });
+      if (archived) details.createDiv({ text: 'Archived ' + timeText(task.archivedAt), cls: 'tp-muted' });
+      details.createDiv({ text: 'Activity history', cls: 'tp-section-title' });
+      if (!task.worklog.length) details.createDiv({ text: 'No activity recorded yet.', cls: 'tp-muted' });
+      for (const entry of [...task.worklog].reverse()) { const row = details.createDiv('tp-log-entry'); row.createDiv({ text: entry.text, cls: 'tp-log-text' }); row.createEl('time', { text: timeText(entry.at), cls: 'tp-muted' }); }
+    }
     const actions = card.createDiv('tp-card-actions');
-    if (archived) button(actions, 'Wieder öffnen', () => this.plugin.changeStatus(task.id, 'ToDo'), 'tp-small-button');
-    else button(actions, 'Bearbeiten', () => new TaskModal(this.app, this.plugin, task.id).open(), 'tp-small-button');
-    button(actions, 'Löschen', () => this.plugin.trashTask(task.id), 'tp-small-button tp-delete-task');
+    const more = button(actions, expanded ? 'Show Less' : 'Show More', () => { if (this.expanded.has(task.id)) this.expanded.delete(task.id); else this.expanded.add(task.id); this.render(); }, 'tp-small-button tp-show-more');
+    more.setAttribute('aria-expanded', String(expanded));
+    if (archived) button(actions, 'Reopen', () => this.plugin.changeStatus(task.id, 'ToDo'), 'tp-small-button');
+    else button(actions, 'Edit', () => new TaskModal(this.app, this.plugin, task.id).open(), 'tp-small-button');
+    button(actions, 'Delete', () => this.plugin.trashTask(task.id), 'tp-small-button tp-delete-task');
   }
   renderArchive(parent) {
-    const tools = parent.createDiv('tp-archive-tools'); tools.createEl('h3', { text: 'Dein Archiv' });
-    tools.createDiv({ text: 'Erledigte Aufgaben bleiben mit Unteraufgaben und Arbeitsverlauf erhalten.', cls: 'tp-muted' });
-    const input = tools.createEl('input', { type: 'search', attr: { placeholder: 'Archiv durchsuchen …', 'aria-label': 'Archiv durchsuchen' } }); input.value = this.archiveSearch;
+    const tools = parent.createDiv('tp-archive-tools'); tools.createEl('h3', { text: "Your archive" });
+    tools.createDiv({ text: "Completed tasks keep their subtasks and activity history.", cls: 'tp-muted' });
+    const input = tools.createEl('input', { type: 'search', attr: { placeholder: "Search archive …", 'aria-label': "Search archive" } }); input.value = this.archiveSearch;
     const grid = parent.createDiv('tp-archive-grid');
     const draw = () => {
       grid.empty(); const q = this.archiveSearch.toLocaleLowerCase();
       const tasks = this.plugin.data.tasks.filter(t => !t.deletedAt && !projectOnlyTask(this.plugin.data, t) && t.archivedAt && [t.title, t.note, ...t.worklog.map(e => e.text), ...t.subtasks.map(s => s.title)].join(' ').toLocaleLowerCase().includes(q));
       tasks.sort((a, b) => b.archivedAt - a.archivedAt).forEach(t => this.renderCard(grid, t, true));
-      if (!tasks.length) grid.createDiv({ text: q ? 'Keine passenden Aufgaben gefunden.' : 'Noch keine archivierten Aufgaben. Fertige Aufgaben erscheinen nach 24 Stunden hier.', cls: 'tp-empty' });
+      if (!tasks.length) grid.createDiv({ text: q ? "No matching tasks found." : "No archived tasks yet. Completed tasks appear here after 24 hours.", cls: 'tp-empty' });
     };
     input.oninput = () => { this.archiveSearch = input.value; draw(); }; draw();
   }
   renderDashboard(parent) {
     const data = { ...this.plugin.data, tasks: this.plugin.data.tasks.filter(t => !t.deletedAt && this.plugin.data.projects.find(p => p.id === t.projectId)?.includeInDashboard !== false) };
-    const m = metrics(data), intro = parent.createDiv('tp-dashboard-intro'); intro.createEl('h3', { text: 'Deine Woche im Blick' });
-    intro.createDiv({ text: new Date().toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long' }), cls: 'tp-muted' });
+    const m = metrics(data), intro = parent.createDiv('tp-dashboard-intro'); intro.createEl('h3', { text: "Your week at a glance" });
+    intro.createDiv({ text: new Date().toLocaleDateString("en-GB", { weekday: 'long', day: 'numeric', month: 'long' }), cls: 'tp-muted' });
     const kpis = parent.createDiv('tp-kpis');
     const metric = (label, value, hint, tone = '', symbol = COLS[0]) => {
       const tile = kpis.createDiv('tp-kpi ' + tone), header = tile.createDiv('tp-kpi-header'); addSymbol(header, symbol); header.createDiv({ text: label, cls: 'tp-muted' }); tile.createDiv({ text: String(value), cls: 'tp-kpi-value' }); tile.createDiv({ text: hint, cls: 'tp-kpi-hint' });
     };
-    metric('Offene Aufgaben', m.active.length, 'Alle noch nicht fertigen Aufgaben'); metric('In Progress', m.inProgress.length, 'Aktuell im Fokus', 'tp-progress', COLS[1]);
-    metric('Heute fällig', m.dueToday.length, 'Noch zu erledigen', '', COLS[2]); metric('Überfällig', m.overdue.length, 'Fälligkeit bereits überschritten', m.overdue.length ? 'tp-risk' : '', PRIORITIES[3]);
-    metric('Erledigt · 7 Tage', m.done7, 'Heute und die letzten 6 Tage', 'tp-done', COLS.find(c => c.name === 'Done')); metric('Erledigt · 30 Tage', m.done30, 'Inklusive archivierter Aufgaben', 'tp-done', COLS.find(c => c.name === 'Done'));
-    metric('Waiting', m.waiting.length, 'Braucht eventuell Unterstützung', 'tp-waiting', COLS[2]); metric('Unteraufgaben', m.subtasksDone + '/' + m.subtasks, 'Erledigt / gesamt, inklusive Archiv', '', COLS.find(c => c.name === 'Done'));
+    metric("Open tasks", m.active.length, "All unfinished tasks"); metric('In Progress', m.inProgress.length, "Currently in focus", 'tp-progress', COLS[1]);
+    metric("Due today", m.dueToday.length, "Still to complete", '', COLS[2]); metric("Overdue", m.overdue.length, "Past the due date or time", m.overdue.length ? 'tp-risk' : '', PRIORITIES[3]);
+    metric("Completed · 7 days", m.done7, "Today and the previous 6 days", 'tp-done', COLS.find(c => c.name === 'Done')); metric("Completed · 30 days", m.done30, "Including archived tasks", 'tp-done', COLS.find(c => c.name === 'Done'));
+    metric('Waiting', m.waiting.length, "May need attention", 'tp-waiting', COLS[2]); metric("Subtasks", m.subtasksDone + '/' + m.subtasks, "Completed / total, including archive", '', COLS.find(c => c.name === 'Done'));
     const grid = parent.createDiv('tp-dashboard-grid');
     const panel = title => { const box = grid.createDiv('tp-panel'); box.createEl('h4', { text: title }); return box; };
-    const priorities = panel('Offene Aufgaben nach Priorität');
+    const priorities = panel("Open tasks by priority");
     for (const p of PRIORITIES) {
       const count = m.active.filter(t => t.priority === p.name).length, row = priorities.createDiv('tp-distribution tp-priority-' + p.key);
-      symbolLabel(row, p); row.createSpan({ text: String(count), cls: 'tp-count' }); progress(row, count / Math.max(1, m.active.length) * 100, 'Priorität ' + p.name);
+      symbolLabel(row, p); row.createSpan({ text: String(count), cls: 'tp-count' }); progress(row, count / Math.max(1, m.active.length) * 100, "Priority " + p.name);
     }
-    const activity = panel('Erledigte Aufgaben · letzte 7 Tage'), chart = activity.createDiv('tp-chart'), max = Math.max(1, ...m.week.map(d => d.count));
+    const activity = panel("Completed tasks · Last 7 days"), chart = activity.createDiv('tp-chart'), max = Math.max(1, ...m.week.map(d => d.count));
     for (const day of m.week) {
       const col = chart.createDiv('tp-chart-column'); col.createSpan({ text: String(day.count), cls: 'tp-chart-count' });
       col.createDiv('tp-chart-track').createDiv('tp-chart-bar').style.height = day.count / max * 100 + '%';
-      col.createSpan({ text: shortDate(day.key), cls: 'tp-muted' }); col.setAttribute('aria-label', day.key + ': ' + day.count + ' erledigt');
+      col.createSpan({ text: shortDate(day.key), cls: 'tp-muted' }); col.setAttribute('aria-label', day.key + ': ' + day.count + ' completed');
     }
-    activity.createDiv({ text: 'Archivierte Aufgaben zählen weiterhin mit. Wieder geöffnete Aufgaben zählen erst nach erneutem Abschluss. Alte Aufgaben ohne Abschlussdatum sind im Zeitdiagramm nicht enthalten.', cls: 'tp-help' });
-    const distribution = panel('Verteilung auf die Kategorien');
+    activity.createDiv({ text: "Archived tasks are included. Reopened tasks count when completed again. Older tasks without a completion date are excluded from this chart.", cls: 'tp-help' });
+    const distribution = panel("Status distribution");
     for (const col of COLS) {
       const count = data.tasks.filter(t => !t.archivedAt && t.status === col.name).length, row = distribution.createDiv('tp-distribution tp-' + col.key);
       symbolLabel(row, col); row.createSpan({ text: String(count), cls: 'tp-count' }); progress(row, count / Math.max(1, data.tasks.filter(t => !t.archivedAt).length) * 100, col.name);
     }
-    const due = panel('Als Nächstes · Fälligkeit'), upcoming = m.active.filter(t => t.due && t.due <= dayKey(shiftDay(Date.now(), 7))).sort((a, b) => a.due.localeCompare(b.due));
+    const due = panel("Coming up · Due dates"), upcoming = m.active.filter(t => t.due && t.due <= dayKey(shiftDay(Date.now(), 7))).sort((a, b) => a.due.localeCompare(b.due) || (a.dueTime || '').localeCompare(b.dueTime || ''));
     for (const t of upcoming.slice(0, 6)) {
-      const row = due.createDiv('tp-summary-row'); button(row, t.title, () => new TaskModal(this.app, this.plugin, t.id).open(), 'tp-text-button'); row.createSpan({ text: shortDate(t.due), cls: t.due < m.today ? 'tp-overdue tp-badge' : 'tp-badge' });
+      const row = due.createDiv('tp-summary-row'); button(row, t.title, () => new TaskModal(this.app, this.plugin, t.id).open(), 'tp-text-button'); row.createSpan({ text: shortDate(t.due) + (t.dueTime ? ' · ' + t.dueTime : ''), cls: taskOverdue(t) ? 'tp-overdue tp-badge' : 'tp-badge' });
     }
-    if (!upcoming.length) due.createDiv({ text: 'Keine offenen Fälligkeiten in den nächsten 7 Tagen.', cls: 'tp-muted' });
-    if (upcoming.length > 6) due.createDiv({ text: '+ ' + (upcoming.length - 6) + ' weitere Aufgaben im Board', cls: 'tp-help' });
-    const recent = panel('Zuletzt abgeschlossen'), completed = [...m.done].sort((a, b) => b.completedAt - a.completedAt).slice(0, 5);
+    if (!upcoming.length) due.createDiv({ text: "No open due dates in the next 7 days.", cls: 'tp-muted' });
+    if (upcoming.length > 6) due.createDiv({ text: '+ ' + (upcoming.length - 6) + " more tasks on the board", cls: 'tp-help' });
+    const recent = panel("Recently completed"), completed = [...m.done].sort((a, b) => b.completedAt - a.completedAt).slice(0, 5);
     for (const t of completed) {
-      const row = recent.createDiv('tp-summary-row'); row.createSpan({ text: t.title }); row.createSpan({ text: (t.archivedAt ? 'Archiv · ' : '') + (t.completionDateEstimated ? 'Vor dem Update erledigt' : timeText(t.completedAt)), cls: 'tp-muted' });
+      const row = recent.createDiv('tp-summary-row'); row.createSpan({ text: t.title }); row.createSpan({ text: (t.archivedAt ? "Archive · " : '') + (t.completionDateEstimated ? "Completed before the update" : timeText(t.completedAt)), cls: 'tp-muted' });
     }
-    if (!completed.length) recent.createDiv({ text: 'Deine nächsten Erfolge erscheinen hier.', cls: 'tp-muted' });
-    const logs = panel('Letzte dokumentierte Arbeitsschritte'), entries = data.tasks.flatMap(t => t.worklog.map(e => ({ ...e, title: t.title }))).sort((a, b) => b.at - a.at).slice(0, 4);
+    if (!completed.length) recent.createDiv({ text: "Your completed tasks will appear here.", cls: 'tp-muted' });
+    const logs = panel("Recent activity"), entries = data.tasks.flatMap(t => t.worklog.map(e => ({ ...e, title: t.title }))).sort((a, b) => b.at - a.at).slice(0, 4);
     for (const e of entries) {
       const row = logs.createDiv('tp-log-entry'); row.createDiv({ text: e.title, cls: 'tp-section-title' }); row.createDiv({ text: e.text, cls: 'tp-log-text' }); row.createDiv({ text: timeText(e.at), cls: 'tp-muted' });
     }
-    if (!entries.length) logs.createDiv({ text: 'Dokumentiere Arbeitsschritte im Bearbeitungsdialog einer Aufgabe.', cls: 'tp-muted' });
+    if (!entries.length) logs.createDiv({ text: "Record activity in a task's edit dialog.", cls: 'tp-muted' });
   }
 }
 
@@ -1046,13 +1086,13 @@ module.exports = class TagesplanerPlugin extends Plugin {
   async onload() {
     this.queue = Promise.resolve(); this.data = normalize(await this.loadData()); await this.saveData(copy(this.data));
     this.registerView(VIEW, leaf => new PlannerView(leaf, this));
-    this.addRibbonIcon('layout-dashboard', 'Tagesplaner öffnen', () => this.activate());
-    this.addCommand({ id: 'open', name: 'Tagesplaner öffnen', callback: () => this.activate() });
-    this.addCommand({ id: 'dashboard', name: 'Dashboard öffnen', callback: () => this.activate('dashboard') });
-    this.addCommand({ id: 'calendar', name: 'Wochen- und Kalenderübersicht öffnen', callback: () => this.activate('calendar') });
-    this.addCommand({ id: 'trash', name: 'Papierkorb öffnen', callback: () => this.activate('trash') });
-    this.addCommand({ id: 'projects', name: 'Projektansicht öffnen', callback: () => this.activate('projects') });
-    this.addCommand({ id: 'reminders', name: 'Erinnerungen jetzt prüfen', callback: () => this.checkReminders(Date.now(), true) });
+    this.addRibbonIcon('layout-dashboard', "Open Daily Planner", () => this.activate());
+    this.addCommand({ id: 'open', name: "Open Daily Planner", callback: () => this.activate() });
+    this.addCommand({ id: 'dashboard', name: "Open dashboard", callback: () => this.activate('dashboard') });
+    this.addCommand({ id: 'calendar', name: "Open week and calendar view", callback: () => this.activate('calendar') });
+    this.addCommand({ id: 'trash', name: "Open Trash", callback: () => this.activate('trash') });
+    this.addCommand({ id: 'projects', name: "Open project view", callback: () => this.activate('projects') });
+    this.addCommand({ id: 'reminders', name: "Check reminders now", callback: () => this.checkReminders(Date.now(), true) });
     await this.runMaintenance(); await this.checkReminders(); this.lastDay = dayKey();
     this.registerInterval(window.setInterval(() => {
       void this.tick();
@@ -1063,17 +1103,17 @@ module.exports = class TagesplanerPlugin extends Plugin {
     const operation = this.queue.then(async () => {
       const before = copy(this.data);
       try { change(this.data); await this.saveData(copy(this.data)); }
-      catch (error) { this.data = before; console.error('Tagesplaner: Speichern fehlgeschlagen', error); new Notice('Änderung nicht gespeichert. Bitte erneut versuchen.'); this.refreshViews(); return false; }
+      catch (error) { this.data = before; console.error("Daily Planner: Save failed", error); new Notice("Change not saved. Please try again."); this.refreshViews(); return false; }
       this.refreshViews(); return true;
     });
-    this.queue = operation.catch(error => { console.error('Tagesplaner: Ansicht konnte nicht aktualisiert werden', error); }); return operation;
+    this.queue = operation.catch(error => { console.error("Daily Planner: Could not update view", error); }); return operation;
   }
   async archiveExpired(now = Date.now()) {
     // Check inside the write queue to serialize archival with status changes.
     const operation = this.queue.then(async () => {
       const before = copy(this.data); if (!archiveDue(this.data, now)) return false;
       try { await this.saveData(copy(this.data)); }
-      catch (error) { this.data = before; console.error('Tagesplaner: Archivieren fehlgeschlagen', error); new Notice('Archivierung konnte nicht gespeichert werden.'); return false; }
+      catch (error) { this.data = before; console.error("Daily Planner: Archiving failed", error); new Notice("Could not save the archive update."); return false; }
       this.refreshViews(); return true;
     });
     this.queue = operation.catch(error => console.error(error)); return operation;
@@ -1083,72 +1123,74 @@ module.exports = class TagesplanerPlugin extends Plugin {
       const before = copy(this.data), generated = generateRecurring(this.data, now), archived = archiveDue(this.data, now);
       if (!generated.changed && !archived) return false;
       try { await this.saveData(copy(this.data)); }
-      catch (error) { this.data = before; console.error('Tagesplaner: Automatische Aktualisierung fehlgeschlagen', error); new Notice('Automatische Aufgaben/Ablage konnten nicht gespeichert werden. Der nächste Versuch folgt automatisch.'); return false; }
+      catch (error) { this.data = before; console.error("Daily Planner: Automatic update failed", error); new Notice("Could not save automatic task updates. The plugin will retry automatically."); return false; }
       this.refreshViews(); return true;
     });
     this.queue = operation.catch(error => console.error(error)); return operation;
   }
   async checkReminders(now = Date.now(), force = false) {
     const operation = this.queue.then(async () => {
-      if (!this.data.reminderSettings.enabled) { if (force) new Notice('Fälligkeits-Erinnerungen sind deaktiviert.'); return false; }
+      if (!this.data.reminderSettings.enabled) { if (force) new Notice("Due date reminders are disabled."); return false; }
       const today = dayKey(now), lastDate = shiftDate(today, this.data.reminderSettings.leadDays);
       const seen = new Set(this.data.reminderState.day === today ? this.data.reminderState.seen : []);
-      const eligible = attentionEntries(this.data).filter(e => e.date <= lastDate && this.data.projects.find(p => p.id === e.task.projectId)?.remindersEnabled !== false);
-      const fresh = force ? eligible : eligible.filter(e => !seen.has(e.key));
-      if (!fresh.length) { if (force) new Notice('Keine anstehenden oder überfälligen Fälligkeiten.'); return false; }
-      const before = copy(this.data.reminderState); fresh.forEach(e => seen.add(e.key));
+      const eligible = attentionEntries(this.data).filter(e => e.date <= lastDate && (!e.time || this.data.reminderSettings.leadDays > 0 || entryOverdue(e, now)) && this.data.projects.find(p => p.id === e.task.projectId)?.remindersEnabled !== false);
+      const fresh = force ? eligible : eligible.filter(e => !seen.has(reminderKey(e, now)));
+      if (!fresh.length) { if (force) new Notice("No upcoming or overdue items."); return false; }
+      const before = copy(this.data.reminderState); fresh.forEach(e => seen.add(reminderKey(e, now)));
       this.data.reminderState = { day: today, seen: [...seen] };
       try { await this.saveData(copy(this.data)); }
-      catch (error) { this.data.reminderState = before; console.error('Tagesplaner: Erinnerungsstatus konnte nicht gespeichert werden', error); return false; }
-      const overdue = fresh.filter(e => e.date < today).length, dueToday = fresh.filter(e => e.date === today).length, upcoming = fresh.length - overdue - dueToday;
-      new Notice('Tagesplaner: ' + overdue + ' überfällig · ' + dueToday + ' heute fällig · ' + upcoming + ' demnächst. Der Kalender zeigt Aufgaben-, Unteraufgaben- und Nachfragetermine. Überfälliges steht unterhalb des Kalenders.', 10000);
+      catch (error) { this.data.reminderState = before; console.error("Daily Planner: Could not save reminder state", error); return false; }
+      const overdue = fresh.filter(e => entryOverdue(e, now)).length, dueToday = fresh.filter(e => e.date === today && !entryOverdue(e, now)).length, upcoming = fresh.length - overdue - dueToday;
+      new Notice("Daily Planner: " + overdue + " overdue · " + dueToday + " due today · " + upcoming + " upcoming. View dates in Calendar and overdue items below it. Hidden projects remain in Projects.", 10000);
       return true;
     });
     this.queue = operation.catch(error => console.error(error)); return operation;
   }
   async tick(now = Date.now()) {
     await this.runMaintenance(now); await this.checkReminders(now);
-    if (this.lastDay !== dayKey(now)) { this.lastDay = dayKey(now); this.refreshViews(); }
+    const minute = Math.floor(now / 60000), today = dayKey(now);
+    if (this.lastDay !== today || (this.lastMinute !== minute && this.data.tasks.some(t => !t.deletedAt && !t.archivedAt && t.status !== 'Done' && t.due === today && t.dueTime))) this.refreshViews();
+    this.lastDay = today; this.lastMinute = minute;
   }
   trashTask(id) {
-    return this.mutate(data => { const task = data.tasks.find(t => t.id === id); if (!task || task.deletedAt) throw new Error('Aufgabe nicht gefunden.'); task.deletedAt = Date.now(); task.updatedAt = task.deletedAt; });
+    return this.mutate(data => { const task = data.tasks.find(t => t.id === id); if (!task || task.deletedAt) throw new Error("Task not found."); task.deletedAt = Date.now(); task.updatedAt = task.deletedAt; });
   }
   restoreTask(id) {
-    return this.mutate(data => { const task = data.tasks.find(t => t.id === id && t.deletedAt); if (!task) throw new Error('Aufgabe nicht im Papierkorb.'); task.deletedAt = null; task.updatedAt = Date.now(); });
+    return this.mutate(data => { const task = data.tasks.find(t => t.id === id && t.deletedAt); if (!task) throw new Error("Task is not in Trash."); task.deletedAt = null; task.updatedAt = Date.now(); });
   }
   deleteTaskForever(id) {
-    return this.mutate(data => { const task = data.tasks.find(t => t.id === id && t.deletedAt); if (!task) throw new Error('Aufgabe nicht im Papierkorb.'); if (task.recurrenceId && task.occurrenceDate) { const key = task.recurrenceId + ':' + task.occurrenceDate; if (!data.deletedOccurrences.includes(key)) data.deletedOccurrences.push(key); } data.tasks = data.tasks.filter(t => t.id !== id); });
+    return this.mutate(data => { const task = data.tasks.find(t => t.id === id && t.deletedAt); if (!task) throw new Error("Task is not in Trash."); if (task.recurrenceId && task.occurrenceDate) { const key = task.recurrenceId + ':' + task.occurrenceDate; if (!data.deletedOccurrences.includes(key)) data.deletedOccurrences.push(key); } data.tasks = data.tasks.filter(t => t.id !== id); });
   }
   reschedule(id, kind, subtaskId, date) {
     return this.mutate(data => {
-      if (!validDate(date)) throw new Error('Ungültiger Termin.');
-      const task = data.tasks.find(t => t.id === id); if (!task || task.deletedAt || task.archivedAt || task.status === 'Done') throw new Error('Aufgabe nicht mehr offen.');
+      if (!validDate(date)) throw new Error("Invalid date.");
+      const task = data.tasks.find(t => t.id === id); if (!task || task.deletedAt || task.archivedAt || task.status === 'Done') throw new Error("Task is no longer open.");
       if (kind === 'task') task.due = date;
       else if (kind === 'followup' && task.status === 'Waiting') task.followUpDate = date;
-      else if (kind === 'subtask') { const sub = task.subtasks.find(s => s.id === subtaskId && !s.done); if (!sub) throw new Error('Unteraufgabe nicht mehr offen.'); sub.due = date; }
-      else throw new Error('Unbekannter Termin.');
+      else if (kind === 'subtask') { const sub = task.subtasks.find(s => s.id === subtaskId && !s.done); if (!sub) throw new Error("Subtask is no longer open."); sub.due = date; }
+      else throw new Error("Unknown date type.");
       task.updatedAt = Date.now();
     });
   }
-  changeStatus(id, status) { return this.mutate(data => { const task = data.tasks.find(t => t.id === id); if (!task || task.deletedAt) throw new Error('Aufgabe nicht gefunden.'); setStatus(task, status); }); }
+  changeStatus(id, status) { return this.mutate(data => { const task = data.tasks.find(t => t.id === id); if (!task || task.deletedAt) throw new Error("Task not found."); setStatus(task, status); }); }
   changePriority(id, priority) {
     return this.mutate(data => {
-      if (!PRIORITIES.some(p => p.name === priority)) throw new Error('Unbekannte Priorität.');
+      if (!PRIORITIES.some(p => p.name === priority)) throw new Error("Unknown priority.");
       const task = data.tasks.find(t => t.id === id);
-      if (!task || task.deletedAt || task.archivedAt) throw new Error('Die Aufgabe ist nicht mehr bearbeitbar.');
+      if (!task || task.deletedAt || task.archivedAt) throw new Error("This task can no longer be edited.");
       task.priority = priority; task.updatedAt = Date.now();
     });
   }
   async createTaskFromTemplate(id, defaultProjectId = null) {
     let taskId = null;
     const ok = await this.mutate(data => {
-      const template = data.templates.find(t => t.id === id); if (!template) throw new Error('Vorlage nicht gefunden.');
+      const template = data.templates.find(t => t.id === id); if (!template) throw new Error("Template not found.");
       const values = templateFields(template), now = Date.now();
       taskId = uid(); data.tasks.push({
         id: taskId, title: values.title.trim() || template.name, note: values.note, priority: values.priority,
         status: values.status, projectId: data.projects.some(p => p.id === values.projectId) ? values.projectId : (data.projects.some(p => p.id === defaultProjectId) ? defaultProjectId : null),
         waitingFor: values.waitingFor, followUpDate: values.followUpInDays == null ? '' : shiftDate(dayKey(now), values.followUpInDays),
-        due: values.dueInDays == null ? (values.repeat.frequency !== 'none' ? dayKey(now) : '') : dayKey(shiftDay(now, values.dueInDays)),
+        dueTime: values.dueTime, due: values.dueInDays == null ? (values.repeat.frequency !== 'none' ? dayKey(now) : '') : dayKey(shiftDay(now, values.dueInDays)),
         subtasks: values.subtasks.map(s => ({ id: uid(), title: s.title, done: false, due: s.dueInDays == null ? '' : shiftDate(dayKey(now), s.dueInDays) })), worklog: [],
         recurrenceId: null, occurrenceDate: '',
         createdAt: now, updatedAt: now, completedAt: null, archivedAt: null, completionDateEstimated: false

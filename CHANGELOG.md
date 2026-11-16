@@ -1,4 +1,17 @@
-# Änderungen
+# Changelog
+
+## 1.9.0
+
+- Complete or reopen subtasks directly on collapsed task cards. Changes persist across task boards, project views, reloads and calendar entries; archived subtasks remain read-only.
+- Add Show More / Show Less to cards, expanding descriptions, activity history and task details while preserving compact default cards.
+- Make the plugin interface, display name, commands, dialogs, notifications and errors consistently English. Preserve existing user content and the plugin ID/data path.
+- Add optional local task due times in 24-hour format, including templates and recurring tasks. Keep existing tasks all-day.
+- Display and sort timed calendar events chronologically; preserve time when dragging tasks to another date. Include time in overdue indicators, filters and dashboard dates.
+- Respect due times in reminders, with a separate due-time notification after an advance reminder and persistent deduplication.
+
+Release assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.9.0**.
+
+Historical release notes below retain their original language.
 
 ## 1.8.0
 
