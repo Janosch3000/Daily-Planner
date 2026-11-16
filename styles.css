@@ -305,3 +305,17 @@
 .tp-agenda-all-day { position: sticky; top: 56px; z-index: 10; border-bottom: 1px solid var(--background-modifier-border); }
 .tp-agenda-all-label { top: 56px; z-index: 11; }
 .tp-scheduled-event .tp-timed-event { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; }
+
+.tp-calendar-workspace { display: grid; grid-template-columns: minmax(0,1fr) 220px; gap: 16px; align-items: start; }
+.tp-calendar-main { min-width: 0; }
+.tp-calendar-sidebar { min-width: 0; position: sticky; top: 0; }
+.tp-unscheduled-zone { min-height: 180px; padding: 16px; border-style: dashed; transition: background .15s,border-color .15s; max-height: 62vh; overflow: auto; }
+.tp-unscheduled-zone h4 { margin: 0 0 12px; font-size: 13px; }
+.tp-unscheduled-zone .tp-help { margin-bottom: 14px; font-size: 11px; line-height: 1.5; }
+.tp-unscheduled-zone .tp-calendar-undated { cursor: grab; white-space: normal; line-height: 1.45; padding: 12px; margin: 8px 0; font-size: 12px; text-align: left; height: auto; }
+.tp-unscheduled-zone .tp-calendar-undated:active { cursor: grabbing; }
+.tp-unscheduled-zone.tp-over { border-color: var(--interactive-accent); background: var(--background-modifier-hover); box-shadow: inset 0 0 0 1px var(--interactive-accent); }
+.tp-calendar-workspace + .tp-calendar-extras { grid-template-columns: 1fr; }
+@container tagesplaner (max-width: 700px) { .tp-calendar-workspace { grid-template-columns: 1fr; } .tp-calendar-sidebar { order: -1; position: static; } .tp-unscheduled-zone { max-height: 230px; } }
+.tp-calendar-event.is-dragging { opacity: .55; cursor: grabbing; }
+.tp-calendar-drag-ghost { position: fixed; z-index: 10000; pointer-events: none; max-width: 240px; padding: 10px 14px; border-radius: 8px; background: var(--background-secondary); color: var(--text-normal); border: 1px solid var(--interactive-accent); box-shadow: 0 4px 15px #0003; font-size: 12px; font-weight: 600; }

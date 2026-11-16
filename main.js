@@ -379,6 +379,7 @@ class TaskModal extends Modal {
     this.startTimeInput.onchange=()=>{if(!validTime(this.startTimeInput.value))return;const start=readDate('start')||dayKey();setDate('start',start);if(!readDate('end')||!this.dueTimeInput.value){const end=wallParts(wallValue(start,this.startTimeInput.value)+60);setDate('end',end.date);this.dueTimeInput.value=end.time;}};
     const series = this.plugin.data.recurrences.find(s => s.id === task?.recurrenceId);
     const rule = repeatRule(this.isTemplate ? task?.repeat : (series?.enabled ? series : {}));
+    this.originalRule=copy(rule);this.originalDue=task?.due||'';
     this.repeatInput = field("Recurrence", 'select', null, '');
     REPEAT_OPTIONS.forEach(r => this.repeatInput.createEl('option', { text: r.label, value: r.value })); this.repeatInput.value = rule.frequency;
     this.repeatIntervalInput = field("Every … days / weeks / months", 'input', 'number', rule.interval);
@@ -553,7 +554,8 @@ class TaskModal extends Modal {
     const frequency = this.repeatInput.value, interval = Number(this.repeatIntervalInput.value);
     if (!REPEAT_OPTIONS.some(r => r.value === frequency) || (frequency !== 'none' && (!Number.isInteger(interval) || interval < 1 || interval > 365))) { new Notice("Enter a valid recurrence interval."); return; }
     const rule = repeatRule({ frequency, interval });
-    if (!this.isTemplate && frequency !== 'none' && !validDate(this.dueInput.value)) { new Notice("Set a due date for this recurring task."); return; }
+    const keepUnscheduledSeries = !this.isTemplate && !!this.taskId && !this.originalDue && frequency !== 'none' && frequency === this.originalRule.frequency && interval === this.originalRule.interval;
+    if (!this.isTemplate && frequency !== 'none' && !validDate(this.dueInput.value) && !keepUnscheduledSeries) { new Notice("Set a due date for this recurring task."); return; }
     const dueInDays = this.offsetInput && this.offsetInput.value !== '' ? Number(this.offsetInput.value) : (this.isTemplate && (frequency !== 'none' || this.dueTimeInput.value) ? 0 : null);
     if (dueInDays != null && (!Number.isInteger(dueInDays) || dueInDays < 0 || dueInDays > 3650)) return;
     const followUpInDays = this.isTemplate && this.followUpInput.value !== '' ? Number(this.followUpInput.value) : null;
@@ -586,7 +588,7 @@ class TaskModal extends Modal {
         Object.assign(task, values, { due: this.dueInput.value }); if (subtasksChanged) task.subtasks = subtasks;
         if (status !== this.originalStatus) setStatus(task, status);
         if (this.logInput?.value.trim()) task.worklog.push({ id: uid(), text: this.logInput.value.trim(), at: Date.now() });
-        configureRecurrence(data, task, rule);
+        if(task.due || rule.frequency==='none') configureRecurrence(data, task, rule);
       } else {
         const task = { id: uid(), ...values, status, due: this.dueInput.value, createdAt: Date.now(), completedAt: null, archivedAt: null, recurrenceId: null, occurrenceDate: '', subtasks, worklog: [] };
         if (this.logInput?.value.trim()) task.worklog.push({ id: uid(), text: this.logInput.value.trim(), at: Date.now() });
@@ -877,8 +879,9 @@ class PlannerView extends ItemView {
       const entries = attentionEntries(this.plugin.data).filter(e => allowed.has(e.task.id));
       const label = this.calendarMode === 'month' ? new Date(this.calendarDate + 'T12:00:00').toLocaleDateString("en-GB", { month: 'long', year: 'numeric' }) : shortDate(range.start) + ' – ' + shortDate(shiftDate(range.start, 6));
       target.createEl('h3', { text: label, cls: 'tp-calendar-period' });
-      if(this.calendarMode==='week') this.renderWeekTimeline(target,entries,range.start); else {
-      const scroll = target.createDiv('tp-calendar-scroll'), grid = scroll.createDiv('tp-calendar-grid tp-calendar-' + this.calendarMode); grid.setAttribute('aria-label', label);
+      const workspace=target.createDiv('tp-calendar-workspace'),calendarHost=workspace.createDiv('tp-calendar-main'),sidebar=workspace.createDiv('tp-calendar-sidebar');
+      if(this.calendarMode==='week') this.renderWeekTimeline(calendarHost,entries,range.start); else {
+      const scroll = calendarHost.createDiv('tp-calendar-scroll'), grid = scroll.createDiv('tp-calendar-grid tp-calendar-' + this.calendarMode); grid.setAttribute('aria-label', label);
       for (const weekday of ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]) grid.createDiv({ text: weekday, cls: 'tp-calendar-weekday' });
       for (let i = 0; i < range.days; i++) {
         const date = shiftDate(range.start, i), day = grid.createDiv('tp-calendar-day' + (date === dayKey() ? ' is-today' : '') + (date.slice(0, 7) !== this.calendarDate.slice(0, 7) && this.calendarMode === 'month' ? ' is-other-month' : ''));
@@ -892,10 +895,18 @@ class PlannerView extends ItemView {
       const over = extras.createDiv('tp-panel'); over.createEl('h4', { text: "Overdue · " + overdue.length });
       for (const entry of overdue.sort((a,b) => a.date.localeCompare(b.date) || compareCalendarEntries(a,b))) this.renderCalendarEvent(over, entry, true);
       if (!overdue.length) over.createDiv({ text: "No overdue items.", cls: 'tp-muted' });
-      const dated = new Set(entries.map(e => e.task.id)), undated = this.plugin.data.tasks.filter(t => allowed.has(t.id) && !t.archivedAt && t.status !== 'Done' && !dated.has(t.id));
-      const none = extras.createDiv('tp-panel'); none.createEl('h4', { text: "No due date · " + undated.length });
-      for (const task of undated) button(none, task.title, () => new TaskModal(this.app, this.plugin, task.id).open(), 'tp-calendar-undated');
-      if (!undated.length) none.createDiv({ text: "All open tasks have a date.", cls: 'tp-muted' });
+      const undated = this.plugin.data.tasks.filter(t => allowed.has(t.id) && !t.archivedAt && t.status !== 'Done' && !validDate(t.due));
+      const none = sidebar.createDiv('tp-panel tp-unscheduled-zone'); none.createEl('h4', { text: 'No due date · ' + undated.length });
+      none.setAttribute('data-unscheduled-dropzone','true');none.setAttribute('aria-label','Unscheduled tasks drop zone');
+      none.createDiv({text:'Drag a task into a day or time slot. Drop an event here to remove its date.',cls:'tp-help'});
+      none.ondragover=e=>{if(e.dataTransfer?.types.includes('application/x-tagesplaner-date')){e.preventDefault();none.addClass('tp-over');e.dataTransfer.dropEffect='move';}};
+      none.ondragleave=e=>{if(!none.contains(e.relatedTarget))none.removeClass('tp-over');};
+      none.ondrop=e=>{e.preventDefault();e.stopPropagation?.();none.removeClass('tp-over');try{const value=JSON.parse(e.dataTransfer?.getData('application/x-tagesplaner-date')||'null');if(value)void this.plugin.clearCalendarDate(value.id,value.kind,value.subtaskId);}catch{new Notice('Could not remove this date.');}};
+      for (const task of undated) {
+        const item=button(none,task.title,()=>new TaskModal(this.app,this.plugin,task.id).open(),'tp-calendar-undated');item.setAttribute('data-undated-task',task.id);item.draggable=true;item.title='Drag into the calendar to schedule this task, or click to edit.';
+        item.ondragstart=e=>{e.dataTransfer.setData('application/x-tagesplaner-date',JSON.stringify({id:task.id,kind:'task'}));e.dataTransfer.effectAllowed='move';};
+      }
+      if (!undated.length) none.createDiv({ text: 'Drop a task here to remove its schedule.', cls: 'tp-empty' });
     };
     this.renderFilters(filters, draw, { hideDate: true }); draw();
   }
@@ -945,6 +956,35 @@ class PlannerView extends ItemView {
     item.title=entry.task.title+'\n'+label+'\n'+projectName(this.plugin.data,entry.task.projectId);
     item.setAttribute('data-event-task',entry.task.id);item.setAttribute('data-event-kind',entry.kind);item.setAttribute('data-event-time',entry.task.dueTime||'');
     item.draggable=true;item.ondragstart=e=>{e.dataTransfer.setData('application/x-tagesplaner-date',JSON.stringify({id:entry.task.id,kind:entry.kind,subtaskId:entry.subtaskId}));e.dataTransfer.effectAllowed='move';};
+    this.bindCalendarPointerDrag(item,entry);
+  }
+  bindCalendarPointerDrag(item,entry) {
+    const open=item.onclick,doc=item.ownerDocument;let drag=null,ghost=null,highlight=null;
+    const clean=()=>{ghost?.remove();ghost=null;highlight?.removeClass('tp-over');highlight=null;item.removeClass('is-dragging');};
+    const hit=(x,y)=>doc.elementFromPoint?.(x,y);
+    item.onclick=e=>{if(Date.now()>=(this.suppressCalendarClickUntil||0))open?.(e);};
+    item.onpointerdown=e=>{if(e.button!=null&&e.button!==0)return;e.preventDefault();drag={x:e.clientX,y:e.clientY,moved:false,pointerId:e.pointerId};try{item.setPointerCapture?.(e.pointerId);}catch{drag=null;}};
+    item.onpointermove=e=>{
+      if(!drag)return;
+      if(!drag.moved&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<5)return;
+      e.preventDefault();drag.moved=true;item.addClass('is-dragging');
+      if(!ghost&&doc.body?.createDiv)ghost=doc.body.createDiv({text:entry.task.title,cls:'tp-calendar-drag-ghost'});
+      if(ghost){ghost.style.left=(e.clientX+14)+'px';ghost.style.top=(e.clientY+14)+'px';}
+      const target=hit(e.clientX,e.clientY)?.closest('[data-unscheduled-dropzone], [data-calendar-date], [data-all-day-date]');
+      if(target!==highlight){highlight?.removeClass('tp-over');highlight=target;highlight?.addClass('tp-over');}
+    };
+    item.onpointerup=async e=>{
+      if(!drag)return;const state=drag;drag=null;e.preventDefault();clean();try{item.releasePointerCapture?.(state.pointerId);}catch{}
+      if(!state.moved){open?.(e);this.suppressCalendarClickUntil=Date.now()+300;return;}
+      this.suppressCalendarClickUntil=Date.now()+300;
+      const target=hit(e.clientX,e.clientY);if(!target)return;
+      if(target.closest('[data-unscheduled-dropzone]')){await this.plugin.clearCalendarDate(entry.task.id,entry.kind,entry.subtaskId);return;}
+      const day=target.closest('[data-calendar-date], [data-all-day-date]');if(!day)return;
+      const date=day.getAttribute('data-calendar-date')||day.getAttribute('data-all-day-date');
+      if(day.classList.contains('tp-agenda-day')&&entry.kind==='task'){const box=day.getBoundingClientRect(),minute=Math.max(0,Math.min(1425,Math.round((e.clientY-box.top)/CALENDAR_PX_PER_MINUTE/15)*15));await this.plugin.moveTimedTask(entry.task.id,date,minute);}
+      else await this.plugin.reschedule(entry.task.id,entry.kind,entry.subtaskId,date);
+    };
+    item.onpointercancel=()=>{drag=null;clean();};item.onlostpointercapture=()=>{if(drag){drag=null;clean();}};
   }
   renderTimedEvent(parent, entry) {
     const box=parent.createDiv('tp-scheduled-event tp-priority-'+(PRIORITIES.find(p=>p.name===entry.task.priority)?.key||'mid'));box.setAttribute('data-schedule-id',entry.task.id);
@@ -1288,6 +1328,16 @@ module.exports = class TagesplanerPlugin extends Plugin {
       else if (kind === 'subtask') { const sub = task.subtasks.find(s => s.id === subtaskId && !s.done); if (!sub) throw new Error("Subtask is no longer open."); sub.due = date; }
       else throw new Error("Unknown date type.");
       task.updatedAt = Date.now();
+    });
+  }
+  clearCalendarDate(id,kind='task',subtaskId=null) {
+    return this.mutate(data=>{
+      const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done')throw new Error('This event is no longer editable.');
+      if(kind==='task') Object.assign(task,{startDate:'',startTime:'',due:'',dueTime:''});
+      else if(kind==='subtask'){const sub=task.subtasks.find(s=>s.id===subtaskId&&!s.done);if(!sub)throw new Error('Subtask is no longer open.');sub.due='';}
+      else if(kind==='followup'&&task.status==='Waiting')task.followUpDate='';
+      else throw new Error('Unknown date type.');
+      task.updatedAt=Date.now();
     });
   }
   resizeTask(id, edge, delta, expected = null) {

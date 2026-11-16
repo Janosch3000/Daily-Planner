@@ -1,6 +1,6 @@
 # Daily Planner for Obsidian
 
-Version **1.10.0** · Tasks and projects with start/end schedules, resizable weekly time blocks, a roomier month calendar, templates, recurring tasks and Trash.
+Version **1.11.0** · Tasks and projects with start/end schedules, resizable weekly time blocks, a roomier month calendar, templates, recurring tasks and Trash.
 
 ## Install or update with BRAT
 
@@ -17,6 +17,19 @@ Collapsed cards show the title, small priority/status/project labels, due date a
 **Edit** opens the task dialog for title, description, priority, status, project, dates, time, recurrence, subtasks and activity. New activity is appended when changes are saved. Drag the card by its title to change status on the Status board or priority on the Priorities board. Inline priority/status selectors are intentionally absent.
 
 Statuses are **ToDo**, **In Progress**, **Waiting**, **Done**. Priorities are **low**, **mid**, **high**, **immediately**. Status columns put higher priorities first, then earlier due dates and times. Done tasks are excluded from Priorities and return when reopened. Coloured card borders turn white on hover.
+
+## Drag tasks between the calendar and No due date
+
+**No due date** is a drop zone beside the calendar. It lists open, visible tasks without their own main end date. A task can be listed here even when one of its subtasks or its Waiting follow-up has a separate date. The list follows search/project/status/priority filters and excludes project-only, Done, archived and deleted tasks.
+
+- Drag a task from this list into a weekly time slot to create a one-hour range starting at the selected time, snapped to 15 minutes. Resize or edit the range afterwards.
+- Drop onto the weekly all-day row or a Month day cell to assign that date without inventing clock times.
+- Drag a main task event back into No due date to clear its start date/time and end date/time. The task itself, its status, priority, project, description, subtasks and activity are kept.
+- Drag a subtask or follow-up entry into the zone to remove only that entry's date. Other dates on the parent task remain unchanged. Removing a child's date does not put an otherwise scheduled parent into the unscheduled list.
+
+The zone remains available when empty. During calendar-event dragging the valid target is highlighted. Releasing outside a valid target cancels the move. Clicking an entry still opens Edit; the dialog is also the alternative for assigning or clearing dates without dragging. On narrow panels the unscheduled list appears above the calendar.
+
+Unscheduling one recurring occurrence does not pause the series or change its future defaults. The unscheduled occurrence remains editable without requiring a new date when the recurrence settings are unchanged. Assign a date to change its recurrence settings, or manage the series under Calendar → Recurrences.
 
 ## Start and end dates
 
@@ -99,9 +112,9 @@ Search matches task titles, descriptions, subtasks, activity, waiting people and
 
 Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Back up that file before downgrading; older versions do not understand Trash, visibility options or times.
 
-## Create release 1.10.0
+## Create release 1.11.0
 
-Create a GitHub release with tag **1.10.0**, target **main**, title **Daily Planner 1.10.0**. Attach these files individually:
+Create a GitHub release with tag **1.11.0**, target **main**, title **Daily Planner 1.11.0**. Attach these files individually:
 
 - `main.js`
 - `manifest.json`

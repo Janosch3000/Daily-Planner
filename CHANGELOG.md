@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.11.0
+
+- Add draggable unscheduled tasks beside the calendar. Dropping into a time slot creates a one-hour range; all-day/Month drops assign a date without times.
+- Drop calendar events back into No due date to clear the main schedule, or only the dragged subtask/follow-up date. Preserve task content and unrelated dates.
+- Keep the empty drop zone visible and highlight valid targets. Make calendar time-block movement reliable with pointer capture, a drag preview and cancellation.
+- Keep parents without main dates available even when child/follow-up dates are scheduled. Respect existing visibility and filters.
+- Preserve active recurrences when unscheduling a single occurrence; allow ordinary edits of the undated occurrence.
+
+Release assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.11.0**.
+
+
 ## 1.10.0
 
 - Replace due-time-only editing with start/end dates and times. Preserve old deadlines and supply a one-hour start for existing timed tasks.
