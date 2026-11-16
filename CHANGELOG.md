@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.14.0
+
+- Open on a new Home page with large icon cards for all eight planner sections, plus recurrence settings and reminders.
+- Add descriptions, live counts, subtle coloured accents and responsive card grids.
+- Add a Home button at the top left while keeping the top navigation available in every view.
+- Preserve drafts, filters, board selections and direct-view commands when navigating through Home.
+
+Release assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.14.0**.
+
+
 ## 1.13.3
 
 - Permanently delete archived tasks two calendar months after archiving, including subtasks and activity. Apply retention to existing and project archives; clamp missing month days to month end.

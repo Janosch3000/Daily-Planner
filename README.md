@@ -1,12 +1,18 @@
 # Daily Planner for Obsidian
 
-Version **1.13.3** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
+Version **1.14.0** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
 
 ## Install or update with BRAT
 
 In Obsidian, open **BRAT → Add Beta plugin** and enter `Janosch3000/Daily-Planner`. Enable **Daily Planner** under Community plugins. Open it using the ribbon icon or the **Open Daily Planner** command.
 
 For updates, check for plugin updates in BRAT, then reload the plugin or restart Obsidian. Existing data is preserved. The plugin ID and data location remain `tagesplaner`; changing the display name does not create a second installation.
+
+## Home page
+
+Opening Daily Planner with the ribbon or **Open Daily Planner** command opens **Home**. Large cards with coloured line icons lead to Tasks, Recurring tasks, Calendar, Projects, Dashboard, Templates, Archive and Trash. Two additional cards open recurrence settings and reminders. Cards show short descriptions and live counts where relevant.
+
+The **Home** button at the top left returns here from any view. The top navigation stays available throughout the plugin. Switching through Home preserves task drafts, filters and board selections. Direct commands such as Open dashboard still open their named view. Cards adapt from three to two to one column as the panel narrows and support keyboard navigation and the shared white hover/focus outline.
 
 ## Interaction feedback
 
@@ -138,11 +144,11 @@ All plugin-owned interface text, commands, dialogs, reminders and errors are Eng
 
 Search matches task titles, descriptions, subtasks, activity, waiting people and project names. Multiple words must all match. Combine status, priority, date and project filters. **Reset filters** clears them.
 
-Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.13.3 uses data schema 3 for shared weekly tasks. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
+Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.14.0 uses data schema 3 for shared weekly tasks. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
 
-## Create release 1.13.3
+## Create release 1.14.0
 
-Create a GitHub release with tag **1.13.3**, target **main**, title **Daily Planner 1.13.3**. Attach these files individually:
+Create a GitHub release with tag **1.14.0**, target **main**, title **Daily Planner 1.14.0**. Attach these files individually:
 
 - `main.js`
 - `manifest.json`
