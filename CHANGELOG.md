@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.15.1
+
+- Show + Task only in Tasks, Calendar and Projects, and + Recurring task in Recurring tasks.
+- Show + Template only in Templates; remove creation actions from Dashboard, Archive and Trash as well as Home.
+- Update empty-state instructions while retaining task creation from templates in the task dialog.
+
+Release assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.15.1**.
+
+
 ## 1.15.0
 
 - Remove the visible plugin title and tagline; let Home use the full available tool-content width.

@@ -770,7 +770,7 @@ class TemplatePickerModal extends Modal {
       meta.createSpan({ text: t.subtasks.length + " subtasks", cls: 'tp-muted' });
       if (t.title) row.createDiv({ text: t.title, cls: 'tp-template-title' });
     }
-    if (!templates.length) this.list.createDiv({ text: search ? "No matching templates." : "No templates yet. Create one using + Template next to + Task.", cls: 'tp-empty' });
+    if (!templates.length) this.list.createDiv({ text: search ? "No matching templates." : "No templates yet. Open Templates and use + Template to create one.", cls: 'tp-empty' });
   }
   async choose(id) {
     if (this.creating) return false;
@@ -966,7 +966,12 @@ class PlannerView extends ItemView {
       const head=root.createDiv('tp-head tp-tool-header'),identity=head.createDiv('tp-head-identity');
       const home=button(identity,'',()=>this.goHome(),'tp-home-button');home.setAttribute('aria-label','Go to home');home.title='Go to home';addSymbol(home,{key:'home',icon:'home'});home.createSpan({text:'Home'});
       const toggle=button(identity,'',()=>{this.sidebarOpen=!this.sidebarOpen;sidebar.hidden=!this.sidebarOpen;toggle.setAttribute('aria-expanded',String(this.sidebarOpen));},'tp-sidebar-toggle');addSymbol(toggle,{key:'menu',icon:'menu'});toggle.createSpan({text:'Tools'});toggle.setAttribute('aria-label','Toggle tool sidebar');toggle.setAttribute('aria-expanded',String(this.sidebarOpen));toggle.setAttribute('aria-controls',this.sidebarId);toggle.title='Show or hide tools';
-      const headActions=head.createDiv('tp-head-actions');button(headActions,this.tab==='recurring'?'+ Recurring task':'+ Task',()=>new TaskModal(this.app,this.plugin,null,{defaultRepeat:this.tab==='recurring'?'weekly':null,defaultProjectId:this.tab==='projects'&&this.plugin.data.projects.some(project=>project.id===this.selectedProject)?this.selectedProject:null}).open(),'mod-cta');button(headActions,'+ Template',()=>new TemplateModal(this.app,this.plugin).open());
+      const canCreateTask=['board','recurring','calendar','today','projects'].includes(this.tab);
+      if(canCreateTask||this.tab==='templates'){
+        const headActions=head.createDiv('tp-head-actions');
+        if(canCreateTask)button(headActions,this.tab==='recurring'?'+ Recurring task':'+ Task',()=>new TaskModal(this.app,this.plugin,null,{defaultRepeat:this.tab==='recurring'?'weekly':null,defaultProjectId:this.tab==='projects'&&this.plugin.data.projects.some(project=>project.id===this.selectedProject)?this.selectedProject:null}).open(),'mod-cta');
+        if(this.tab==='templates')button(headActions,'+ Template',()=>new TemplateModal(this.app,this.plugin).open(),'mod-cta');
+      }
       const workspace=root.createDiv('tp-tool-workspace'),sidebar=workspace.createDiv('tp-tabs tp-tool-sidebar');sidebar.hidden=!this.sidebarOpen;sidebar.setAttribute('id',this.sidebarId);sidebar.setAttribute('aria-label','Planner views');sidebar.createDiv({text:'TOOLS',cls:'tp-sidebar-heading'});
       const archiveCount=this.plugin.data.tasks.filter(task=>!task.deletedAt&&!projectOnlyTask(this.plugin.data,task)&&task.archivedAt).length;
       for(const [id,label] of [['board','Tasks'],['recurring','Recurring tasks'],['calendar','Calendar'],['projects','Projects'],['dashboard','Dashboard'],['templates','Templates'],['archive','Archive · '+archiveCount],['trash','Trash · '+this.plugin.data.tasks.filter(task=>task.deletedAt).length]]){
@@ -1290,7 +1295,7 @@ class PlannerView extends ItemView {
     heading.createDiv({ text: "Prepare recurring workflows. Each new task remains fully editable.", cls: 'tp-muted' });
     const grid = parent.createDiv('tp-template-grid');
     const templates = [...this.plugin.data.templates].sort((a, b) => a.name.localeCompare(b.name));
-    if (!templates.length) grid.createDiv({ text: "No templates yet. Use + Template next to + Task to create one.", cls: 'tp-empty' });
+    if (!templates.length) grid.createDiv({ text: "No templates yet. Use + Template above to create one.", cls: 'tp-empty' });
     for (const template of templates) {
       const card = grid.createDiv('tp-template-card'); card.setAttribute('data-template-id', template.id);
       card.createEl('h4', { text: template.name });

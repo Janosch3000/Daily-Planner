@@ -1,6 +1,6 @@
 # Daily Planner for Obsidian
 
-Version **1.15.0** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
+Version **1.15.1** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
 
 ## Install or update with BRAT
 
@@ -12,7 +12,7 @@ For updates, check for plugin updates in BRAT, then reload the plugin or restart
 
 Opening Daily Planner with the ribbon or **Open Daily Planner** command opens **Home**. Large cards with coloured line icons lead to Tasks, Recurring tasks, Calendar, Projects, Dashboard, Templates, Archive and Trash. Two additional cards open recurrence settings and reminders. Cards show short descriptions and live counts where relevant.
 
-Inside a tool, a large **Home** button at the top left returns here. **Tools** beside it expands a left sidebar for switching tools; selecting a tool closes it. The sidebar overlays the content on narrow panels. The plugin title and tagline are no longer rendered inside the planner. Home uses the full available content width and has no navigation header. Home itself has no Home button, sidebar toggle or task/template creation shortcuts. Within the planner content, the mouse Back button (button 3) returns from a tool to Home. Alt+Left is supported as well. The handler prevents the native Back action for the handled event sequence and is removed when the view closes; unrelated mouse buttons and Back on Home keep their normal behavior. Browser/Obsidian history is not modified. Open a tool to create tasks or templates. Switching through Home preserves task drafts, filters and board selections. Direct commands such as Open dashboard still open their named view. Home places a compact dashboard to the left of the tool cards and a Next up preview to their right. The dashboard shows open work, In Progress, due today, completed work in the last seven days, overdue/waiting counts and a small completion chart; project-only and dashboard-excluded tasks are omitted. Next up shows up to six distinct open tasks with scheduled ranges within the next 60 days, ordered by their start; completed, deleted, archived and project-only tasks are excluded. Weekly routines appear only once using their next occurrence. Preview clicks enter the task’s tool before opening Edit. With no upcoming tasks, a helpful empty state appears. The columns stack as the panel narrows, and tool cards adapt from two to one column and support keyboard navigation and the shared white hover/focus outline.
+Inside a tool, a large **Home** button at the top left returns here. **Tools** beside it expands a left sidebar for switching tools; selecting a tool closes it. The sidebar overlays the content on narrow panels. The plugin title and tagline are no longer rendered inside the planner. Home uses the full available content width and has no navigation header. Home itself has no Home button, sidebar toggle or task/template creation shortcuts. Within the planner content, the mouse Back button (button 3) returns from a tool to Home. Alt+Left is supported as well. The handler prevents the native Back action for the handled event sequence and is removed when the view closes; unrelated mouse buttons and Back on Home keep their normal behavior. Browser/Obsidian history is not modified. **+ Task** is available in Tasks, Calendar and Projects; **+ Recurring task** appears in Recurring tasks; **+ Template** appears only in Templates. Home, Dashboard, Archive and Trash have no task/template creation shortcuts. Creating a task from a template remains available in the task dialog. Switching through Home preserves task drafts, filters and board selections. Direct commands such as Open dashboard still open their named view. Home places a compact dashboard to the left of the tool cards and a Next up preview to their right. The dashboard shows open work, In Progress, due today, completed work in the last seven days, overdue/waiting counts and a small completion chart; project-only and dashboard-excluded tasks are omitted. Next up shows up to six distinct open tasks with scheduled ranges within the next 60 days, ordered by their start; completed, deleted, archived and project-only tasks are excluded. Weekly routines appear only once using their next occurrence. Preview clicks enter the task’s tool before opening Edit. With no upcoming tasks, a helpful empty state appears. The columns stack as the panel narrows, and tool cards adapt from two to one column and support keyboard navigation and the shared white hover/focus outline.
 
 ## Interaction feedback
 
@@ -116,7 +116,7 @@ Checks run on loading/opening and every minute while the plugin is loaded. Obsid
 
 ## Templates and recurring tasks
 
-Use **+ Template** next to **+ Task** to create a named template. Templates store an optional title, description, initial status, priority, project, relative dates, due time, subtasks and recurrence rules. Enter adds a subtask row without saving prematurely.
+Open **Templates → + Template** to create a named template. Templates store an optional title, description, initial status, priority, project, relative dates, due time, subtasks and recurrence rules. Enter adds a subtask row without saving prematurely.
 
 Use **+ Task → Create task from template** to choose a template. An independent task is created and immediately opened for editing. Cancelling that edit dialog keeps the already-created task; use Delete if it was created accidentally. Editing or deleting templates does not change tasks already created from them.
 
@@ -144,11 +144,11 @@ All plugin-owned interface text, commands, dialogs, reminders and errors are Eng
 
 Search matches task titles, descriptions, subtasks, activity, waiting people and project names. Multiple words must all match. Combine status, priority, date and project filters. **Reset filters** clears them.
 
-Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.15.0 uses data schema 3 for shared weekly tasks. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
+Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.15.1 uses data schema 3 for shared weekly tasks. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
 
-## Create release 1.15.0
+## Create release 1.15.1
 
-Create a GitHub release with tag **1.15.0**, target **main**, title **Daily Planner 1.15.0**. Attach these files individually:
+Create a GitHub release with tag **1.15.1**, target **main**, title **Daily Planner 1.15.1**. Attach these files individually:
 
 - `main.js`
 - `manifest.json`
