@@ -1,6 +1,6 @@
 # Daily Planner for Obsidian
 
-Version **1.9.0** · Tasks and projects with expandable cards, subtask checkboxes, due times, a week/month calendar, templates, recurring tasks and Trash.
+Version **1.10.0** · Tasks and projects with start/end schedules, resizable weekly time blocks, a roomier month calendar, templates, recurring tasks and Trash.
 
 ## Install or update with BRAT
 
@@ -18,23 +18,36 @@ Collapsed cards show the title, small priority/status/project labels, due date a
 
 Statuses are **ToDo**, **In Progress**, **Waiting**, **Done**. Priorities are **low**, **mid**, **high**, **immediately**. Status columns put higher priorities first, then earlier due dates and times. Done tasks are excluded from Priorities and return when reopened. Coloured card borders turn white on hover.
 
-## Due dates and times
+## Start and end dates
 
-In **Edit → Due date** and **Due time**, set an optional local time using a 24-hour value such as `09:30`. A time requires a date. Selecting a time on a new task supplies today's date if none is set. Clearing the time keeps the date and makes the task all-day again. Existing tasks without times remain all-day; no midnight deadline is invented.
+In **Edit**, set **Start date**, **Start time**, **End date** and **End time**. Times use local 24-hour values. Both dates can differ, including overnight and multi-day tasks. The end must be after the start for timed tasks; all-day ranges include both boundary dates.
 
-The time appears on the card, calendar entry and upcoming dashboard list. Calendar days show all-day entries first, then timed tasks in chronological order, using priority for equal times. A timed task becomes overdue when its local due time arrives. An all-day task becomes overdue on the next day. The open interface updates during the regular minute checks.
+Entering a start time supplies an end one hour later if no complete end exists. Entering only an end time supplies a start one hour earlier, including the previous day when necessary. Leave both times empty for all-day scheduling. A date without times remains all-day.
 
-Dragging a task to another calendar day preserves its time. Rescheduling a subtask or follow-up changes only that item's date. These are date-only entries; this version adds due times to main tasks. Times use the device's local timezone, including its daylight-saving rules, and are not fixed UTC appointments. The calendar is a dated event list, not an hourly duration grid.
+Existing due dates and due times become end dates/times without changing the deadline. Existing timed tasks receive a one-hour start before that deadline. Existing all-day tasks remain all-day. Change the generated start in Edit if the task needs a different duration.
 
-Templates and recurrence defaults also preserve due times. A timed template without a relative date uses creation day. New recurring tasks inherit the saved time. Editing a recurring task's defaults affects future occurrences; dragging an existing calendar entry changes that occurrence only.
+**The end remains the deadline** for overdue indicators, filters, dashboard dates and reminders. Start and end are scheduling boundaries, not work-effort estimates. Times follow the device's local timezone and daylight-saving rules rather than representing fixed UTC appointments.
 
-## Week and month calendar
+Templates store relative start/end dates and both times. Recurrence defaults preserve the start's offset from the end, including negative offsets for overnight ranges. New occurrences inherit these values. Editing a recurring task in its dialog updates future defaults; moving or resizing an existing calendar event changes only that occurrence.
 
-**Calendar** replaces the old Today page. **Week** starts on Monday; **Month** includes adjacent dates to complete the grid. Use the arrows, **Today**, or the date input to navigate. Scroll horizontally on narrow screens.
+## Weekly timeline and month calendar
 
-Entries cover open task dates, open subtask dates and follow-ups for Waiting tasks. Their type and optional time are shown. A task can have several entries. Click one to edit its task, or drag it to a date to reschedule that specific entry. Done, archived and deleted tasks are excluded.
+**Week** displays an hourly timeline from Monday to Sunday. All-day tasks, subtasks and follow-ups stay above the time grid. Time blocks are positioned by their starts and sized by their duration. The initial vertical position targets the first scheduled hour; subsequent scrolling is retained while the view is open.
 
-**Overdue** and **No due date** below the grid remain accessible regardless of the displayed period. Search and status/priority/project filters apply to the grid and these lists together. Completed subtasks no longer create open calendar entries.
+Overlapping events use separate columns. Busy days widen to retain readable event titles, and very short events receive enough visual height to keep their labels readable. This minimum display height does not change a task's actual duration. Scroll horizontally to reach the remaining weekdays on narrow screens. Titles are larger and bold; time, priority, status and project are smaller within the block. Hover for the full title and project.
+
+**Move:** drag a time block onto a date/time slot to move the whole range while preserving its duration. Dropping an all-day task into the time grid creates a one-hour timed range. Date-based moves, including in Month, preserve the existing times and number of days. Subtask and follow-up moves change only their own dates.
+
+**Resize timed events:** in Week, drag the small top handle to change the start or the bottom handle to change the end. Changes snap to 15-minute increments, with a minimum resized duration of 15 minutes. The time label previews the proposed range while dragging. Releasing saves it; cancelling the pointer gesture keeps the original schedule. Resize handles also support Arrow Up/Arrow Down for 15-minute changes. Edit remains available as an alternative.
+
+**Resize dates:** all-day entries and Month entries have small date handles. Drag the start or end handle onto another day to extend or shorten that boundary without moving the other one. Clicking a date handle opens Edit. Timed Month entries preserve their clocks while their dates change; use Week or Edit for precise time adjustments.
+
+Multi-day timed tasks are split across day columns with continuation arrows. A range ending exactly at midnight does not add an empty block on the following day. All-day ranges include their end day. All-day dates and time blocks refer to the same underlying task; clicking an entry opens that task.
+
+**Month** uses larger day cells and more space between entries. Use the arrows, **Today**, or the date input to navigate. Search and status/priority/project filters apply to the calendar and the **Overdue** / **No due date** lists below it. Done, archived, deleted and project-only tasks remain excluded from the general calendar. Completed subtasks no longer create calendar entries.
+
+Resizing validates that the task is still open and that its schedule has not changed in another dialog. Failed saves restore the original range. A task deleted or archived during an interaction cannot be resized.
+
 
 ## Projects and visibility
 
@@ -86,9 +99,9 @@ Search matches task titles, descriptions, subtasks, activity, waiting people and
 
 Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Back up that file before downgrading; older versions do not understand Trash, visibility options or times.
 
-## Create release 1.9.0
+## Create release 1.10.0
 
-Create a GitHub release with tag **1.9.0**, target **main**, title **Daily Planner 1.9.0**. Attach these files individually:
+Create a GitHub release with tag **1.10.0**, target **main**, title **Daily Planner 1.10.0**. Attach these files individually:
 
 - `main.js`
 - `manifest.json`

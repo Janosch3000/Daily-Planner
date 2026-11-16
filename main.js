@@ -84,7 +84,7 @@ function projectName(data, id) { return data.projects.find(p => p.id === id)?.na
 function taskDefaults(task, baseDate = task.due || dayKey()) {
   return {
     title: task.title, note: task.note || '', status: task.status === 'Done' ? 'ToDo' : task.status,
-    dueTime: validTime(task.dueTime), priority: task.priority, projectId: task.projectId || null, waitingFor: task.waitingFor || '',
+    startTime: validTime(task.startTime), startOffsetDays: task.startDate ? daysBetween(baseDate, task.startDate) : null, dueTime: validTime(task.dueTime), priority: task.priority, projectId: task.projectId || null, waitingFor: task.waitingFor || '',
     followUpInDays: validDate(task.followUpDate) ? daysBetween(baseDate, task.followUpDate) : null,
     subtasks: task.subtasks.map(s => ({ title: s.title, dueInDays: validDate(s.due) ? daysBetween(baseDate, s.due) : null }))
   };
@@ -93,7 +93,7 @@ function recurringTask(series, date, now) {
   const d = series.defaults;
   return {
     id: uid(), title: d.title, note: d.note, status: d.status, priority: d.priority, projectId: d.projectId,
-    due: date, dueTime: validTime(d.dueTime), waitingFor: d.waitingFor, followUpDate: d.followUpInDays == null ? '' : shiftDate(date, d.followUpInDays),
+    ...normaliseSchedule({ due: date, dueTime: d.dueTime, startDate: d.startOffsetDays == null ? '' : shiftDate(date, d.startOffsetDays), startTime: d.startTime }), due: date, dueTime: validTime(d.dueTime), waitingFor: d.waitingFor, followUpDate: d.followUpInDays == null ? '' : shiftDate(date, d.followUpInDays),
     subtasks: d.subtasks.map(s => ({ id: uid(), title: s.title, done: false, due: s.dueInDays == null ? '' : shiftDate(date, s.dueInDays) })),
     worklog: [], recurrenceId: series.id, occurrenceDate: date,
     createdAt: now, updatedAt: now, completedAt: null, archivedAt: null, completionDateEstimated: false
@@ -151,6 +151,51 @@ function compareCalendarEntries(a, b) {
   return (a.time || '').localeCompare(b.time || '') || (PRIORITIES.find(p => p.name === b.task.priority)?.rank || 0) - (PRIORITIES.find(p => p.name === a.task.priority)?.rank || 0) || a.task.title.localeCompare(b.task.title);
 }
 function reminderKey(entry, now) { return entry.time ? (entryOverdue(entry, now) ? 'due:' : 'upcoming:') + entry.key : entry.key; }
+const CALENDAR_PX_PER_MINUTE = 1.2;
+function minuteOfDay(time) { const t = validTime(time); return t ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3)) : 0; }
+function wallValue(date, time = '00:00') { return Math.round(Date.parse(date + 'T00:00:00Z') / DAY) * 1440 + minuteOfDay(time); }
+function wallParts(value) { const day = Math.floor(value / 1440), minutes = value - day * 1440; return { date: new Date(day * DAY).toISOString().slice(0, 10), time: String(Math.floor(minutes / 60)).padStart(2, '0') + ':' + String(minutes % 60).padStart(2, '0') }; }
+function resolveSchedule(task) {
+  const due = validDate(task.due), dueTime = validTime(task.dueTime), startDate = validDate(task.startDate), startTime = validTime(task.startTime);
+  if (!due) { if (startDate || startTime || dueTime) throw new Error('An end date is required for a scheduled task.'); return { startDate: '', startTime: '' }; }
+  if (dueTime && !startDate && !startTime) { const start = wallParts(wallValue(due, dueTime) - 60); return { startDate: start.date, startTime: start.time }; }
+  if (!dueTime && !startTime) { if (startDate && startDate > due) throw new Error('The end date must not precede the start date.'); return { startDate, startTime: '' }; }
+  if (!startDate || !startTime || !dueTime) throw new Error('Set both start and end dates and times, or leave both times empty for an all-day task.');
+  if (wallValue(startDate, startTime) >= wallValue(due, dueTime)) throw new Error('The end must be after the start.');
+  return { startDate, startTime };
+}
+function normaliseSchedule(task) {
+  try { return resolveSchedule(task); } catch { return resolveSchedule({ due: validDate(task.due), dueTime: validDate(task.due) ? validTime(task.dueTime) : '' }); }
+}
+function scheduleKey(task) { const s = normaliseSchedule(task); return [s.startDate, s.startTime, task.due || '', task.dueTime || ''].join('|'); }
+function taskRange(task) {
+  if (!validDate(task.due)) return null;
+  const s = normaliseSchedule(task), startDate = s.startDate || task.due, timed = !!validTime(task.dueTime);
+  return { startDate, startTime: s.startTime, endDate: task.due, endTime: validTime(task.dueTime), timed, start: wallValue(startDate, s.startTime), end: wallValue(task.due, task.dueTime) + (timed ? 0 : 1440) };
+}
+function resizeRange(task, edge, delta) {
+  const range = taskRange(task); if (!range?.timed || !['start', 'end'].includes(edge) || !Number.isFinite(delta)) throw new Error('This timed event cannot be resized.');
+  const change = Math.round(delta / 15) * 15, start = edge === 'start' ? Math.min(range.start + change, range.end - 15) : range.start, end = edge === 'end' ? Math.max(range.end + change, range.start + 15) : range.end;
+  const a = wallParts(start), b = wallParts(end); if (!validDate(a.date) || !validDate(b.date)) throw new Error('The resulting date is out of range.');
+  return { startDate: a.date, startTime: a.time, due: b.date, dueTime: b.time };
+}
+function calendarEntriesForDate(entries, date) {
+  const result = [], dayStart = wallValue(date);
+  for (const entry of entries) {
+    if (entry.kind !== 'task') { if (entry.date === date) result.push({ ...entry, timed: false }); continue; }
+    const range = taskRange(entry.task); if (!range || range.end <= dayStart || range.start >= dayStart + 1440) continue;
+    result.push({ ...entry, date, range, timed: range.timed, startMinute: Math.max(0, range.start - dayStart), endMinute: Math.min(1440, range.end - dayStart), continuesBefore: range.start < dayStart, continuesAfter: range.end > dayStart + 1440 });
+  }
+  return result;
+}
+function layoutTimedEvents(entries) {
+  const sorted = entries.map(e => ({ ...e, layoutEnd: Math.max(e.endMinute, e.startMinute + 80) })).sort((a,b) => a.startMinute - b.startMinute || b.endMinute - a.endMinute || a.task.title.localeCompare(b.task.title));
+  const groups = []; let group = [], until = -1;
+  for (const entry of sorted) { if (group.length && entry.startMinute >= until) { groups.push(group); group = []; until = -1; } group.push(entry); until = Math.max(until, entry.layoutEnd); }
+  if (group.length) groups.push(group);
+  return groups.flatMap(items => { const ends = []; for (const item of items) { let col = ends.findIndex(end => end <= item.startMinute); if (col < 0) col = ends.length; ends[col] = item.layoutEnd; item.column = col; } return items.map(item => ({ ...item, columns: ends.length })); });
+}
+
 function attentionEntries(data) {
   const entries = [];
   for (const task of data.tasks) {
@@ -193,7 +238,7 @@ function shiftMonth(date, amount) {
 function templateFields(source = {}) {
   const offset = source.dueInDays;
   return {
-    title: String(source.title || ''), note: String(source.note || ''), dueTime: validTime(source.dueTime),
+    title: String(source.title || ''), note: String(source.note || ''), dueTime: validTime(source.dueTime), startTime: validTime(source.startTime), startInDays: offsetDays(source.startInDays), startOffsetDays: offsetDays(source.startOffsetDays),
     priority: PRIORITIES.some(p => p.name === source.priority) ? source.priority : source.priority === 'Anpassungen Planner' ? 'low' : 'mid',
     status: COLS.some(c => c.name === source.status && c.name !== 'Done') ? source.status : 'ToDo',
     projectId: source.projectId || null, waitingFor: String(source.waitingFor || ''),
@@ -220,7 +265,7 @@ function normalize(raw, now = Date.now()) {
     const incomingStatus = Object.prototype.hasOwnProperty.call(LEGACY_STATUS, t.status) ? LEGACY_STATUS[t.status] : t.status;
     const status = COLS.some(c => c.name === incomingStatus) ? incomingStatus : 'ToDo';
     return {
-      ...t, deletedAt: stamp(t.deletedAt), id: String(t.id || uid()), title: String(t.title || "Untitled task"), status,
+      ...t, ...normaliseSchedule(t), deletedAt: stamp(t.deletedAt), id: String(t.id || uid()), title: String(t.title || "Untitled task"), status,
       priority: PRIORITIES.some(p => p.name === t.priority) ? t.priority : t.priority === 'Anpassungen Planner' ? 'low' : 'mid',
       projectId: projectIds.has(t.projectId) ? t.projectId : null, waitingFor: String(t.waitingFor || ''), followUpDate: validDate(t.followUpDate),
       recurrenceId: t.recurrenceId ? String(t.recurrenceId) : null, occurrenceDate: validDate(t.occurrenceDate),
@@ -317,14 +362,21 @@ class TaskModal extends Modal {
     this.projectInput = field("Project · optional", 'select', null, '');
     this.refreshProjects(task?.projectId || this.options.defaultProjectId || '');
     button(this.projectInput.parentElement, "+ Create project", () => new ProjectModal(this.app, this.plugin, null, id => this.refreshProjects(id)).open(), 'tp-small-button');
+    const schedule = this.isTemplate ? task || {} : normaliseSchedule(task || {});
     if (this.isTemplate) {
-      const offset = savedTemplate ? savedTemplate.dueInDays : (dateKeyValid(task?.due) ? Math.max(0, Math.round((Date.parse(task.due + 'T00:00:00Z') - Date.parse(dayKey() + 'T00:00:00Z')) / DAY)) : null);
-      this.offsetInput = field("Days until due from creation · optional", 'input', 'number', offset);
-      this.offsetInput.min = '0'; this.offsetInput.max = '3650'; this.offsetInput.step = '1'; this.offsetInput.placeholder = "0 = creation day";
-    } else this.dueInput = field("Due date · optional", 'input', 'date', task?.due);
-    this.dueTimeInput = field('Due time · optional (24-hour)', 'input', 'time', validTime(task?.dueTime)); this.dueTimeInput.step = '60';
-    form.createDiv({ text: 'Local time. Leave empty for an all-day task.', cls: 'tp-help' });
-    this.dueTimeInput.onchange = () => { if (this.dueTimeInput.value) { if (this.dueInput && !this.dueInput.value) this.dueInput.value = dayKey(); if (this.offsetInput && this.offsetInput.value === '') this.offsetInput.value = '0'; } };
+      this.startOffsetInput = field('Days until start from creation · optional', 'input', 'number', savedTemplate?.startInDays ?? (validDate(task?.startDate) ? daysBetween(dayKey(),task.startDate) : null));this.startOffsetInput.min='-3650';this.startOffsetInput.max='3650';this.startOffsetInput.step='1';
+    } else this.startDateInput = field('Start date · optional','input','date',schedule.startDate);
+    this.startTimeInput = field('Start time · optional (24-hour)','input','time',schedule.startTime);this.startTimeInput.step='60';
+    if (this.isTemplate) {
+      const offset = savedTemplate ? savedTemplate.dueInDays : (dateKeyValid(task?.due) ? Math.max(0,daysBetween(dayKey(),task.due)) : null);
+      this.offsetInput = field('Days until end from creation · optional','input','number',offset);this.offsetInput.min='0';this.offsetInput.max='3650';this.offsetInput.step='1';this.offsetInput.placeholder='0 = creation day';
+    } else this.dueInput = field('End date · optional','input','date',task?.due);
+    this.dueTimeInput = field('End time · optional (24-hour)','input','time',validTime(task?.dueTime));this.dueTimeInput.step='60';
+    form.createDiv({text:'Set a start and end. Leave both times empty for an all-day task. The end remains the deadline for reminders. Local time.',cls:'tp-help'});
+    const setDate = (which,date) => { const dateInput=which==='start'?this.startDateInput:this.dueInput,offsetInput=which==='start'?this.startOffsetInput:this.offsetInput;if(dateInput)dateInput.value=date;else offsetInput.value=String(daysBetween(dayKey(),date)); };
+    const readDate = which => { const dateInput=which==='start'?this.startDateInput:this.dueInput,offsetInput=which==='start'?this.startOffsetInput:this.offsetInput;return dateInput?dateInput.value:(offsetInput.value===''?'':shiftDate(dayKey(),Number(offsetInput.value))); };
+    this.dueTimeInput.onchange=()=>{if(!validTime(this.dueTimeInput.value))return;const end=readDate('end')||dayKey();setDate('end',end);if(!readDate('start')&&!this.startTimeInput.value){const start=wallParts(wallValue(end,this.dueTimeInput.value)-60);setDate('start',start.date);this.startTimeInput.value=start.time;}};
+    this.startTimeInput.onchange=()=>{if(!validTime(this.startTimeInput.value))return;const start=readDate('start')||dayKey();setDate('start',start);if(!readDate('end')||!this.dueTimeInput.value){const end=wallParts(wallValue(start,this.startTimeInput.value)+60);setDate('end',end.date);this.dueTimeInput.value=end.time;}};
     const series = this.plugin.data.recurrences.find(s => s.id === task?.recurrenceId);
     const rule = repeatRule(this.isTemplate ? task?.repeat : (series?.enabled ? series : {}));
     this.repeatInput = field("Recurrence", 'select', null, '');
@@ -471,11 +523,11 @@ class TaskModal extends Modal {
     if (!source) { new Notice("This template no longer exists."); return false; }
     const values = templateFields(source);
     this.titleInput.value = values.title; this.noteInput.value = values.note;
-    this.priorityInput.value = values.priority; this.statusInput.value = values.status; this.dueTimeInput.value = values.dueTime;
+    this.priorityInput.value = values.priority; this.statusInput.value = values.status; this.dueTimeInput.value = values.dueTime; this.startTimeInput.value = values.startTime;
     this.refreshProjects(values.projectId || ''); this.waitingForInput.value = values.waitingFor;
     this.followUpInput.value = values.followUpInDays == null ? '' : shiftDate(dayKey(), values.followUpInDays);
     this.repeatInput.value = values.repeat.frequency; this.repeatIntervalInput.value = String(values.repeat.interval); this.repeatInput.onchange(); this.statusInput.onchange();
-    this.dueInput.value = values.dueInDays == null ? '' : dayKey(shiftDay(Date.now(), values.dueInDays));
+    this.dueInput.value = values.dueInDays == null ? '' : dayKey(shiftDay(Date.now(), values.dueInDays)); this.startDateInput.value = values.startInDays == null ? '' : shiftDate(dayKey(),values.startInDays); if (values.dueTime && !this.startDateInput.value && !this.startTimeInput.value) this.dueTimeInput.onchange();
     this.subtaskRows = values.subtasks.map(s => ({ id: uid(), title: s.title, done: false, due: s.dueInDays == null ? '' : shiftDate(dayKey(), s.dueInDays), dueInDays: null })); this.renderSubtasks(); return true;
   }
   refreshProjects(selected) {
@@ -490,6 +542,10 @@ class TaskModal extends Modal {
     if (this.isTemplate ? !name : !title) { new Notice(this.isTemplate ? "Enter a template name." : "Enter a task title."); (this.nameInput || this.titleInput).focus(); return; }
     if (this.isTemplate && this.plugin.data.templates.some(t => t.id !== this.options.templateId && t.name.toLocaleLowerCase() === name.toLocaleLowerCase())) { new Notice("A template with this name already exists. Choose a different name."); return; }
     if (this.dueInput && (!this.dueInput.checkValidity() || (this.dueInput.value && !dateKeyValid(this.dueInput.value)))) { this.dueInput.reportValidity(); return; }
+    if (!this.startTimeInput.checkValidity() || (this.startTimeInput.value && !validTime(this.startTimeInput.value))) { new Notice('Enter a valid start time in HH:mm format.'); return; }
+    if (this.startDateInput && !this.startDateInput.checkValidity()) { this.startDateInput.reportValidity(); return; }
+    if (this.startOffsetInput && !this.startOffsetInput.checkValidity()) { this.startOffsetInput.reportValidity(); return; }
+    if (this.startOffsetInput && this.startOffsetInput.value !== '' && (!Number.isInteger(Number(this.startOffsetInput.value)) || Math.abs(Number(this.startOffsetInput.value)) > 3650)) { new Notice('Enter a valid start offset in days.'); return; }
     if (!this.dueTimeInput.checkValidity() || (this.dueTimeInput.value && !validTime(this.dueTimeInput.value))) { new Notice('Enter a valid time in HH:mm format.'); return; }
     if (!this.isTemplate && this.dueTimeInput.value && !validDate(this.dueInput.value)) { new Notice('Set a due date before assigning a time.'); return; }
     if (this.offsetInput && !this.offsetInput.checkValidity()) { this.offsetInput.reportValidity(); return; }
@@ -505,17 +561,21 @@ class TaskModal extends Modal {
     for (const item of this.subtaskRows.filter(s => s.title.trim())) {
       if (this.isTemplate ? item.dueInDays != null && (!Number.isInteger(item.dueInDays) || item.dueInDays < 0 || item.dueInDays > 3650) : item.due && !dateKeyValid(item.due)) { new Notice("Enter a valid date for each subtask."); return; }
     }
+    const endDate = this.isTemplate ? (dueInDays == null ? '' : shiftDate(dayKey(),dueInDays)) : this.dueInput.value;
+    const rawStartDate = this.isTemplate ? (this.startOffsetInput.value === '' ? '' : shiftDate(dayKey(),Number(this.startOffsetInput.value))) : this.startDateInput.value;
+    let scheduleValues;
+    try { scheduleValues = resolveSchedule({due:endDate,dueTime:this.dueTimeInput.value,startDate:rawStartDate,startTime:this.startTimeInput.value}); } catch(error) { new Notice(error.message);return; }
     if (!PRIORITIES.some(p => p.name === this.priorityInput.value)) return;
     const status = this.statusInput.value;
     if (!COLS.some(c => c.name === status) || ((!this.taskId || this.isTemplate) && status === 'Done')) return;
     this.saving = true; this.saveButton.disabled = true; if (this.deleteTaskButton) this.deleteTaskButton.disabled = true; this.setSubtaskSaving(true);
     const subtasks = this.subtaskRows.filter(s => s.title.trim()).map(s => this.isTemplate ? { title: s.title.trim(), dueInDays: s.dueInDays ?? null } : { id: s.id, title: s.title.trim(), done: !!s.done, due: s.due || '' });
-    const values = { title, dueTime: validTime(this.dueTimeInput.value), note: this.noteInput.value.trim(), priority: this.priorityInput.value, projectId: this.projectInput.value || null, waitingFor: this.waitingForInput.value.trim(), followUpDate: this.isTemplate ? '' : this.followUpInput.value, updatedAt: Date.now() };
+    const values = { title, ...scheduleValues, dueTime: validTime(this.dueTimeInput.value), note: this.noteInput.value.trim(), priority: this.priorityInput.value, projectId: this.projectInput.value || null, waitingFor: this.waitingForInput.value.trim(), followUpDate: this.isTemplate ? '' : this.followUpInput.value, updatedAt: Date.now() };
     const ok = await this.plugin.mutate(data => {
       if (values.projectId && !data.projects.some(p => p.id === values.projectId)) throw new Error("This project has been removed.");
       if (this.isTemplate) {
         if (data.templates.some(t => t.id !== this.options.templateId && t.name.toLocaleLowerCase() === name.toLocaleLowerCase())) throw new Error("A template with this name already exists.");
-        const fields = { name, ...templateFields({ ...values, status, dueInDays, followUpInDays, repeat: rule, subtasks }), updatedAt: Date.now() };
+        const fields = { name, ...templateFields({ ...values, startInDays: scheduleValues.startDate ? daysBetween(dayKey(),scheduleValues.startDate) : null, startOffsetDays: scheduleValues.startDate && endDate ? daysBetween(endDate,scheduleValues.startDate) : null, status, dueInDays, followUpInDays, repeat: rule, subtasks }), updatedAt: Date.now() };
         if (this.options.templateId) {
           const template = data.templates.find(t => t.id === this.options.templateId); if (!template) throw new Error("Template not found."); Object.assign(template, fields);
         } else data.templates.push({ id: uid(), ...fields, createdAt: Date.now() });
@@ -796,7 +856,7 @@ class PlannerView extends ItemView {
   }
   renderCalendar(parent) {
     const head = parent.createDiv('tp-page-heading'), title = head.createDiv(); title.createEl('h3', { text: "Week and calendar view" });
-    title.createDiv({ text: "Tasks, subtasks and follow-ups. Drag dates to reschedule or click to edit.", cls: 'tp-muted' });
+    title.createDiv({ text: this.calendarMode === 'week' ? 'Drag to move · Pull a time-block edge to resize (15 min)' : 'Drag to move · Drag date handles to extend a range · Click to edit times', cls: 'tp-muted' });
     const actions = head.createDiv('tp-inline-actions');
     button(actions, "Recurrences", () => new SeriesManagerModal(this.app, this.plugin).open());
     button(actions, "Reminders", () => new ReminderSettingsModal(this.app, this.plugin).open());
@@ -817,18 +877,15 @@ class PlannerView extends ItemView {
       const entries = attentionEntries(this.plugin.data).filter(e => allowed.has(e.task.id));
       const label = this.calendarMode === 'month' ? new Date(this.calendarDate + 'T12:00:00').toLocaleDateString("en-GB", { month: 'long', year: 'numeric' }) : shortDate(range.start) + ' – ' + shortDate(shiftDate(range.start, 6));
       target.createEl('h3', { text: label, cls: 'tp-calendar-period' });
+      if(this.calendarMode==='week') this.renderWeekTimeline(target,entries,range.start); else {
       const scroll = target.createDiv('tp-calendar-scroll'), grid = scroll.createDiv('tp-calendar-grid tp-calendar-' + this.calendarMode); grid.setAttribute('aria-label', label);
       for (const weekday of ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]) grid.createDiv({ text: weekday, cls: 'tp-calendar-weekday' });
       for (let i = 0; i < range.days; i++) {
         const date = shiftDate(range.start, i), day = grid.createDiv('tp-calendar-day' + (date === dayKey() ? ' is-today' : '') + (date.slice(0, 7) !== this.calendarDate.slice(0, 7) && this.calendarMode === 'month' ? ' is-other-month' : ''));
         day.setAttribute('data-calendar-date', date); day.createDiv({ text: new Date(date + 'T12:00:00').toLocaleDateString("en-GB", { day: 'numeric', month: 'short' }), cls: 'tp-calendar-day-label' });
-        day.ondragover = e => { if (e.dataTransfer?.types.includes('application/x-tagesplaner-date')) { e.preventDefault(); day.addClass('tp-over'); } };
-        day.ondragleave = () => day.removeClass('tp-over');
-        day.ondrop = e => {
-          e.preventDefault(); day.removeClass('tp-over');
-          try { const value = JSON.parse(e.dataTransfer?.getData('application/x-tagesplaner-date') || 'null'); if (value) void this.plugin.reschedule(value.id, value.kind, value.subtaskId, date); } catch { new Notice("Could not reschedule this date."); }
-        };
-        for (const entry of entries.filter(e => e.date === date).sort(compareCalendarEntries)) this.renderCalendarEvent(day, entry);
+        this.calendarDrop(day,date);
+        for (const entry of calendarEntriesForDate(entries,date).sort((a,b)=>Number(a.timed)-Number(b.timed)||(a.startMinute||0)-(b.startMinute||0)||compareCalendarEntries(a,b))) this.renderCalendarEvent(day, entry);
+      }
       }
       const extras = target.createDiv('tp-calendar-extras');
       const overdue = entries.filter(e => entryOverdue(e));
@@ -846,13 +903,74 @@ class PlannerView extends ItemView {
     this.calendarDate = this.calendarMode === 'week' ? shiftDate(this.calendarDate, direction * 7) : shiftMonth(this.calendarDate, direction);
     this.render();
   }
+  calendarDrop(day, date, timed = false) {
+    day.ondragover = e => { if (e.dataTransfer?.types.some(type => ['application/x-tagesplaner-date', 'application/x-tagesplaner-range-edge'].includes(type))) { e.preventDefault(); day.addClass('tp-over'); } };
+    day.ondragleave = () => day.removeClass('tp-over');
+    day.ondrop = e => {
+      e.preventDefault(); day.removeClass('tp-over');
+      try {
+        const resize = e.dataTransfer?.getData('application/x-tagesplaner-range-edge');
+        if (resize) { const payload = JSON.parse(resize); void this.plugin.setScheduleEdgeDate(payload.id, payload.edge, date, payload.expected); return; }
+        const value = JSON.parse(e.dataTransfer?.getData('application/x-tagesplaner-date') || 'null'); if (!value) return;
+        if (timed && value.kind === 'task') { const box = day.getBoundingClientRect(), minute = Math.max(0, Math.min(1425, Math.round((e.clientY - box.top) / CALENDAR_PX_PER_MINUTE / 15) * 15)); void this.plugin.moveTimedTask(value.id, date, minute); }
+        else void this.plugin.reschedule(value.id, value.kind, value.subtaskId, date);
+      } catch { new Notice('Could not move this event.'); }
+    };
+  }
+  renderWeekTimeline(parent, entries, start) {
+    const days = Array.from({length:7},(_,i) => shiftDate(start,i)), events = days.map(date => calendarEntriesForDate(entries,date)), layouts = events.map(items => layoutTimedEvents(items.filter(e => e.timed)));
+    const widths = layouts.map(items => Math.max(210, Math.max(1,...items.map(e=>e.columns)) * 175));
+    const scroller = parent.createDiv('tp-agenda-scroll'); scroller.setAttribute('aria-label','Weekly schedule');
+    const grid = scroller.createDiv('tp-agenda-grid'); grid.style.gridTemplateColumns = '58px ' + widths.map(w=>'minmax('+w+'px,1fr)').join(' ');
+    grid.style.minWidth=(58+widths.reduce((sum,w)=>sum+w,0))+'px';
+    grid.createDiv({text:'Local time',cls:'tp-agenda-heading tp-agenda-corner'});
+    for(const date of days) { const heading=grid.createDiv('tp-agenda-heading'+(date===dayKey()?' is-today':''));heading.createDiv({text:new Date(date+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short'}),cls:'tp-agenda-weekday'});heading.createDiv({text:shortDate(date),cls:'tp-agenda-date'}); }
+    grid.createDiv({text:'All day',cls:'tp-agenda-all-label'});
+    for(let i=0;i<7;i++){const day=grid.createDiv('tp-agenda-all-day');day.setAttribute('data-all-day-date',days[i]);this.calendarDrop(day,days[i]);for(const entry of events[i].filter(e=>!e.timed))this.renderCalendarEvent(day,entry);}
+    const hours = grid.createDiv('tp-agenda-hours');hours.style.height = (1440*CALENDAR_PX_PER_MINUTE)+'px';
+    for(let h=0;h<24;h++){const label=hours.createDiv({text:String(h).padStart(2,'0')+':00',cls:'tp-agenda-hour'});label.style.top=(h*60*CALENDAR_PX_PER_MINUTE)+'px';}
+    for(let i=0;i<7;i++){
+      const day=grid.createDiv('tp-agenda-day'+(days[i]===dayKey()?' is-today':''));day.setAttribute('data-calendar-date',days[i]);day.style.height=(1440*CALENDAR_PX_PER_MINUTE)+'px';this.calendarDrop(day,days[i],true);
+      for(const entry of layouts[i]) this.renderTimedEvent(day,entry);
+    }
+    const saved = this.calendarTimelineScroll;
+    const firstStart = layouts.flat().length ? Math.floor(Math.min(...layouts.flat().map(e=>e.startMinute))/60)*60 : 7*60;
+    scroller.scrollTop = saved == null ? firstStart*CALENDAR_PX_PER_MINUTE : saved;
+    scroller.onscroll = () => { this.calendarTimelineScroll = scroller.scrollTop; };
+  }
+  eventText(item, entry, label) {
+    item.createDiv({text:entry.task.title,cls:'tp-calendar-event-title'});
+    item.createDiv({text:label,cls:'tp-calendar-event-time'});
+    item.createDiv({text:entry.task.priority+' · '+entry.task.status+' · '+projectName(this.plugin.data,entry.task.projectId),cls:'tp-calendar-event-detail'});
+    item.title=entry.task.title+'\n'+label+'\n'+projectName(this.plugin.data,entry.task.projectId);
+    item.setAttribute('data-event-task',entry.task.id);item.setAttribute('data-event-kind',entry.kind);item.setAttribute('data-event-time',entry.task.dueTime||'');
+    item.draggable=true;item.ondragstart=e=>{e.dataTransfer.setData('application/x-tagesplaner-date',JSON.stringify({id:entry.task.id,kind:entry.kind,subtaskId:entry.subtaskId}));e.dataTransfer.effectAllowed='move';};
+  }
+  renderTimedEvent(parent, entry) {
+    const box=parent.createDiv('tp-scheduled-event tp-priority-'+(PRIORITIES.find(p=>p.name===entry.task.priority)?.key||'mid'));box.setAttribute('data-schedule-id',entry.task.id);
+    const paint=(start,end)=>{box.style.top=(start*CALENDAR_PX_PER_MINUTE)+'px';box.style.height=Math.max(86,(end-start)*CALENDAR_PX_PER_MINUTE-8)+'px';};paint(entry.startMinute,entry.endMinute);
+    box.style.left='calc('+100*entry.column/entry.columns+'% + 5px)';box.style.width='calc('+100/entry.columns+'% - 10px)';
+    const item=button(box,'',()=>{if(Date.now()<(this.suppressCalendarClickUntil||0))return;new TaskModal(this.app,this.plugin,entry.task.id).open();},'tp-calendar-event tp-timed-event'+(taskOverdue(entry.task)?' is-overdue':''));
+    const range=entry.range,label=(entry.continuesBefore?'← '+shortDate(range.startDate)+' ':'')+(entry.continuesBefore?'00:00':range.startTime)+' – '+(entry.continuesAfter?'24:00 → '+shortDate(range.endDate):range.endTime);
+    this.eventText(item,entry,label);
+    for(const edge of ['start','end'].filter(edge=>edge==='start'?!entry.continuesBefore:!entry.continuesAfter)){
+      const handle=button(box,'',()=>{},'tp-resize-handle tp-resize-'+edge);handle.setAttribute('aria-label','Resize '+edge+' of '+entry.task.title);handle.title='Drag to resize '+edge+' · 15-minute steps. Arrow keys adjust by 15 minutes.';handle.draggable=false;
+      let drag=null;
+      const cancel=()=>{if(!drag)return;drag=null;box.removeClass('is-resizing');paint(entry.startMinute,entry.endMinute);const time=item.querySelector('.tp-calendar-event-time');if(time)time.textContent=label;item.title=entry.task.title+'\n'+label;};
+      handle.onpointerdown=e=>{if(e.button!=null&&e.button!==0)return;e.preventDefault();e.stopPropagation();drag={y:e.clientY,delta:0,expected:scheduleKey(entry.task),id:e.pointerId};try{handle.setPointerCapture?.(e.pointerId);}catch{cancel();return;}box.addClass('is-resizing');};
+      handle.onpointermove=e=>{if(!drag)return;e.preventDefault();drag.delta=Math.round((e.clientY-drag.y)/CALENDAR_PX_PER_MINUTE/15)*15;const updated=resizeRange(entry.task,edge,drag.delta),current=calendarEntriesForDate([{...entry,task:{...entry.task,...updated}}],entry.date)[0];if(current)paint(current.startMinute,current.endMinute);const time=item.querySelector('.tp-calendar-event-time');if(time)time.textContent=updated.startTime+' – '+updated.dueTime;item.title=updated.startDate+' '+updated.startTime+' – '+updated.due+' '+updated.dueTime;};
+      handle.onpointerup=async e=>{if(!drag)return;e.preventDefault();e.stopPropagation();const change=drag;drag=null;box.removeClass('is-resizing');try{handle.releasePointerCapture?.(change.id);}catch{}this.suppressCalendarClickUntil=Date.now()+300;if(change.delta)await this.plugin.resizeTask(entry.task.id,edge,change.delta,change.expected);else paint(entry.startMinute,entry.endMinute);};
+      handle.onpointercancel=cancel;handle.onlostpointercapture=cancel;
+      handle.onkeydown=e=>{if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();void this.plugin.resizeTask(entry.task.id,edge,e.key==='ArrowUp'?-15:15,scheduleKey(entry.task));}};
+    }
+  }
   renderCalendarEvent(parent, entry, showDate = false) {
-    const item = button(parent, '', () => new TaskModal(this.app, this.plugin, entry.task.id).open(), 'tp-calendar-event tp-priority-' + (PRIORITIES.find(p => p.name === entry.task.priority)?.key || 'mid') + (entryOverdue(entry) ? ' is-overdue' : ''));
-    item.createDiv({ text: entry.task.title, cls: 'tp-calendar-event-title' });
-    item.createDiv({ text: (showDate ? shortDate(entry.date) + " · " : '') + (entry.time || 'All day') + " · " + entry.label, cls: 'tp-calendar-event-detail' });
-    item.createDiv({ text: entry.task.priority + " · " + entry.task.status + " · " + projectName(this.plugin.data, entry.task.projectId), cls: 'tp-calendar-event-detail' });
-    item.setAttribute('data-event-time', entry.time || ''); item.setAttribute('data-event-task', entry.task.id); item.setAttribute('data-event-kind', entry.kind); item.draggable = true;
-    item.ondragstart = e => { e.dataTransfer.setData('application/x-tagesplaner-date', JSON.stringify({ id: entry.task.id, kind: entry.kind, subtaskId: entry.subtaskId })); e.dataTransfer.effectAllowed = 'move'; };
+    const wrap=parent.createDiv('tp-calendar-entry'),item=button(wrap,'',()=>new TaskModal(this.app,this.plugin,entry.task.id).open(),'tp-calendar-event tp-priority-'+(PRIORITIES.find(p=>p.name===entry.task.priority)?.key||'mid')+((entry.kind==='task'?taskOverdue(entry.task):entryOverdue(entry))?' is-overdue':''));
+    const range=entry.kind==='task'?taskRange(entry.task):null;
+    const span=range&&range.startDate!==range.endDate;
+    const label=(showDate?shortDate(entry.date)+' · ':'')+(range?.timed?(span?shortDate(range.startDate)+' ':'')+range.startTime+' – '+(span?shortDate(range.endDate)+' ':'')+range.endTime:'All day'+(span?' · '+shortDate(range.startDate)+' – '+shortDate(range.endDate):''))+' · '+entry.label;
+    this.eventText(item,entry,label);
+    if(range){for(const edge of ['start','end']){const handle=button(wrap,edge==='end'?'↔':'',()=>new TaskModal(this.app,this.plugin,entry.task.id).open(),'tp-date-resize tp-date-resize-'+edge);handle.setAttribute('aria-label','Resize '+edge+' date of '+entry.task.title);handle.title='Drag to another day to change the '+edge+' date';handle.draggable=true;handle.ondragstart=e=>{e.stopPropagation();e.dataTransfer.setData('application/x-tagesplaner-range-edge',JSON.stringify({id:entry.task.id,edge,expected:scheduleKey(entry.task)}));};}}
   }
   renderTrash(parent) {
     const title = parent.createDiv('tp-page-heading'); title.createEl('h3', { text: "Trash" });
@@ -1165,12 +1283,21 @@ module.exports = class TagesplanerPlugin extends Plugin {
     return this.mutate(data => {
       if (!validDate(date)) throw new Error("Invalid date.");
       const task = data.tasks.find(t => t.id === id); if (!task || task.deletedAt || task.archivedAt || task.status === 'Done') throw new Error("Task is no longer open.");
-      if (kind === 'task') task.due = date;
+      if (kind === 'task') { const range=taskRange(task),delta=range?daysBetween(range.startDate,date):0; task.startDate=range?shiftDate(range.startDate,delta):'';task.due=range?shiftDate(range.endDate,delta):date; }
       else if (kind === 'followup' && task.status === 'Waiting') task.followUpDate = date;
       else if (kind === 'subtask') { const sub = task.subtasks.find(s => s.id === subtaskId && !s.done); if (!sub) throw new Error("Subtask is no longer open."); sub.due = date; }
       else throw new Error("Unknown date type.");
       task.updatedAt = Date.now();
     });
+  }
+  resizeTask(id, edge, delta, expected = null) {
+    return this.mutate(data=>{const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done')throw new Error('This event is no longer editable.');if(expected&&scheduleKey(task)!==expected)throw new Error('This schedule has changed. Please try again.');Object.assign(task,resizeRange(task,edge,delta),{updatedAt:Date.now()});});
+  }
+  setScheduleEdgeDate(id, edge, date, expected = null) {
+    return this.mutate(data=>{const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done'||!validDate(date)||!['start','end'].includes(edge))throw new Error('This event cannot be resized.');if(expected&&scheduleKey(task)!==expected)throw new Error('This schedule has changed.');const range=taskRange(task);if(!range)throw new Error('An end date is required.');const next={...task,startDate:range.startDate,...(edge==='start'?{startDate:date}:{due:date})};Object.assign(task,resolveSchedule(next),edge==='start'?{startDate:date}:{due:date},{updatedAt:Date.now()});});
+  }
+  moveTimedTask(id,date,minute) {
+    return this.mutate(data=>{const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done'||!validDate(date)||!Number.isInteger(minute)||minute<0||minute>1425)throw new Error('This event cannot be moved.');const range=taskRange(task),start=wallValue(date)+minute,end=start+(range?.timed?range.end-range.start:60),a=wallParts(start),b=wallParts(end);Object.assign(task,{startDate:a.date,startTime:a.time,due:b.date,dueTime:b.time,updatedAt:Date.now()});});
   }
   changeStatus(id, status) { return this.mutate(data => { const task = data.tasks.find(t => t.id === id); if (!task || task.deletedAt) throw new Error("Task not found."); setStatus(task, status); }); }
   changePriority(id, priority) {
@@ -1186,11 +1313,13 @@ module.exports = class TagesplanerPlugin extends Plugin {
     const ok = await this.mutate(data => {
       const template = data.templates.find(t => t.id === id); if (!template) throw new Error("Template not found.");
       const values = templateFields(template), now = Date.now();
-      taskId = uid(); data.tasks.push({
+      const endDate = values.dueInDays == null ? (values.repeat.frequency !== 'none' || values.dueTime ? dayKey(now) : '') : dayKey(shiftDay(now,values.dueInDays));
+      const scheduleValues = resolveSchedule({due:endDate,dueTime:values.dueTime,startDate:values.startInDays==null?'':shiftDate(dayKey(now),values.startInDays),startTime:values.startTime});
+      taskId = uid(); data.tasks.push({ ...scheduleValues,
         id: taskId, title: values.title.trim() || template.name, note: values.note, priority: values.priority,
         status: values.status, projectId: data.projects.some(p => p.id === values.projectId) ? values.projectId : (data.projects.some(p => p.id === defaultProjectId) ? defaultProjectId : null),
         waitingFor: values.waitingFor, followUpDate: values.followUpInDays == null ? '' : shiftDate(dayKey(now), values.followUpInDays),
-        dueTime: values.dueTime, due: values.dueInDays == null ? (values.repeat.frequency !== 'none' ? dayKey(now) : '') : dayKey(shiftDay(now, values.dueInDays)),
+        dueTime: values.dueTime, due: endDate,
         subtasks: values.subtasks.map(s => ({ id: uid(), title: s.title, done: false, due: s.dueInDays == null ? '' : shiftDate(dayKey(now), s.dueInDays) })), worklog: [],
         recurrenceId: null, occurrenceDate: '',
         createdAt: now, updatedAt: now, completedAt: null, archivedAt: null, completionDateEstimated: false

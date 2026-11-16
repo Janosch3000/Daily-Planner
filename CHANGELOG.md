@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.10.0
+
+- Replace due-time-only editing with start/end dates and times. Preserve old deadlines and supply a one-hour start for existing timed tasks.
+- Add a weekly hourly timeline with readable titles, smaller metadata, generous spacing, separate overlap columns and sticky all-day entries.
+- Resize timed events by dragging their top/bottom edges in 15-minute steps; support keyboard adjustment, pointer cancellation and stale-data validation.
+- Move entire event ranges while preserving duration. Extend or shorten all-day/month date ranges using date handles.
+- Handle overnight and multi-day ranges, including midnight boundaries. Preserve relative ranges in templates and recurrence defaults.
+- Keep the end as the deadline for overdue indicators, filters and reminders. Retain English UI, Trash, project visibility and card features.
+
+Release assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.10.0**.
+
+
 ## 1.9.0
 
 - Complete or reopen subtasks directly on collapsed task cards. Changes persist across task boards, project views, reloads and calendar entries; archived subtasks remain read-only.
