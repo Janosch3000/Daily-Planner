@@ -473,7 +473,7 @@ class TaskModal extends Modal {
     this.dueTimeInput.onchange=()=>{if(!validTime(this.dueTimeInput.value))return;const end=readDate('end')||dayKey();setDate('end',end);if(!readDate('start')&&!this.startTimeInput.value){const start=wallParts(wallValue(end,this.dueTimeInput.value)-60);setDate('start',start.date);this.startTimeInput.value=start.time;}};
     this.startTimeInput.onchange=()=>{if(!validTime(this.startTimeInput.value))return;const start=readDate('start')||dayKey();setDate('start',start);if(!readDate('end')||!this.dueTimeInput.value){const end=wallParts(wallValue(start,this.startTimeInput.value)+60);setDate('end',end.date);this.dueTimeInput.value=end.time;}};
     const series = this.plugin.data.recurrences.find(s => s.id === task?.recurrenceId);
-    const rule = repeatRule(this.isTemplate ? task?.repeat : (series?.enabled ? series : {}));
+    const rule = repeatRule(this.isTemplate ? task?.repeat : (series?.enabled ? series : !task && this.options.defaultRepeat ? {frequency:this.options.defaultRepeat,interval:1} : {}));
     this.originalRule=copy(rule);this.originalDue=task?.due||'';
     this.repeatInput = field("Recurrence", 'select', null, '');
     REPEAT_OPTIONS.forEach(r => this.repeatInput.createEl('option', { text: r.label, value: r.value })); this.repeatInput.value = rule.frequency;
@@ -485,7 +485,7 @@ class TaskModal extends Modal {
       const enabled = this.repeatInput.value !== 'none'; this.repeatIntervalInput.disabled = !enabled;this.weekdayInput.parentElement.hidden=this.repeatInput.value!=='weekly';
       if (enabled && this.dueInput && !this.dueInput.value) this.dueInput.value = dayKey();
       if (enabled && this.offsetInput && this.offsetInput.value === '') this.offsetInput.value = '0';
-    }; this.repeatIntervalInput.disabled = rule.frequency === 'none';this.weekdayInput.parentElement.hidden=rule.frequency!=='weekly';
+    }; this.repeatIntervalInput.disabled = rule.frequency === 'none';this.weekdayInput.parentElement.hidden=rule.frequency!=='weekly';if(!task && this.options.defaultRepeat)this.repeatInput.onchange();
     this.waitingSection = form.createDiv('tp-waiting-fields');
     const waitingLabel = this.waitingSection.createEl('label', { cls: 'tp-field', text: "Waiting for · Person or team" });
     this.waitingForInput = waitingLabel.createEl('input', { type: 'text', attr: { placeholder: "e.g. Anna or the IT team" } }); this.waitingForInput.value = task?.waitingFor || '';
@@ -868,9 +868,11 @@ class SeriesManagerModal extends Modal {
   onClose(){this.contentEl.empty();}
 }
 
+function isRecurringTask(data, task) { return !!task.recurrenceId && data.recurrences.some(series => series.id === task.recurrenceId); }
+
 class PlannerView extends ItemView {
   constructor(leaf, plugin) {
-    super(leaf); this.plugin = plugin; this.tab = 'board'; this.taskBoard = 'status'; this.drafts = new Map();
+    super(leaf); this.plugin = plugin; this.tab = 'board'; this.taskBoard = 'status'; this.recurringBoard = 'status'; this.drafts = new Map();
     this.draftInputs = new Map(); this.draftControls = new Map(); this.pendingDrafts = new Set();
     this.expanded = new Set(); this.archiveSearch = ''; this.scrollPositions = new Map();
     this.filters = { query: '', status: '', priority: '', due: 'all', project: 'all' };
@@ -895,25 +897,25 @@ class PlannerView extends ItemView {
     const head = root.createDiv('tp-head'), heading = head.createDiv(); heading.createEl('h2', { text: "Daily Planner" });
     heading.createDiv({ text: "Focus for today. An overview of your week.", cls: 'tp-muted' });
     const headActions = head.createDiv('tp-head-actions');
-    button(headActions, "+ Task", () => new TaskModal(this.app, this.plugin, null, { defaultProjectId: this.tab === 'projects' && this.plugin.data.projects.some(p => p.id === this.selectedProject) ? this.selectedProject : null }).open(), 'mod-cta');
+    button(headActions, this.tab === 'recurring' ? "+ Recurring task" : "+ Task", () => new TaskModal(this.app, this.plugin, null, { defaultRepeat: this.tab === 'recurring' ? 'weekly' : null, defaultProjectId: this.tab === 'projects' && this.plugin.data.projects.some(p => p.id === this.selectedProject) ? this.selectedProject : null }).open(), 'mod-cta');
     button(headActions, "+ Template", () => new TemplateModal(this.app, this.plugin).open());
     const nav = root.createDiv('tp-tabs'); nav.setAttribute('aria-label', "Planner views");
     const archiveCount = this.plugin.data.tasks.filter(t => !t.deletedAt && !projectOnlyTask(this.plugin.data, t) && t.archivedAt).length;
-    for (const [id, label] of [['board', "Tasks"], ['calendar', "Calendar"], ['projects', "Projects"], ['dashboard', 'Dashboard'], ['templates', "Templates"], ['archive', "Archive · " + archiveCount], ['trash', "Trash · " + this.plugin.data.tasks.filter(t => t.deletedAt).length]]) {
+    for (const [id, label] of [['board', "Tasks"], ['recurring', 'Recurring tasks'], ['calendar', "Calendar"], ['projects', "Projects"], ['dashboard', 'Dashboard'], ['templates', "Templates"], ['archive', "Archive · " + archiveCount], ['trash', "Trash · " + this.plugin.data.tasks.filter(t => t.deletedAt).length]]) {
       const b = button(nav, label, () => { this.tab = id; this.render(); }, this.tab === id ? 'tp-tab is-active' : 'tp-tab'); b.setAttribute('aria-pressed', String(this.tab === id));
     }
-    if (this.tab === 'board') {
-      const taskNav = root.createDiv('tp-task-navigation'); taskNav.setAttribute('aria-label', "Views within Tasks");
-      taskNav.createSpan({ text: "Tasks", cls: 'tp-task-group-label' });
+    if (this.tab === 'board' || this.tab === 'recurring') {
+      const taskNav = root.createDiv('tp-task-navigation'); taskNav.setAttribute('aria-label', this.tab === 'recurring' ? "Views within Recurring tasks" : "Views within Tasks");
+      taskNav.createSpan({ text: this.tab === 'recurring' ? "Recurring tasks" : "Tasks", cls: 'tp-task-group-label' });
       const segments = taskNav.createDiv('tp-task-segments'); segments.setAttribute('role', 'group'); segments.setAttribute('aria-label', "Choose task view");
       for (const [id, label] of [['status', 'Status'], ['priority', "Priorities"]]) {
-        const b = button(segments, label, () => this.switchTaskBoard(id), this.taskBoard === id ? 'tp-task-segment is-active' : 'tp-task-segment');
-        b.setAttribute('aria-pressed', String(this.taskBoard === id)); b.setAttribute('data-task-board', id);
+        const b = button(segments, label, () => this.switchTaskBoard(id), (this.tab === 'recurring' ? this.recurringBoard : this.taskBoard) === id ? 'tp-task-segment is-active' : 'tp-task-segment');
+        b.setAttribute('aria-pressed', String((this.tab === 'recurring' ? this.recurringBoard : this.taskBoard) === id)); b.setAttribute('data-task-board', id);
       }
     }
     const body = root.createDiv('tp-body');
     if (this.tab === 'dashboard') this.renderDashboard(body); else if (this.tab === 'archive') this.renderArchive(body); else if (this.tab === 'templates') this.renderTemplates(body); else if (this.tab === 'calendar' || this.tab === 'today') this.renderCalendar(body); else if (this.tab === 'trash') this.renderTrash(body); else if (this.tab === 'projects') this.renderProjects(body); else this.renderBoard(body);
-    const viewKey = this.tab === 'board' ? 'board:' + this.taskBoard : this.tab === 'projects' ? 'projects:' + this.selectedProject + ':' + this.projectBoard : this.tab;
+    const viewKey = this.tab === 'recurring' ? 'recurring:' + this.recurringBoard : this.tab === 'board' ? 'board:' + this.taskBoard : this.tab === 'projects' ? 'projects:' + this.selectedProject + ':' + this.projectBoard : this.tab;
     const position = this.scrollPositions.get(viewKey);
     if (position) {
       body.scrollTop = position.top;
@@ -923,14 +925,20 @@ class PlannerView extends ItemView {
   }
   switchTaskBoard(board) {
     if (!['status', 'priority'].includes(board)) return;
-    this.tab = 'board'; this.taskBoard = board; this.render();
+    if (this.tab === 'recurring') this.recurringBoard = board; else { this.tab = 'board'; this.taskBoard = board; } this.render();
   }
   renderBoard(parent) {
+    const recurring = this.tab === 'recurring', board = recurring ? this.recurringBoard : this.taskBoard;
+    if (recurring) {
+      const head = parent.createDiv('tp-page-heading'), title = head.createDiv();title.createEl('h3',{text:'Recurring tasks'});
+      title.createDiv({text:'Daily, weekly and monthly routines have their own boards. Paused routines stay here.',cls:'tp-muted'});
+      button(head,'Manage recurrences',()=>new SeriesManagerModal(this.app,this.plugin).open());
+    }
     const target = parent.createDiv('tp-filter-results');
     const draw = () => {
       target.empty(); this.draftInputs = new Map(); this.draftControls = new Map();
-      if (this.taskBoard === 'priority') this.renderTaskBoard(target, "Priorities", "Unfinished tasks by urgency · Part of Tasks", 'priority', PRIORITIES);
-      else this.renderTaskBoard(target, 'Status', "Organise by status · Part of Tasks", 'status', COLS);
+      if (board === 'priority') this.renderTaskBoard(target, recurring ? 'Recurring priorities' : 'Priorities', recurring ? 'Unfinished recurring tasks by urgency' : 'Unfinished tasks by urgency · Part of Tasks', 'priority', PRIORITIES);
+      else this.renderTaskBoard(target, recurring ? 'Recurring status' : 'Status', recurring ? 'Organise recurring tasks by status' : 'Organise by status · Part of Tasks', 'status', COLS);
     };
     const filters = parent.createDiv('tp-filter-slot'); parent.insertBefore(filters, target); this.renderFilters(filters, draw); draw();
   }
@@ -948,9 +956,9 @@ class PlannerView extends ItemView {
     if (!options.hideProject) select("Filter by project", 'project', [['all', "All projects"], ['none', "No project"], ...this.plugin.data.projects.map(p => [p.id, p.name])]);
     button(bar, "Reset filters", () => { this.filters = { query: '', status: '', priority: '', due: 'all', project: 'all' }; this.render(); }, 'tp-small-button');
   }
-  visibleTasks(scope = null, archived = false) {
+  visibleTasks(scope = null, archived = false, category = this.tab === 'recurring' ? 'recurring' : 'regular') {
     const filters = { ...this.filters, project: scope == null ? this.filters.project : scope };
-    return this.plugin.data.tasks.filter(t => !t.deletedAt && !!t.archivedAt === archived && (scope != null || !projectOnlyTask(this.plugin.data, t)) && taskMatches(t, filters, this.plugin.data));
+    return this.plugin.data.tasks.filter(t => !t.deletedAt && !!t.archivedAt === archived && (archived || isRecurringTask(this.plugin.data,t) === (category === 'recurring')) && (scope != null || !projectOnlyTask(this.plugin.data, t)) && taskMatches(t, filters, this.plugin.data));
   }
   renderCalendar(parent) {
     const head = parent.createDiv('tp-page-heading'), title = head.createDiv(); title.createEl('h3', { text: "Week and calendar view" });
@@ -1141,6 +1149,11 @@ class PlannerView extends ItemView {
     const filters = parent.createDiv(), target = parent.createDiv();
     const draw = () => {
       target.empty(); this.draftInputs = new Map(); this.draftControls = new Map(); this.renderTaskBoard(target, this.projectBoard === 'status' ? "Project tasks by status" : "Project tasks by priority", project?.name || (this.selectedProject === 'none' ? "No project" : "All projects"), this.projectBoard, this.projectBoard === 'status' ? COLS : PRIORITIES, this.selectedProject);
+      const recurring = this.visibleTasks(this.selectedProject, false, 'recurring');
+      if (recurring.length) {
+        const section = target.createDiv('tp-project-recurring');section.createEl('h3',{text:'Recurring tasks · '+recurring.length});section.createDiv({text:'Project routines are separate from regular project tasks.',cls:'tp-muted'});
+        const list=section.createDiv('tp-list-grid');recurring.sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999')).forEach(task=>this.renderCard(list,task,false));
+      }
       const archived = this.visibleTasks(this.selectedProject, true);
       if (archived.length) { const details = target.createEl('details', { cls: 'tp-project-archive' }); details.createEl('summary', { text: archived.length + " archived tasks in this project" }); const list = details.createDiv('tp-list-grid'); archived.sort((a, b) => b.archivedAt - a.archivedAt).forEach(t => this.renderCard(list, t, true)); }
     };

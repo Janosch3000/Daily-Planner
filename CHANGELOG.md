@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.13.0
+
+- Add a separate Recurring tasks category with its own Status and Priorities boards. Exclude series-linked tasks, including paused routines, from ordinary task boards.
+- Add a recurring-task creation shortcut prefilled with Weekly and an initial date, plus direct access to Manage recurrences.
+- Separate project routines from regular project boards while preserving project-only visibility and full editing.
+- Keep existing tasks and series intact; retain the shared calendar, dashboard counts, archive, Trash and recurrence behavior.
+
+Release assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.13.0**.
+
+
 ## 1.12.2
 
 - Add a consistent thin white hover outline to buttons, tabs, calendar events and resize handles, draggable headings, fields, selectors, checkbox labels and expandable sections.

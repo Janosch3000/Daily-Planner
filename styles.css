@@ -342,3 +342,6 @@
   outline-offset: -1px !important;
   border-color: #fff !important;
 }
+
+.tp-project-recurring { border-top: 1px solid var(--background-modifier-border); margin: 20px 0; padding-top: 16px; }
+.tp-project-recurring .tp-list-grid { margin-top: 14px; }

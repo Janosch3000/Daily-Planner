@@ -1,6 +1,6 @@
 # Daily Planner for Obsidian
 
-Version **1.12.2** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
+Version **1.13.0** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
 
 ## Install or update with BRAT
 
@@ -11,6 +11,16 @@ For updates, check for plugin updates in BRAT, then reload the plugin or restart
 ## Interaction feedback
 
 Interactive controls throughout Daily Planner receive a subtle white outline on hover and keyboard focus: buttons, tabs, calendar events and resize handles, draggable task headings, fields, selects, checkbox labels and expandable sections. Disabled controls remain inactive. The outline does not change control sizes or calendar tile durations, and is scoped to this plugin and its dialogs.
+
+## Separate recurring task boards
+
+**Tasks** shows regular tasks. **Recurring tasks** is a separate category for tasks linked to daily, weekly or monthly series, including paused series. Both categories have independent **Status** and **Priorities** boards, with the same editing, subtasks, activity, drag/drop, filters and Trash actions. Done tasks stay out of priority boards as before.
+
+Use **+ Recurring task** from the new view to open the creation dialog with Weekly and today's date selected; change the rule, weekday and dates before saving. Choosing No recurrence on a new task creates a regular task instead. Existing recurring tasks appear in the new category automatically, without copying or resetting them. **Manage recurrences** opens rule settings directly.
+
+In Projects, regular tasks occupy the boards and recurring tasks appear in their own separate section. This preserves access to routines in project-only projects. Project visibility settings and filters remain respected. Calendar, dashboard totals, Archive and Trash continue to include both categories; weekly calendar entries still share one task.
+
+Pausing or choosing No recurrence on an existing recurring task pauses its series; the task stays in Recurring tasks so it remains easy to find and resume. Historical weekly copies detached by the 1.12 migration remain independent regular tasks.
 
 ## Cards and subtasks
 
@@ -128,11 +138,11 @@ All plugin-owned interface text, commands, dialogs, reminders and errors are Eng
 
 Search matches task titles, descriptions, subtasks, activity, waiting people and project names. Multiple words must all match. Combine status, priority, date and project filters. **Reset filters** clears them.
 
-Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.12.2 uses data schema 3 for shared weekly tasks. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
+Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.13.0 uses data schema 3 for shared weekly tasks. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
 
-## Create release 1.12.2
+## Create release 1.13.0
 
-Create a GitHub release with tag **1.12.2**, target **main**, title **Daily Planner 1.12.2**. Attach these files individually:
+Create a GitHub release with tag **1.13.0**, target **main**, title **Daily Planner 1.13.0**. Attach these files individually:
 
 - `main.js`
 - `manifest.json`
