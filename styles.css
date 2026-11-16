@@ -377,3 +377,37 @@
 @container tagesplaner (max-width: 900px) { .tp-home-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @container tagesplaner (max-width: 540px) { .tp-home-grid,.tp-home-settings { grid-template-columns: minmax(0,1fr); } .tp-head-identity { gap: 10px; } .tp-home-button { padding: 7px; } .tp-home-button>span:last-child { display: none; } .tp-root .tp-tool-tile { min-height: 160px; padding: 17px; } }
 @media(prefers-reduced-motion:reduce) { .tp-root .tp-tool-tile { transition: none; } }
+
+/* Calm Home header and a three-column workspace with previews. */
+.tp-home-root .tp-head { margin-bottom: 8px; }
+.tp-home-root .tp-home { max-width: 1600px; }
+.tp-home-layout { display: grid; grid-template-columns: minmax(165px,.7fr) minmax(400px,2.1fr) minmax(220px,.9fr); grid-template-areas: 'summary tools upcoming'; gap: 18px; align-items: start; }
+.tp-home-summary { grid-area: summary; }.tp-home-tools { grid-area: tools; min-width: 0; }.tp-home-upcoming { grid-area: upcoming; }
+.tp-home-summary,.tp-home-upcoming { padding: 17px 14px; border: 1px solid var(--background-modifier-border); border-radius: 14px; background: var(--background-secondary); min-width: 0; }
+.tp-home-side-heading { display: flex; align-items: center; gap: 8px; }
+.tp-home-side-heading .tp-symbol { width: 18px; height: 18px; color: var(--text-accent); }
+.tp-home-side-heading h4 { margin: 0; font-size: 14px; font-weight: 650; }
+.tp-home-side-subtitle { margin: 7px 0 17px; font-size: 10px; color: var(--text-muted); line-height: 1.5; }
+.tp-home-tools .tp-home-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.tp-home-tools .tp-tool-tile { min-height: 178px; padding: 17px; }
+.tp-home-tools .tp-tool-description { font-size: 11px; }
+.tp-home-stat-grid { display: grid; gap: 14px; }
+.tp-home-stat { --tp-tool-color: #85a9d9; border-bottom: 1px solid var(--background-modifier-border); padding-bottom: 12px; }
+.tp-home-stat-value { display: block; font-size: 29px; font-weight: 650; letter-spacing: -.04em; line-height: 1.2; color: var(--tp-tool-color); }
+.tp-home-stat-label { display: block; color: var(--text-muted); font-size: 10px; margin-top: 4px; }
+.tp-home-attention { display: flex; flex-wrap: wrap; gap: 7px; font-size: 10px; color: var(--text-muted); margin: 15px 0; }
+.tp-home-overdue { color: var(--text-error); }
+.tp-home-mini-chart { display: flex; gap: 6px; height: 65px; margin: 18px 0 8px; }
+.tp-home-mini-day { flex: 1; min-width: 0; text-align: center; font-size: 9px; color: var(--text-faint); }
+.tp-home-mini-track { height: 43px; display: flex; align-items: flex-end; background: var(--background-modifier-hover); border-radius: 3px; overflow: hidden; margin-bottom: 5px; }
+.tp-home-mini-bar { width: 100%; background: #7db9a1; border-radius: 3px; }
+.tp-root .tp-home-side-link { display: block; width: 100%; height: auto; padding: 8px 4px; margin-top: 12px; background: transparent; border: 1px solid transparent; box-shadow: none; color: var(--text-accent); font-size: 10px; text-align: left; }
+.tp-home-preview-list { display: grid; gap: 10px; }
+.tp-root .tp-home-preview { width: 100%; height: auto; min-height: 85px; display: flex; flex-direction: column; align-items: stretch; text-align: left; white-space: normal; padding: 11px; border: 1px solid var(--background-modifier-border); border-left: 2px solid var(--tp-tone); border-radius: 9px; background: var(--background-primary); box-shadow: none; }
+.tp-home-preview-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; font-weight: 650; line-height: 1.4; margin-bottom: 6px; }
+.tp-home-preview-date { font-size: 10px; line-height: 1.5; color: var(--text-accent); }
+.tp-home-preview-meta { color: var(--text-muted); font-size: 9px; line-height: 1.5; margin-top: 4px; overflow-wrap: anywhere; }
+.tp-home-empty { color: var(--text-muted); font-size: 11px; line-height: 1.6; padding: 8px 0; }
+@container tagesplaner (max-width: 1050px) { .tp-home-layout { grid-template-columns: minmax(320px,1fr) minmax(210px,.6fr); grid-template-areas: 'tools upcoming' 'summary upcoming'; }.tp-home-stat-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }.tp-home-mini-chart { max-width: 220px; } }
+@container tagesplaner (max-width: 700px) { .tp-home-layout { grid-template-columns: minmax(0,1fr); grid-template-areas: 'tools' 'summary' 'upcoming'; }.tp-home-stat-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@container tagesplaner (max-width: 450px) { .tp-home-tools .tp-home-grid,.tp-home-tools .tp-home-settings { grid-template-columns: minmax(0,1fr); } }

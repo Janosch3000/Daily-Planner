@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.14.1
+
+- Remove navigation, Home and task/template creation shortcuts from Home; retain them inside tools.
+- Place a compact dashboard to the left of tool cards and a chronological Next up preview to the right.
+- Include live metrics and a seven-day completion chart. Show up to six distinct upcoming tasks, including next weekly occurrences, respecting visibility and lifecycle states.
+- Open preview tasks inside their tool and stack Home columns on narrow panels.
+
+Release assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.14.1**.
+
+
 ## 1.14.0
 
 - Open on a new Home page with large icon cards for all eight planner sections, plus recurrence settings and reminders.

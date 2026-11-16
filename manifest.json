@@ -1,7 +1,7 @@
 {
   "id": "tagesplaner",
   "name": "Daily Planner",
-  "version": "1.14.0",
+  "version": "1.14.1",
   "minAppVersion": "1.4.0",
   "description": "Task planning with start/end schedules, a resizable weekly calendar, projects, templates and Trash.",
   "author": "Janosch",

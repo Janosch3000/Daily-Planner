@@ -938,11 +938,12 @@ class PlannerView extends ItemView {
       for (const group of root.querySelectorAll('[data-board]')) boards[group.getAttribute('data-board')] = group.querySelector('.tp-board-scroll')?.scrollLeft || 0;
       this.scrollPositions.set(this.renderedTab, { top: previousBody.scrollTop, boards });
     }
-    root.empty(); root.addClass('tp-root'); root.setAttribute('lang', 'en-GB');
+    root.empty(); root.addClass('tp-root');root.removeClass('tp-home-root');if(this.tab==='home')root.addClass('tp-home-root'); root.setAttribute('lang', 'en-GB');
     const head = root.createDiv('tp-head'), identity = head.createDiv('tp-head-identity');
-    const home = button(identity,'',()=>{this.tab='home';this.render();},'tp-home-button');home.setAttribute('aria-label','Go to home');home.title='Go to home';home.disabled=this.tab==='home';addSymbol(home,{key:'home',icon:'home'});home.createSpan({text:'Home'});
+    if(this.tab!=='home'){const home = button(identity,'',()=>{this.tab='home';this.render();},'tp-home-button');home.setAttribute('aria-label','Go to home');home.title='Go to home';home.disabled=this.tab==='home';addSymbol(home,{key:'home',icon:'home'});home.createSpan({text:'Home'});}
     const heading = identity.createDiv(); heading.createEl('h2', { text: "Daily Planner" });
     heading.createDiv({ text: "Focus for today. An overview of your week.", cls: 'tp-muted' });
+    if(this.tab!=='home'){
     const headActions = head.createDiv('tp-head-actions');
     button(headActions, this.tab === 'recurring' ? "+ Recurring task" : "+ Task", () => new TaskModal(this.app, this.plugin, null, { defaultRepeat: this.tab === 'recurring' ? 'weekly' : null, defaultProjectId: this.tab === 'projects' && this.plugin.data.projects.some(p => p.id === this.selectedProject) ? this.selectedProject : null }).open(), 'mod-cta');
     button(headActions, "+ Template", () => new TemplateModal(this.app, this.plugin).open());
@@ -950,6 +951,7 @@ class PlannerView extends ItemView {
     const archiveCount = this.plugin.data.tasks.filter(t => !t.deletedAt && !projectOnlyTask(this.plugin.data, t) && t.archivedAt).length;
     for (const [id, label] of [['board', "Tasks"], ['recurring', 'Recurring tasks'], ['calendar', "Calendar"], ['projects', "Projects"], ['dashboard', 'Dashboard'], ['templates', "Templates"], ['archive', "Archive · " + archiveCount], ['trash', "Trash · " + this.plugin.data.tasks.filter(t => t.deletedAt).length]]) {
       const b = button(nav, label, () => { this.tab = id; this.render(); }, this.tab === id ? 'tp-tab is-active' : 'tp-tab'); b.setAttribute('aria-pressed', String(this.tab === id));
+    }
     }
     if (this.tab === 'board' || this.tab === 'recurring') {
       const taskNav = root.createDiv('tp-task-navigation'); taskNav.setAttribute('aria-label', this.tab === 'recurring' ? "Views within Recurring tasks" : "Views within Tasks");
@@ -973,6 +975,9 @@ class PlannerView extends ItemView {
   renderHome(parent) {
     const page=parent.createDiv('tp-home');
     const intro=page.createDiv('tp-home-intro');intro.createSpan({text:'YOUR WORKSPACE',cls:'tp-home-eyebrow'});intro.createEl('h3',{text:'What would you like to work on?'});intro.createDiv({text:'Your plans, projects and routines. Everything in one place.',cls:'tp-home-subtitle'});
+    const layout=page.createDiv('tp-home-layout'),summary=layout.createDiv('tp-home-summary'),center=layout.createDiv('tp-home-tools'),upcoming=layout.createDiv('tp-home-upcoming');
+    summary.setAttribute('aria-label','Workspace overview');upcoming.setAttribute('aria-label','Upcoming tasks');
+    this.renderHomeOverview(summary);this.renderHomeUpcoming(upcoming);
     const tasks=this.plugin.data.tasks.filter(task=>!task.deletedAt&&!task.archivedAt&&task.status!=='Done'&&!projectOnlyTask(this.plugin.data,task));
     const archive=this.plugin.data.tasks.filter(task=>!task.deletedAt&&task.archivedAt&&!projectOnlyTask(this.plugin.data,task)).length;
     const count=(n,one,many=one+'s')=>n+' '+(n===1?one:many);
@@ -986,15 +991,41 @@ class PlannerView extends ItemView {
       {id:'archive',name:'Archive',icon:'archive',tone:'green',description:'Review finished work. Entries are kept for two months.',detail:count(archive,'archived task')},
       {id:'trash',name:'Trash',icon:'trash',tone:'rose',description:'Restore accidentally deleted tasks or remove them forever.',detail:count(this.plugin.data.tasks.filter(task=>task.deletedAt).length,'deleted task')}
     ];
-    const grid=page.createDiv('tp-home-grid');grid.setAttribute('aria-label','Planner tools');
+    const grid=center.createDiv('tp-home-grid');grid.setAttribute('aria-label','Planner tools');
     const tile=(parent,tool,action)=>{const item=button(parent,'',action,'tp-tool-tile tp-tool-'+tool.tone);item.setAttribute('data-tool',tool.id);item.setAttribute('aria-label','Open '+tool.name);
       const top=item.createSpan({cls:'tp-tool-top'});addSymbol(top,{key:tool.icon,icon:tool.icon});top.createSpan({text:'↗',cls:'tp-tool-arrow',attr:{'aria-hidden':'true'}});
       item.createSpan({text:tool.name,cls:'tp-tool-name'});item.createSpan({text:tool.description,cls:'tp-tool-description'});item.createSpan({text:tool.detail,cls:'tp-tool-detail'});
     };
     for(const tool of tools)tile(grid,tool,()=>{this.tab=tool.id;this.render();});
-    page.createEl('h4',{text:'Tools & settings',cls:'tp-home-settings-title'});const settings=page.createDiv('tp-home-settings');
+    center.createEl('h4',{text:'Tools & settings',cls:'tp-home-settings-title'});const settings=center.createDiv('tp-home-settings');
     tile(settings,{id:'recurrence-settings',name:'Recurrence settings',icon:'repeat',tone:'purple',description:'Choose weekdays, adjust intervals and pause routines.',detail:'Manage repetition'},()=>new SeriesManagerModal(this.app,this.plugin).open());
     tile(settings,{id:'reminders',name:'Reminders',icon:'bell',tone:'amber',description:'Choose when to be notified about upcoming work.',detail:this.plugin.data.reminderSettings.enabled?'Reminders enabled':'Reminders disabled'},()=>new ReminderSettingsModal(this.app,this.plugin).open());
+  }
+  renderHomeOverview(parent) {
+    const data={...this.plugin.data,tasks:this.plugin.data.tasks.filter(task=>!projectOnlyTask(this.plugin.data,task)&&this.plugin.data.projects.find(project=>project.id===task.projectId)?.includeInDashboard!==false)},m=metrics(data);
+    const heading=parent.createDiv('tp-home-side-heading');addSymbol(heading,{key:'chart',icon:'chart'});heading.createEl('h4',{text:'At a glance'});
+    parent.createDiv({text:new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'}),cls:'tp-home-side-subtitle'});
+    const stats=parent.createDiv('tp-home-stat-grid');
+    for(const [key,label,value,tone] of [['open','Open tasks',m.active.length,'blue'],['progress','In Progress',m.inProgress.length,'amber'],['today','Due today',m.dueToday.length,'purple'],['done','Completed · 7 days',m.done7,'green']]){
+      const stat=stats.createDiv('tp-home-stat tp-tool-'+tone);stat.setAttribute('data-home-metric',key);stat.createSpan({text:String(value),cls:'tp-home-stat-value'});stat.createSpan({text:label,cls:'tp-home-stat-label'});
+    }
+    const attention=parent.createDiv('tp-home-attention');attention.createSpan({text:m.overdue.length+' overdue',cls:m.overdue.length?'tp-home-overdue':''});attention.createSpan({text:m.waiting.length+' waiting'});
+    const activity=parent.createDiv('tp-home-mini-chart'),max=Math.max(1,...m.week.map(day=>day.count));activity.setAttribute('aria-label','Completed tasks in the last seven days');
+    for(const day of m.week){const col=activity.createDiv('tp-home-mini-day');col.title=day.key+': '+day.count+' completed';col.createDiv('tp-home-mini-track').createDiv('tp-home-mini-bar').style.height=(day.count/max*100)+'%';col.createSpan({text:new Date(day.key+'T12:00:00').toLocaleDateString('en-GB',{weekday:'narrow'})});}
+    button(parent,'Open dashboard →',()=>{this.tab='dashboard';this.render();},'tp-home-side-link');
+  }
+  renderHomeUpcoming(parent) {
+    const now=Date.now(),today=dayKey(now),last=shiftDate(today,60),heading=parent.createDiv('tp-home-side-heading');addSymbol(heading,{key:'calendar',icon:'calendar'});heading.createEl('h4',{text:'Next up'});
+    parent.createDiv({text:'Upcoming tasks · next 60 days',cls:'tp-home-side-subtitle'});
+    const entries=attentionEntries(this.plugin.data,today,last).filter(entry=>entry.kind==='task'&&!projectOnlyTask(this.plugin.data,entry.task)).map(entry=>({...entry,range:taskRange(entry.task)})).filter(entry=>entry.range&&entry.range.endDate>=today&&entry.range.startDate<=last&&(!entry.range.timed||entry.range.end>=wallValue(today,new Date(now).toTimeString().slice(0,5)))).sort((a,b)=>a.range.start-b.range.start||a.range.end-b.range.end||a.task.title.localeCompare(b.task.title));
+    const list=parent.createDiv('tp-home-preview-list'),seen=new Set();let shown=0;
+    for(const entry of entries){if(seen.has(entry.task.id))continue;seen.add(entry.task.id);if(shown++>=6)break;
+      const task=calendarSourceTask(entry),item=button(list,'',()=>{this.tab=isRecurringTask(this.plugin.data,task)?'recurring':'board';this.render();new TaskModal(this.app,this.plugin,task.id).open();},'tp-home-preview tp-priority-'+(PRIORITIES.find(priority=>priority.name===task.priority)?.key||'mid'));item.setAttribute('data-preview-task',task.id);item.setAttribute('aria-label','Open task: '+task.title);
+      item.createSpan({text:entry.task.title,cls:'tp-home-preview-title'});const date=entry.range.startDate===today?'Today':new Date(entry.range.startDate+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'});item.createSpan({text:date+' · '+(entry.range.timed?entry.range.startTime+' – '+entry.range.endTime:'All day'),cls:'tp-home-preview-date'});
+      item.createSpan({text:task.priority+' · '+projectName(this.plugin.data,task.projectId)+(task.weeklyRecurrence?' · ↻ Weekly':''),cls:'tp-home-preview-meta'});
+    }
+    if(!seen.size)list.createDiv({text:'Nothing scheduled yet. Open Calendar to plan your next task.',cls:'tp-home-empty'});
+    button(parent,'Open calendar →',()=>{this.tab='calendar';this.render();},'tp-home-side-link');
   }
   switchTaskBoard(board) {
     if (!['status', 'priority'].includes(board)) return;
@@ -1506,7 +1537,7 @@ module.exports = class TagesplanerPlugin extends Plugin {
   async tick(now = Date.now()) {
     await this.runMaintenance(now); await this.checkReminders(now);
     const minute = Math.floor(now / 60000), today = dayKey(now);
-    if (this.lastDay !== today || (this.lastMinute !== minute && this.data.tasks.some(t => !t.deletedAt && !t.archivedAt && t.status !== 'Done' && t.due === today && t.dueTime))) this.refreshViews();
+    if (this.lastDay !== today || (this.lastMinute !== minute && this.app.workspace.getLeavesOfType(VIEW).some(leaf=>leaf.view.tab==='home')) || (this.lastMinute !== minute && this.data.tasks.some(t => !t.deletedAt && !t.archivedAt && t.status !== 'Done' && t.due === today && t.dueTime))) this.refreshViews();
     this.lastDay = today; this.lastMinute = minute;
   }
   trashTask(id) {

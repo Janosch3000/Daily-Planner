@@ -1,6 +1,6 @@
 # Daily Planner for Obsidian
 
-Version **1.14.0** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
+Version **1.14.1** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
 
 ## Install or update with BRAT
 
@@ -12,7 +12,7 @@ For updates, check for plugin updates in BRAT, then reload the plugin or restart
 
 Opening Daily Planner with the ribbon or **Open Daily Planner** command opens **Home**. Large cards with coloured line icons lead to Tasks, Recurring tasks, Calendar, Projects, Dashboard, Templates, Archive and Trash. Two additional cards open recurrence settings and reminders. Cards show short descriptions and live counts where relevant.
 
-The **Home** button at the top left returns here from any view. The top navigation stays available throughout the plugin. Switching through Home preserves task drafts, filters and board selections. Direct commands such as Open dashboard still open their named view. Cards adapt from three to two to one column as the panel narrows and support keyboard navigation and the shared white hover/focus outline.
+Inside a tool, the **Home** button at the top left returns here and the top navigation remains available. Home itself has no Home button, navigation bar or task/template creation shortcuts. Open a tool to create tasks or templates. Switching through Home preserves task drafts, filters and board selections. Direct commands such as Open dashboard still open their named view. Home places a compact dashboard to the left of the tool cards and a Next up preview to their right. The dashboard shows open work, In Progress, due today, completed work in the last seven days, overdue/waiting counts and a small completion chart; project-only and dashboard-excluded tasks are omitted. Next up shows up to six distinct open tasks with scheduled ranges within the next 60 days, ordered by their start; completed, deleted, archived and project-only tasks are excluded. Weekly routines appear only once using their next occurrence. Preview clicks enter the task’s tool before opening Edit. With no upcoming tasks, a helpful empty state appears. The columns stack as the panel narrows, and tool cards adapt from two to one column and support keyboard navigation and the shared white hover/focus outline.
 
 ## Interaction feedback
 
@@ -144,11 +144,11 @@ All plugin-owned interface text, commands, dialogs, reminders and errors are Eng
 
 Search matches task titles, descriptions, subtasks, activity, waiting people and project names. Multiple words must all match. Combine status, priority, date and project filters. **Reset filters** clears them.
 
-Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.14.0 uses data schema 3 for shared weekly tasks. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
+Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.14.1 uses data schema 3 for shared weekly tasks. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
 
-## Create release 1.14.0
+## Create release 1.14.1
 
-Create a GitHub release with tag **1.14.0**, target **main**, title **Daily Planner 1.14.0**. Attach these files individually:
+Create a GitHub release with tag **1.14.1**, target **main**, title **Daily Planner 1.14.1**. Attach these files individually:
 
 - `main.js`
 - `manifest.json`
