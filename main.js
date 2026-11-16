@@ -214,10 +214,19 @@ function alignWeeklyTask(task,series,date) {
   const range=taskRange(task);if(!range)return;const delta=daysBetween(range.startDate,date);
   task.startDate=shiftDate(range.startDate,delta);task.due=shiftDate(range.endDate,delta);series.anchorDate=date;
 }
+function weeklyEventSchedule(task, fallback = dayKey()) {
+  const base=validDate(task.startDate)||validDate(task.due)||validDate(fallback)||dayKey(),start=validTime(task.startTime),end=validTime(task.dueTime);
+  if(!start&&!end)return {startDate:base,startTime:'',due:base,dueTime:''};
+  if(!start&&end){const previous=wallParts(wallValue(base,end)-60);return {startDate:previous.date,startTime:previous.time,due:base,dueTime:end};}
+  if(start&&!end){const next=wallParts(wallValue(base,start)+60);return {startDate:base,startTime:start,due:next.date,dueTime:next.time};}
+  if(start===end)throw new Error('Choose different start and end times for the weekly event.');
+  return {startDate:base,startTime:start,due:start>end?shiftDate(base,1):base,dueTime:end};
+}
 function configureWeekly(data,task,rule,now=Date.now()) {
   let series=data.recurrences.find(s=>s.id===task.recurrenceId);
   if(!series){series={id:uid(),createdAt:now};data.recurrences.push(series);}
-  const range=taskRange(task);if(!range)throw new Error('Set a date for the first weekly occurrence.');
+  Object.assign(task,weeklyEventSchedule(task,series.anchorDate||dayKey(now)));
+  const range=taskRange(task);
   const weekday=rule.weekday==null?weekdayOf(range.startDate):rule.weekday,date=shiftDate(range.startDate,(weekday-weekdayOf(range.startDate)+7)%7);
   Object.assign(series,rule,{weekday,mode:'continuous-weekly',taskId:task.id,anchorDate:date,enabled:true,updatedAt:now});
   task.recurrenceId=series.id;alignWeeklyTask(task,series,date);task.occurrenceDate='';
@@ -235,6 +244,7 @@ function syncWeeklyData(data,now=Date.now()) {
         if(deleted){owner=deleted;series.enabled=false;}
         else {owner=recurringTask(series,validDate(series.nextDate)||dayKey(now),now);data.tasks.push(owner);}
       }
+      if(series.enabled&&!owner.deletedAt)Object.assign(owner,weeklyEventSchedule(owner,series.anchorDate||series.nextDate||dayKey(now)));
       const range=taskRange(owner),weekday=series.weekday==null?weekdayOf(range?.startDate||series.nextDate||dayKey(now)):series.weekday;
       Object.assign(series,{mode:'continuous-weekly',taskId:owner.id,weekday,anchorDate:range?.startDate||series.nextDate||dayKey(now)});
       if(range)alignWeeklyTask(owner,series,shiftDate(range.startDate,(weekday-weekdayOf(range.startDate)+7)%7));
@@ -242,6 +252,7 @@ function syncWeeklyData(data,now=Date.now()) {
     }
     const task=data.tasks.find(t=>t.id===series.taskId);if(!task){series.enabled=false;continue;}
     task.recurrenceId=series.id;
+    if(series.enabled&&!task.deletedAt)Object.assign(task,weeklyEventSchedule(task,series.anchorDate||dayKey(now)));
     if(task.deletedAt||!taskRange(task))series.enabled=false;
     const rule=weeklyRule(series);Object.assign(series,rule);task.weeklyRecurrence=copy(rule);
     if(series.enabled&&task.status==='Done'){task.status='ToDo';task.completedAt=null;task.archivedAt=null;}
@@ -475,17 +486,19 @@ class TaskModal extends Modal {
     const series = this.plugin.data.recurrences.find(s => s.id === task?.recurrenceId);
     const rule = repeatRule(this.isTemplate ? task?.repeat : (series?.enabled ? series : !task && this.options.defaultRepeat ? {frequency:this.options.defaultRepeat,interval:1} : {}));
     this.originalRule=copy(rule);this.originalDue=task?.due||'';
+    if(!this.isTemplate)this.weeklyFirstInput=field('First weekly occurrence · optional','input','date',series?.frequency==='weekly'?(task?.startDate||series.anchorDate||''):'');
     this.repeatInput = field("Recurrence", 'select', null, '');
     REPEAT_OPTIONS.forEach(r => this.repeatInput.createEl('option', { text: r.label, value: r.value })); this.repeatInput.value = rule.frequency;
     this.weekdayInput=field('Weekly weekday','select',null,'');WEEKDAYS.forEach((name,i)=>this.weekdayInput.createEl('option',{text:name,value:String(i)}));this.weekdayInput.value=String(rule.weekday??series?.weekday??weekdayOf(task?.startDate||task?.due||dayKey()));
     this.repeatIntervalInput = field("Every … days / weeks / months", 'input', 'number', rule.interval);
     this.repeatIntervalInput.min = '1'; this.repeatIntervalInput.max = '365'; this.repeatIntervalInput.step = '1';
-    form.createDiv({ text: "Weekly repeats keep one task open and show it on the selected weekday forever. Editing any weekly entry changes the same task everywhere. Dates define the first event, not a series end. Daily/monthly repeats create separate tasks. No recurrence pauses the series.", cls: 'tp-help' });
+    form.createDiv({ text: "Weekly repeats keep one task open and show it on the selected weekday forever. Editing any weekly entry changes the same task everywhere. For Weekly, choose a weekday and optionally the first occurrence. No due date is required. Each all-day occurrence lasts one day; end times describe that occurrence, not the end of the series. Daily/monthly repeats create separate tasks. No recurrence pauses the series.", cls: 'tp-help' });
     this.repeatInput.onchange = () => {
       const enabled = this.repeatInput.value !== 'none'; this.repeatIntervalInput.disabled = !enabled;this.weekdayInput.parentElement.hidden=this.repeatInput.value!=='weekly';
-      if (enabled && this.dueInput && !this.dueInput.value) this.dueInput.value = dayKey();
+      if(this.weeklyFirstInput){const weekly=this.repeatInput.value==='weekly';this.weeklyFirstInput.parentElement.hidden=!weekly;this.startDateInput.parentElement.hidden=weekly;this.dueInput.parentElement.hidden=weekly;}
+      if (enabled && this.dueInput && !this.dueInput.value && this.repeatInput.value!=='weekly') this.dueInput.value = dayKey();
       if (enabled && this.offsetInput && this.offsetInput.value === '') this.offsetInput.value = '0';
-    }; this.repeatIntervalInput.disabled = rule.frequency === 'none';this.weekdayInput.parentElement.hidden=rule.frequency!=='weekly';if(!task && this.options.defaultRepeat)this.repeatInput.onchange();
+    }; this.repeatIntervalInput.disabled = rule.frequency === 'none';this.weekdayInput.parentElement.hidden=rule.frequency!=='weekly';if(this.weeklyFirstInput){const weekly=rule.frequency==='weekly';this.weeklyFirstInput.parentElement.hidden=!weekly;this.startDateInput.parentElement.hidden=weekly;this.dueInput.parentElement.hidden=weekly;}if(!task && this.options.defaultRepeat)this.repeatInput.onchange();
     this.waitingSection = form.createDiv('tp-waiting-fields');
     const waitingLabel = this.waitingSection.createEl('label', { cls: 'tp-field', text: "Waiting for · Person or team" });
     this.waitingForInput = waitingLabel.createEl('input', { type: 'text', attr: { placeholder: "e.g. Anna or the IT team" } }); this.waitingForInput.value = task?.waitingFor || '';
@@ -644,14 +657,15 @@ class TaskModal extends Modal {
     if (this.startOffsetInput && !this.startOffsetInput.checkValidity()) { this.startOffsetInput.reportValidity(); return; }
     if (this.startOffsetInput && this.startOffsetInput.value !== '' && (!Number.isInteger(Number(this.startOffsetInput.value)) || Math.abs(Number(this.startOffsetInput.value)) > 3650)) { new Notice('Enter a valid start offset in days.'); return; }
     if (!this.dueTimeInput.checkValidity() || (this.dueTimeInput.value && !validTime(this.dueTimeInput.value))) { new Notice('Enter a valid time in HH:mm format.'); return; }
-    if (!this.isTemplate && this.dueTimeInput.value && !validDate(this.dueInput.value)) { new Notice('Set a due date before assigning a time.'); return; }
+    if (!this.isTemplate && this.repeatInput.value!=='weekly' && this.dueTimeInput.value && !validDate(this.dueInput.value)) { new Notice('Set a due date before assigning a time.'); return; }
     if (this.offsetInput && !this.offsetInput.checkValidity()) { this.offsetInput.reportValidity(); return; }
     if (!this.followUpInput.checkValidity()) { this.followUpInput.reportValidity(); return; }
     const frequency = this.repeatInput.value, interval = Number(this.repeatIntervalInput.value);
     if (!REPEAT_OPTIONS.some(r => r.value === frequency) || (frequency !== 'none' && (!Number.isInteger(interval) || interval < 1 || interval > 365))) { new Notice("Enter a valid recurrence interval."); return; }
     const rule = repeatRule({ frequency, interval,weekday:Number(this.weekdayInput.value) });
+    if(frequency==='weekly'&&this.weeklyFirstInput&&(!this.weeklyFirstInput.checkValidity()||(this.weeklyFirstInput.value&&!validDate(this.weeklyFirstInput.value)))){this.weeklyFirstInput.reportValidity();return;}
     const keepUnscheduledSeries = !this.isTemplate && !!this.taskId && !this.originalDue && frequency !== 'none' && frequency === this.originalRule.frequency && interval === this.originalRule.interval;
-    if (!this.isTemplate && frequency !== 'none' && !validDate(this.dueInput.value) && !keepUnscheduledSeries) { new Notice("Set a due date for this recurring task."); return; }
+    if (!this.isTemplate && frequency !== 'none' && frequency !== 'weekly' && !validDate(this.dueInput.value) && !keepUnscheduledSeries) { new Notice("Set a due date for this recurring task."); return; }
     const dueInDays = this.offsetInput && this.offsetInput.value !== '' ? Number(this.offsetInput.value) : (this.isTemplate && (frequency !== 'none' || this.dueTimeInput.value) ? 0 : null);
     if (dueInDays != null && (!Number.isInteger(dueInDays) || dueInDays < 0 || dueInDays > 3650)) return;
     const followUpInDays = this.isTemplate && this.followUpInput.value !== '' ? Number(this.followUpInput.value) : null;
@@ -659,10 +673,17 @@ class TaskModal extends Modal {
     for (const item of this.subtaskRows.filter(s => s.title.trim())) {
       if (this.isTemplate ? item.dueInDays != null && (!Number.isInteger(item.dueInDays) || item.dueInDays < 0 || item.dueInDays > 3650) : item.due && !dateKeyValid(item.due)) { new Notice("Enter a valid date for each subtask."); return; }
     }
-    const endDate = this.isTemplate ? (dueInDays == null ? '' : shiftDate(dayKey(),dueInDays)) : this.dueInput.value;
+    let endDate = this.isTemplate ? (dueInDays == null ? '' : shiftDate(dayKey(),dueInDays)) : this.dueInput.value;
     const rawStartDate = this.isTemplate ? (this.startOffsetInput.value === '' ? '' : shiftDate(dayKey(),Number(this.startOffsetInput.value))) : this.startDateInput.value;
     let scheduleValues;
-    try { scheduleValues = resolveSchedule({due:endDate,dueTime:this.dueTimeInput.value,startDate:rawStartDate,startTime:this.startTimeInput.value}); } catch(error) { new Notice(error.message);return; }
+    try {
+      if(frequency==='weekly'){
+        const first=this.weeklyFirstInput?.value||rawStartDate||endDate||dayKey();
+        const weekly=weeklyEventSchedule({startDate:first,startTime:this.startTimeInput.value,due:first,dueTime:this.dueTimeInput.value});
+        endDate=weekly.due;scheduleValues={startDate:weekly.startDate,startTime:weekly.startTime};this.dueTimeInput.value=weekly.dueTime;
+        if(this.dueInput)this.dueInput.value=endDate;
+      }else scheduleValues=resolveSchedule({due:endDate,dueTime:this.dueTimeInput.value,startDate:rawStartDate,startTime:this.startTimeInput.value});
+    } catch(error) { new Notice(error.message);return; }
     if (!PRIORITIES.some(p => p.name === this.priorityInput.value)) return;
     const status = frequency==='weekly'&&this.statusInput.value==='Done'?'ToDo':this.statusInput.value;
     if (!COLS.some(c => c.name === status) || ((!this.taskId || this.isTemplate) && status === 'Done')) return;

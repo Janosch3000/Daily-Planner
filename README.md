@@ -1,6 +1,6 @@
 # Daily Planner for Obsidian
 
-Version **1.13.1** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
+Version **1.13.2** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
 
 ## Install or update with BRAT
 
@@ -16,7 +16,7 @@ Interactive controls throughout Daily Planner receive a subtle white outline on 
 
 **Tasks** shows regular tasks. **Recurring tasks** is a separate category for tasks linked to daily, weekly or monthly series, including paused series. Both categories have independent **Status** and **Priorities** boards, with the same editing, subtasks, activity, drag/drop, filters and Trash actions. Done tasks stay out of priority boards as before.
 
-Use **+ Recurring task** from the new view to open the creation dialog with Weekly and today's date selected; change the rule, weekday and dates before saving. Choosing No recurrence on a new task creates a regular task instead. Existing recurring tasks appear in the new category automatically, without copying or resetting them. **Manage recurrences** opens rule settings directly.
+Use **+ Recurring task** from the new view to open the creation dialog with Weekly selected; change the rule, weekday and dates before saving. Choosing No recurrence on a new task creates a regular task instead. Existing recurring tasks appear in the new category automatically, without copying or resetting them. **Manage recurrences** opens rule settings directly.
 
 In Projects, regular tasks occupy the boards and recurring tasks appear in their own separate section. This preserves access to routines in project-only projects. Project visibility settings and filters remain respected. Calendar, dashboard totals, Archive and Trash continue to include both categories; weekly calendar entries still share one task.
 
@@ -116,9 +116,9 @@ Use **+ Task → Create task from template** to choose a template. An independen
 
 ### Continuous weekly tasks
 
-In the task dialog, choose **Recurrence → Weekly**, then select **Weekly weekday**, for example **Friday**. Set the interval to 1 for every week, or a larger number for every N weeks. The first start is aligned to that weekday on or after the entered start date. Optional start/end times and overnight durations repeat with it.
+In the task dialog, choose **Recurrence → Weekly**, then select **Weekly weekday**, for example **Friday**. Set the interval to 1 for every week, or a larger number for every N weeks. Optionally set **First weekly occurrence**. Leave it empty to start on the next selected weekday, including today. Weekly mode does not require a due date or a start/end date range. Each all-day entry occupies one day only. Optional start/end times define one occurrence; an earlier end clock means the following morning.
 
-Weekly recurrence uses **one continuously open task**. It appears on the selected weekday in every future week, including months viewed far ahead, without creating task copies. There is no end date for the series. The end date in Edit describes the first scheduled range, not the end of the series.
+Weekly recurrence uses **one continuously open task**. It appears on the selected weekday in every future week, including months viewed far ahead, without creating task copies. There is no end date for the series. Weekly mode hides the ordinary start/end date fields and uses its optional first-occurrence field instead. Dates never create a continuous all-day range between weekly entries. Older long weekly ranges are repaired on loading without changing task IDs or content.
 
 All calendar entries share the same title, description, priority, project, subtasks and activity. Completing a subtask changes it everywhere; it does not reset next week. The Tasks board and dashboard count the shared task once. Old weekly dates do not make it permanently overdue. Reminders distinguish individual upcoming weekly dates.
 
@@ -138,11 +138,11 @@ All plugin-owned interface text, commands, dialogs, reminders and errors are Eng
 
 Search matches task titles, descriptions, subtasks, activity, waiting people and project names. Multiple words must all match. Combine status, priority, date and project filters. **Reset filters** clears them.
 
-Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.13.1 uses data schema 3 for shared weekly tasks. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
+Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.13.2 uses data schema 3 for shared weekly tasks. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
 
-## Create release 1.13.1
+## Create release 1.13.2
 
-Create a GitHub release with tag **1.13.1**, target **main**, title **Daily Planner 1.13.1**. Attach these files individually:
+Create a GitHub release with tag **1.13.2**, target **main**, title **Daily Planner 1.13.2**. Attach these files individually:
 
 - `main.js`
 - `manifest.json`

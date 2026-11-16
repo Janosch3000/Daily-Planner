@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.13.2
+
+- Fix weekly all-day tasks incorrectly spanning every day between their start and end dates. Each occurrence now occupies only its selected weekday.
+- Give Weekly its own optional First weekly occurrence field; hide ordinary range dates and remove the due-date requirement. With no date, start on the next selected weekday.
+- Preserve optional event times and overnight clocks, and repair existing active weekly ranges while retaining task IDs, content, project assignments and shared subtasks.
+- Keep daily/monthly recurrence and explicit Pause / No due date drag behavior unchanged.
+
+Release assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.13.2**.
+
+
 ## 1.13.1
 
 - Add subtasks directly on collapsed or expanded task cards with a compact title field and + button; support Enter to save.
