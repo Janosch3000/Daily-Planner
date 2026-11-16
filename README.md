@@ -1,6 +1,6 @@
 # Daily Planner for Obsidian
 
-Version **1.13.2** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
+Version **1.13.3** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
 
 ## Install or update with BRAT
 
@@ -98,7 +98,7 @@ Trash shows every deleted task, including hidden projects, regardless of task fi
 
 **Delete permanently** opens a confirmation. Only confirming it removes the task's contents permanently. Trash is not emptied automatically. Deleting a shared weekly task pauses its rule and removes every projected entry. Restore resumes it if it was active before deletion; permanent deletion also removes its weekly rule. Deleting one daily/monthly occurrence does not pause that series. A minimal series/date key remains after permanent deletion of a daily/monthly occurrence to prevent recreating it; it contains no task content.
 
-Done tasks enter **Archive** after 24 elapsed hours, with their subtasks and activity. **Reopen** returns them to ToDo. Historical Done tasks without completion dates receive an estimated date when first loaded and are excluded from retrospective completion charts.
+Done tasks enter **Archive** after 24 elapsed hours, with their subtasks and activity. Archived tasks are **permanently deleted two calendar months after their archivedAt timestamp**, including all task content, subtasks and activity, without passing through Trash. The same local day/time is used; if the target month lacks that day, its last day is used. This applies to existing archived tasks and project archives, regardless of filters or project visibility. Cleanup runs on startup/opening and every minute while the plugin is loaded; overdue cleanup is performed the next time Obsidian runs. Reopened tasks are no longer archived and are not deleted; archiving them again starts a new retention period. Tasks currently in Trash are excluded. Failed saves roll the cleanup back and are retried. A minimal daily/monthly recurrence ID/date tombstone prevents deleted occurrences from being regenerated, while independent series continue; a deleted weekly owner’s rule is removed. **Reopen** returns them to ToDo. Historical Done tasks without completion dates receive an estimated date when first loaded and are excluded from retrospective completion charts.
 
 ## Reminders and Waiting
 
@@ -138,11 +138,11 @@ All plugin-owned interface text, commands, dialogs, reminders and errors are Eng
 
 Search matches task titles, descriptions, subtasks, activity, waiting people and project names. Multiple words must all match. Combine status, priority, date and project filters. **Reset filters** clears them.
 
-Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.13.2 uses data schema 3 for shared weekly tasks. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
+Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.13.3 uses data schema 3 for shared weekly tasks. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
 
-## Create release 1.13.2
+## Create release 1.13.3
 
-Create a GitHub release with tag **1.13.2**, target **main**, title **Daily Planner 1.13.2**. Attach these files individually:
+Create a GitHub release with tag **1.13.3**, target **main**, title **Daily Planner 1.13.3**. Attach these files individually:
 
 - `main.js`
 - `manifest.json`

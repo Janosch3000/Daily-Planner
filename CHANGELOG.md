@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.13.3
+
+- Permanently delete archived tasks two calendar months after archiving, including subtasks and activity. Apply retention to existing and project archives; clamp missing month days to month end.
+- Run cleanup at startup, on view opening and during minute maintenance. Exclude reopened tasks and tasks in Trash; roll back and retry on save failure.
+- Prevent deleted daily/monthly occurrences from being regenerated and remove weekly rules whose archived owner expires.
+- Explain archive retention in the archive view and show the deletion date in expanded archived cards.
+
+Release assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.13.3**.
+
+
 ## 1.13.2
 
 - Fix weekly all-day tasks incorrectly spanning every day between their start and end dates. Each occurrence now occupies only its selected weekday.

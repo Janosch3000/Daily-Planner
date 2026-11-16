@@ -411,6 +411,20 @@ function archiveDue(data, now = Date.now()) {
   }
   return changed;
 }
+function archiveDeleteAt(archivedAt) {
+  if(!Number.isFinite(archivedAt)||archivedAt<=0)return Infinity;
+  const date=new Date(archivedAt),day=date.getDate();date.setDate(1);date.setMonth(date.getMonth()+2);
+  const last=new Date(date.getFullYear(),date.getMonth()+1,0).getDate();date.setDate(Math.min(day,last));return date.getTime();
+}
+function purgeExpiredArchive(data, now = Date.now()) {
+  const expired=data.tasks.filter(task=>!task.deletedAt&&task.archivedAt&&now>=archiveDeleteAt(task.archivedAt));
+  if(!expired.length)return false;
+  const ids=new Set(expired.map(task=>task.id));
+  for(const task of expired)if(task.recurrenceId&&task.occurrenceDate){const key=task.recurrenceId+':'+task.occurrenceDate;if(!data.deletedOccurrences.includes(key))data.deletedOccurrences.push(key);}
+  data.tasks=data.tasks.filter(task=>!ids.has(task.id));
+  data.recurrences=data.recurrences.filter(series=>!(series.mode==='continuous-weekly'&&ids.has(series.taskId)));
+  return true;
+}
 function metrics(data, now = Date.now()) {
   const today = dayKey(now);
   const weeklyDueToday = new Set(attentionEntries(data,today,today).filter(e=>e.sourceTask&&e.kind==='task'&&e.date===today).map(e=>e.task.id));
@@ -1312,7 +1326,7 @@ class PlannerView extends ItemView {
       if (task.status === 'Waiting') details.createDiv({ text: 'Waiting for: ' + (task.waitingFor || 'Pending response') + (task.followUpDate ? ' · Follow up ' + shortDate(task.followUpDate) : ''), cls: 'tp-muted' });
       if (task.createdAt) details.createDiv({ text: 'Created ' + timeText(task.createdAt), cls: 'tp-muted' });
       if (task.completedAt) details.createDiv({ text: task.completionDateEstimated ? 'Completed before the update' : 'Completed ' + timeText(task.completedAt), cls: 'tp-muted' });
-      if (archived) details.createDiv({ text: 'Archived ' + timeText(task.archivedAt), cls: 'tp-muted' });
+      if (archived) { details.createDiv({ text: 'Archived ' + timeText(task.archivedAt), cls: 'tp-muted' }); details.createDiv({text:'Permanently deleted after '+timeText(archiveDeleteAt(task.archivedAt)),cls:'tp-muted'}); }
       details.createDiv({ text: 'Activity history', cls: 'tp-section-title' });
       if (!task.worklog.length) details.createDiv({ text: 'No activity recorded yet.', cls: 'tp-muted' });
       for (const entry of [...task.worklog].reverse()) { const row = details.createDiv('tp-log-entry'); row.createDiv({ text: entry.text, cls: 'tp-log-text' }); row.createEl('time', { text: timeText(entry.at), cls: 'tp-muted' }); }
@@ -1326,7 +1340,7 @@ class PlannerView extends ItemView {
   }
   renderArchive(parent) {
     const tools = parent.createDiv('tp-archive-tools'); tools.createEl('h3', { text: "Your archive" });
-    tools.createDiv({ text: "Completed tasks keep their subtasks and activity history.", cls: 'tp-muted' });
+    tools.createDiv({ text: "Archived tasks are permanently deleted two calendar months after archiving, including their subtasks and activity. Cleanup runs while the plugin is open, or on the next start.", cls: 'tp-muted' });
     const input = tools.createEl('input', { type: 'search', attr: { placeholder: "Search archive …", 'aria-label': "Search archive" } }); input.value = this.archiveSearch;
     const grid = parent.createDiv('tp-archive-grid');
     const draw = () => {
@@ -1416,7 +1430,7 @@ module.exports = class TagesplanerPlugin extends Plugin {
   async archiveExpired(now = Date.now()) {
     // Check inside the write queue to serialize archival with status changes.
     const operation = this.queue.then(async () => {
-      const before = copy(this.data); if (!archiveDue(this.data, now)) return false;
+      const before = copy(this.data), archived = archiveDue(this.data, now), purged = purgeExpiredArchive(this.data, now); if (!archived && !purged) return false;
       try { await this.saveData(copy(this.data)); }
       catch (error) { this.data = before; console.error("Daily Planner: Archiving failed", error); new Notice("Could not save the archive update."); return false; }
       this.refreshViews(); return true;
@@ -1425,8 +1439,8 @@ module.exports = class TagesplanerPlugin extends Plugin {
   }
   async runMaintenance(now = Date.now()) {
     const operation = this.queue.then(async () => {
-      const before = copy(this.data), generated = generateRecurring(this.data, now), archived = archiveDue(this.data, now);
-      if (!generated.changed && !archived) return false;
+      const before = copy(this.data), archived = archiveDue(this.data, now), purged = purgeExpiredArchive(this.data, now), generated = generateRecurring(this.data, now);
+      if (!generated.changed && !archived && !purged) return false;
       try { await this.saveData(copy(this.data)); }
       catch (error) { this.data = before; console.error("Daily Planner: Automatic update failed", error); new Notice("Could not save automatic task updates. The plugin will retry automatically."); return false; }
       this.refreshViews(); return true;
