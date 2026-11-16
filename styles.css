@@ -291,10 +291,10 @@
 .tp-agenda-day { position: relative; background-color: var(--background-primary); background-image: linear-gradient(to bottom,var(--background-modifier-border) 1px,transparent 1px),linear-gradient(to bottom,color-mix(in srgb,var(--background-modifier-border) 40%,transparent) 1px,transparent 1px); background-size: 100% 72px,100% 36px; }
 .tp-agenda-day.is-today { background-color: color-mix(in srgb,var(--interactive-accent) 3%,var(--background-primary)); }
 .tp-agenda-day.tp-over,.tp-agenda-all-day.tp-over { box-shadow: inset 0 0 0 2px var(--interactive-accent); }
-.tp-scheduled-event { position: absolute; z-index: 2; min-height: 86px; }
+.tp-scheduled-event { position: absolute; z-index: 2; min-height: 0; box-sizing: border-box; }
 .tp-scheduled-event.is-resizing { z-index: 20; opacity: .85; }
-.tp-scheduled-event .tp-timed-event { margin: 0; height: 100%; width: 100%; min-height: 0; padding: 10px; border-radius: 9px; background: var(--background-secondary); background: color-mix(in srgb,var(--tp-tone) 13%,var(--background-primary)); overflow: hidden; box-shadow: 0 2px 6px #00000012; }
-.tp-scheduled-event .tp-calendar-event-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 0 0 4px; font-size: 14px; line-height: 1.25; }
+.tp-scheduled-event .tp-timed-event { margin: 0; height: 100%; width: 100%; min-height: 0; box-sizing: border-box; padding: 3px 6px; border-radius: 4px; background: var(--background-secondary); background: color-mix(in srgb,var(--tp-tone) 13%,var(--background-primary)); overflow: hidden; box-shadow: 0 2px 6px #00000012; }
+.tp-scheduled-event .tp-calendar-event-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 0; font-size: 12px; line-height: 14px; flex-shrink: 0; }
 .tp-scheduled-event .tp-calendar-event-detail { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 9px; }
 .tp-resize-handle { position: absolute; z-index: 3; left: 0; width: 100%; height: 10px !important; padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; cursor: ns-resize; touch-action: none; }
 .tp-resize-handle::after { content: ''; display: block; width: 26px; height: 3px; margin: 2px auto; border-radius: 3px; background: var(--text-muted); opacity: .5; }
@@ -326,3 +326,12 @@
 .tp-modal { color: var(--text-normal); }
 .tp-weekly-rule-fields .tp-field { min-width: 0; }
 .tp-weekly-rule-fields input,.tp-weekly-rule-fields select { width: 100%; min-width: 0; box-sizing: border-box; }
+
+/* Timeline geometry follows real start/end times, including very short events. */
+.tp-scheduled-event .tp-calendar-event-time { font-size: 10px; line-height: 12px; margin: 1px 0 0; white-space: nowrap; flex-shrink: 0; }
+.tp-scheduled-event.is-short .tp-timed-event { flex-direction: row; align-items: center; gap: 5px; padding: 0 4px; }
+.tp-scheduled-event.is-short .tp-calendar-event-title { display: block; flex: 1 1 auto; min-width: 0; white-space: nowrap; text-overflow: ellipsis; font-size: 10px; line-height: 12px; }
+.tp-scheduled-event.is-short .tp-calendar-event-time { flex: 0 0 auto; margin: 0; font-size: 9px; line-height: 12px; }
+.tp-scheduled-event .tp-resize-handle { height: 4px !important; min-height: 0; border-radius: 0; }
+.tp-scheduled-event .tp-resize-handle::after { height: 2px; margin: 0 auto; opacity: 0; }
+.tp-scheduled-event:hover .tp-resize-handle::after,.tp-scheduled-event .tp-resize-handle:focus::after { opacity: .8; }

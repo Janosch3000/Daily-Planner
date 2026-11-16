@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.12.1
+
+- Size timed calendar blocks exactly to their real start/end range. Remove the artificial minimum height and eight-pixel duration gap.
+- Calculate overlapping columns from actual time boundaries, so consecutive short appointments use the full column.
+- Show only title and time on timed blocks, with a compact single line for appointments shorter than 30 minutes. Keep click-to-edit, hover details and resize handles.
+
+Release assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.12.1**.
+
+
 ## 1.12.0
 
 - Select Monday–Sunday for Weekly recurrence and optionally repeat every N weeks.

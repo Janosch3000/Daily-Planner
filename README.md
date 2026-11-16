@@ -1,6 +1,6 @@
 # Daily Planner for Obsidian
 
-Version **1.12.0** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
+Version **1.12.1** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
 
 ## Install or update with BRAT
 
@@ -47,7 +47,7 @@ Templates store relative start/end dates and both times. Recurrence defaults pre
 
 **Week** displays an hourly timeline from Monday to Sunday. All-day tasks, subtasks and follow-ups stay above the time grid. Time blocks are positioned by their starts and sized by their duration. The initial vertical position targets the first scheduled hour; subsequent scrolling is retained while the view is open.
 
-Overlapping events use separate columns. Busy days widen to retain readable event titles, and very short events receive enough visual height to keep their labels readable. This minimum display height does not change a task's actual duration. Scroll horizontally to reach the remaining weekdays on narrow screens. Titles are larger and bold; time, priority, status and project are smaller within the block. Hover for the full title and project.
+Overlapping events use separate columns. Busy days widen to retain readable event titles. Every timed block has exactly the height of its duration, with no minimum height or artificial vertical gap. A 15-minute task is one quarter of an hour tall, and consecutive tasks touch at their shared time boundary. Scroll horizontally to reach the remaining weekdays on narrow screens. Timed blocks show only their title and time range. Tasks shorter than 30 minutes use one compact line; longer blocks put the time below the title. Long titles are clipped to the available space. Click to open all details, or hover for the full title, range and project. Month and all-day entries retain their metadata.
 
 **Move:** drag a time block onto a date/time slot to move the whole range while preserving its duration. Dropping an all-day task into the time grid creates a one-hour timed range. Date-based moves, including in Month, preserve the existing times and number of days. Subtask and follow-up moves change only their own dates.
 
@@ -124,11 +124,11 @@ All plugin-owned interface text, commands, dialogs, reminders and errors are Eng
 
 Search matches task titles, descriptions, subtasks, activity, waiting people and project names. Multiple words must all match. Combine status, priority, date and project filters. **Reset filters** clears them.
 
-Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.12.0 uses data schema 3 for shared weekly tasks. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
+Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.12.1 uses data schema 3 for shared weekly tasks. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
 
-## Create release 1.12.0
+## Create release 1.12.1
 
-Create a GitHub release with tag **1.12.0**, target **main**, title **Daily Planner 1.12.0**. Attach these files individually:
+Create a GitHub release with tag **1.12.1**, target **main**, title **Daily Planner 1.12.1**. Attach these files individually:
 
 - `main.js`
 - `manifest.json`

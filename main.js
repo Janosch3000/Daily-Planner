@@ -194,7 +194,7 @@ function calendarEntriesForDate(entries, date) {
   return result;
 }
 function layoutTimedEvents(entries) {
-  const sorted = entries.map(e => ({ ...e, layoutEnd: Math.max(e.endMinute, e.startMinute + 80) })).sort((a,b) => a.startMinute - b.startMinute || b.endMinute - a.endMinute || a.task.title.localeCompare(b.task.title));
+  const sorted = entries.map(e => ({ ...e, layoutEnd: e.endMinute })).sort((a,b) => a.startMinute - b.startMinute || b.endMinute - a.endMinute || a.task.title.localeCompare(b.task.title));
   const groups = []; let group = [], until = -1;
   for (const entry of sorted) { if (group.length && entry.startMinute >= until) { groups.push(group); group = []; until = -1; } group.push(entry); until = Math.max(until, entry.layoutEnd); }
   if (group.length) groups.push(group);
@@ -1045,10 +1045,10 @@ class PlannerView extends ItemView {
     scroller.scrollTop = saved == null ? firstStart*CALENDAR_PX_PER_MINUTE : saved;
     scroller.onscroll = () => { this.calendarTimelineScroll = scroller.scrollTop; };
   }
-  eventText(item, entry, label) {
+  eventText(item, entry, label, compact = false) {
     item.createDiv({text:entry.task.title,cls:'tp-calendar-event-title'});
     item.createDiv({text:label,cls:'tp-calendar-event-time'});
-    item.createDiv({text:entry.task.priority+' · '+entry.task.status+' · '+projectName(this.plugin.data,entry.task.projectId),cls:'tp-calendar-event-detail'});
+    if(!compact)item.createDiv({text:entry.task.priority+' · '+entry.task.status+' · '+projectName(this.plugin.data,entry.task.projectId),cls:'tp-calendar-event-detail'});
     item.title=entry.task.title+'\n'+label+'\n'+projectName(this.plugin.data,entry.task.projectId);
     item.setAttribute('data-event-task',entry.task.id);item.setAttribute('data-event-kind',entry.kind);item.setAttribute('data-event-time',entry.task.dueTime||'');
     item.draggable=true;item.ondragstart=e=>{e.dataTransfer.setData('application/x-tagesplaner-date',JSON.stringify({id:entry.task.id,kind:entry.kind,subtaskId:entry.subtaskId}));e.dataTransfer.effectAllowed='move';};
@@ -1084,11 +1084,11 @@ class PlannerView extends ItemView {
   }
   renderTimedEvent(parent, entry) {
     const box=parent.createDiv('tp-scheduled-event tp-priority-'+(PRIORITIES.find(p=>p.name===entry.task.priority)?.key||'mid'));box.setAttribute('data-schedule-id',entry.task.id);
-    const paint=(start,end)=>{box.style.top=(start*CALENDAR_PX_PER_MINUTE)+'px';box.style.height=Math.max(86,(end-start)*CALENDAR_PX_PER_MINUTE-8)+'px';};paint(entry.startMinute,entry.endMinute);
+    const paint=(start,end)=>{box.style.top=(start*CALENDAR_PX_PER_MINUTE)+'px';box.style.height=((end-start)*CALENDAR_PX_PER_MINUTE)+'px';if(end-start<30)box.addClass('is-short');else box.removeClass('is-short');};paint(entry.startMinute,entry.endMinute);
     box.style.left='calc('+100*entry.column/entry.columns+'% + 5px)';box.style.width='calc('+100/entry.columns+'% - 10px)';
     const item=button(box,'',()=>{if(Date.now()<(this.suppressCalendarClickUntil||0))return;new TaskModal(this.app,this.plugin,entry.task.id).open();},'tp-calendar-event tp-timed-event'+(taskOverdue(entry.task)?' is-overdue':''));
     const range=entry.range,label=(entry.continuesBefore?'← '+shortDate(range.startDate)+' ':'')+(entry.continuesBefore?'00:00':range.startTime)+' – '+(entry.continuesAfter?'24:00 → '+shortDate(range.endDate):range.endTime);
-    this.eventText(item,entry,label);
+    this.eventText(item,entry,label,true);
     for(const edge of ['start','end'].filter(edge=>edge==='start'?!entry.continuesBefore:!entry.continuesAfter)){
       const handle=button(box,'',()=>{},'tp-resize-handle tp-resize-'+edge);handle.setAttribute('aria-label','Resize '+edge+' of '+entry.task.title);handle.title='Drag to resize '+edge+' · 15-minute steps. Arrow keys adjust by 15 minutes.';handle.draggable=false;
       let drag=null;
