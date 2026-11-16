@@ -1,5 +1,16 @@
 # Änderungen
 
+## 1.8.0
+
+- Aufgaben mit vollständigen Inhalten in Papierkorb verschieben, wiederherstellen oder nach Bestätigung endgültig löschen. Gelöschte Aufgaben aus Ansichten, Statistiken, Erinnerungen und automatischer Archivierung ausschließen.
+- Projekte gezielt ausblenden: Nur Projektansicht, Dashboard-Berücksichtigung und Erinnerungen unabhängig einstellen. Die bisherige Ausnahme für Anpassungen Planer automatisch übernehmen.
+- Heute durch Wochen- und Monatskalender ersetzen, mit Navigation, Datumssprung, Filtern und Terminverschiebung per Drag-and-drop. Aufgaben-, Unteraufgaben- und Nachfragetermine unabhängig erhalten.
+- Überfällige Aufgaben und Aufgaben ohne Termin unter dem Kalender zugänglich halten.
+- Kompakte Karten mit Titel, kleinen Prio-/Status-/Projektangaben, Beschreibung und Unteraufgaben. Änderungen über Bearbeiten oder Verschieben; Arbeitsverlauf im Dialog fortführen.
+- Schutz vor veralteten Bearbeitungsdialogen für gelöschte Aufgaben und Duplikatschutz für gelöschte Serienvorkommen.
+
+Release-Assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.8.0**.
+
 ## 1.7.2
 
 - Aufgaben des Projekts „Anpassungen Planer“ nur in der Projektansicht anzeigen, einschließlich dessen Archiv.

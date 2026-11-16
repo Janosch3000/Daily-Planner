@@ -1,183 +1,89 @@
 # Tagesplaner für Obsidian
 
-Version **1.7.2** · Aufgaben- und Projektplanung mit Suche, Heute-Ansicht, wiederkehrenden Aufgaben, Erinnerungen, Unteraufgabenterminen, Vorlagen und Archiv.
+Version **1.8.0** · Aufgabenplanung mit Projekten, Wochen-/Monatskalender, Papierkorb, kompakten Karten, Vorlagen, Serienaufgaben und Erinnerungen.
 
-## Installation über BRAT
+## Installation und Update über BRAT
 
-1. In Obsidian **BRAT → Add Beta plugin** öffnen.
-2. `Janosch3000/Daily-Planner` hinzufügen.
-3. Unter **Community-Plugins** den Tagesplaner aktivieren.
-4. Über das Dashboard-Symbol in der linken Leiste oder den Befehl **Tagesplaner öffnen** starten.
+In Obsidian **BRAT → Add Beta plugin** öffnen und `Janosch3000/Daily-Planner` hinzufügen. Anschließend unter Community-Plugins den **Tagesplaner** aktivieren. Über das Dashboard-Symbol links oder den Befehl **Tagesplaner öffnen** starten.
 
-Für Updates in BRAT nach Plugin-Updates suchen. Danach den Tagesplaner deaktivieren und erneut aktivieren oder Obsidian neu starten. Das Plugin muss vorher nicht deinstalliert werden.
+Für Updates in BRAT nach Plugin-Updates suchen und den Tagesplaner erneut aktivieren oder Obsidian neu starten. Eine Neuinstallation ist nicht erforderlich; vorhandene Daten werden übernommen.
 
-## Projekt „Anpassungen Planer“
+## Kompakte Aufgabenkarten
 
-Aufgaben dieses Projekts sind ausschließlich in der Projektansicht sichtbar, sowohl bei Auswahl des Projekts als auch unter „Alle Projekte“. Sie erscheinen nicht in den allgemeinen Status-/Prioritätenboards, Heute oder dem allgemeinen Archiv und werden nicht im allgemeinen Dashboard mitgezählt. Das Projektarchiv bleibt verfügbar. Die Zuordnung wird über den Projektnamen erkannt (unabhängig von Groß-/Kleinschreibung und zusätzlichen Leerzeichen). Ein Projektfilter in den allgemeinen Boards hebt die Ausnahme nicht auf. Ohne Projektzuordnung oder nach Zuordnung zu einem anderen Projekt erscheinen Aufgaben dort wieder. Erinnerungen und die automatische Archivierung bleiben aktiv.
+Die Karte zeigt den Titel, direkt darunter kleine Angaben zu Priorität, Status und Projekt sowie gegebenenfalls Termin und Serie. Beschreibung und alle Unteraufgaben einschließlich Abschlusszustand und eigener Termine bleiben sichtbar. Waiting zeigt zusätzlich Person und Nachfragedatum. Die farbigen Rahmen werden beim Überfahren mit der Maus weiß.
 
-## Suche und Filter
+Auf der Karte gibt es keine Auswahlfelder und keine Eingabeformulare. **Bearbeiten** öffnet den Dialog für Titel, Beschreibung, Priorität, Status, Projekt, Termine, Unteraufgaben und Arbeitsverlauf. Auch Unteraufgaben werden dort abgehakt. Unter **Was wurde gemacht?** stehen die bisherigen Einträge; ein neuer Arbeitsschritt wird beim Speichern angehängt.
 
-Über den Aufgabenboards lassen sich Suchtext und Filter für Status, Priorität, Fälligkeit und Projekt kombinieren. Die Suche berücksichtigt Titel, Beschreibung, Unteraufgaben, Arbeitsverlauf, die wartende Person und Projektnamen. Mehrere Suchwörter müssen alle vorkommen, dürfen aber in unterschiedlichen Feldern stehen. Groß- und Kleinschreibung spielt keine Rolle.
+Zum Verschieben die Karte am Titel ziehen: im Statusboard wird nur der Status geändert, im Prioritätenboard nur die Priorität. Beide Boards bearbeiten dieselbe Aufgabe. Done-Aufgaben erscheinen nicht im Prioritätenboard; nach dem Zurückverschieben erscheinen sie wieder.
 
-Terminfilter: heute, überfällig, nächste 7 Tage oder ohne Termin. Neben der Hauptfälligkeit werden offene Unteraufgabentermine und bei Waiting das Nachfragedatum berücksichtigt. **Filter zurücksetzen** hebt die Einschränkungen auf. Die Eingaben bleiben beim Wechsel zwischen den Aufgabenansichten erhalten.
+Status: **ToDo**, **In Progress**, **Waiting**, **Done**. Prioritäten: **low**, **mid**, **high**, **immediately**. Innerhalb jeder Statusspalte stehen höhere Prioritäten oben; bei gleicher Priorität kommt der frühere Termin zuerst, Aufgaben ohne Termin folgen danach. Der frühere Status „Anpassungen Planner“ wird zu ToDo und die gleichnamige Priorität zu low.
 
-## Heute und Erinnerungen
+## Papierkorb
 
-Der neue Hauptreiter **Heute** zeigt Aufgaben, deren eigene Fälligkeit, offene Unteraufgabe oder Nachfrage heute oder früher fällig ist. Überfällige Einträge stehen zuerst. Jede Aufgabe erscheint nur einmal, mit einer Liste der Gründe für ihre Anzeige. Erledigte Aufgaben und bereits abgehakte Unteraufgaben erzeugen keine offenen Fälligkeiten.
+**Löschen** auf einer Karte oder im Bearbeitungsdialog verschiebt die gespeicherte Aufgabe in den **Papierkorb**. Sie verschwindet aus Boards, Kalender, Projektfortschritt, Dashboard, Erinnerungen und normalem Archiv. Projekt, Beschreibung, Termine, Unteraufgaben und Arbeitsverlauf bleiben erhalten.
 
-Unter **Heute → Erinnerungen** lassen sich die Obsidian-Hinweise aktivieren oder abschalten und ein Vorlauf von 0, 1, 3 oder 7 Tagen einstellen. Anfangs sind sie mit einem Tag Vorlauf aktiv. Automatische Erinnerungen erscheinen beim Laden beziehungsweise Öffnen des Planners und bei neuen Fälligkeiten während der minütlichen Prüfung. Jede Fälligkeit wird höchstens einmal pro Kalendertag automatisch gemeldet; dieser Zustand bleibt auch nach einem Neustart erhalten. **Jetzt prüfen** darf ausdrücklich erneut erinnern.
+Der Papierkorb zeigt alle gelöschten Aufgaben unabhängig von Projektfiltern, auch bei ausgeblendeten Projekten. **Wiederherstellen** bringt die Aufgabe mit ihren vorherigen Werten zurück. Archivierte Aufgaben bleiben archiviert; Aufgaben ausgeblendeter Projekte bleiben nur dort sichtbar. Bei wiederhergestellten Done-Aufgaben gilt das ursprüngliche Abschlussdatum für die automatische Archivierung.
 
-Die Hinweise berücksichtigen Aufgaben, Unteraufgaben und Nachfragen. Vorab gemeldete zukünftige Termine lassen sich über die Aufgabenfilter finden; die Heute-Ansicht bleibt auf heute und überfällige Einträge beschränkt. Es handelt sich um Hinweise innerhalb von Obsidian. Bei geschlossenem Obsidian oder deaktiviertem Plugin gibt es keine Hintergrund- oder Systembenachrichtigungen.
+**Endgültig löschen** öffnet eine Bestätigung. Erst danach werden Aufgabe und Inhalte dauerhaft entfernt. Der Papierkorb leert sich nicht automatisch.
 
-## Unteraufgaben mit eigenen Terminen
+Das Löschen eines einzelnen Serienvorkommens beendet die Serie nicht. Künftige Vorkommen werden weiter erzeugt; unter **Kalender → Wiederholungen** lässt sich die Serie pausieren. Gelöschte Vorkommen werden nicht erneut erzeugt. Nach endgültiger Löschung bleibt dafür nur der technische Schlüssel aus Serien-ID und Vorkommensdatum erhalten, ohne Aufgabeninhalt.
 
-Unteraufgaben haben ein eigenes optionales Datum, unabhängig von der Hauptaufgabe. Es lässt sich im Erstell-/Bearbeitungsdialog und direkt neben der Unteraufgabe auf der Karte setzen, ändern oder leeren. Fällige offene Unteraufgaben erscheinen über ihre Hauptaufgabe unter Heute und in den Erinnerungen. Das Abhaken einer Unteraufgabe beendet nur deren offene Fälligkeit.
+## Projekte und Sichtbarkeit
 
-In Vorlagen wird für jede Unteraufgabe statt eines festen Datums ein optionaler Abstand in Tagen ab Erstellung gespeichert. Beim Verwenden der Vorlage wird daraus ein konkreter Termin. Alle Daten bleiben anschließend frei änderbar.
+Aufgaben und Vorlagen lassen sich einem Projekt oder **Kein Projekt** zuordnen. Unter **Projekte** ein bestimmtes Projekt, alle Projekte oder Aufgaben ohne Projekt wählen. Status-/Prioritätenboards, Fortschritt und Projektarchiv stehen dort zur Verfügung. **Projekt entfernen** löscht keine Aufgaben: Aufgaben, Vorlagen und künftige Serienvorgaben verlieren nur die Projektzuordnung.
 
-## Warten auf jemanden
+Unter **Projekt bearbeiten → Sichtbarkeit** gibt es drei unabhängige Optionen:
 
-Im Status **Waiting** bietet der Aufgabendialog die Felder **Warten auf · Person oder Team** und **Nachfragen am**. Beide sind optional. Die Person und das Datum werden auf der Karte angezeigt und sind über **Bearbeiten** anpassbar. Nachfragen erscheinen am entsprechenden Tag unter Heute und werden bei aktivierten Erinnerungen berücksichtigt. Ein Statuswechsel aus Waiting beendet die aktive Nachfrage, bewahrt aber die Angaben für einen späteren Wechsel zurück.
+- **Nur in Projektansicht anzeigen**: Aufgaben aus allgemeinen Boards, Kalender und allgemeinem Archiv ausblenden. Die Projektansicht bleibt vollständig verfügbar. Ein Projektfilter im allgemeinen Board hebt die Ausnahme nicht auf.
+- **Im Dashboard berücksichtigen**: Zählwerte, Verteilungen, Abschlüsse, Fälligkeiten und Arbeitsverlauf dieses Projekts ein- oder ausschließen.
+- **Erinnerungen für dieses Projekt aktivieren**: Hinweise für Aufgaben-, Unteraufgaben- und Nachfragetermine aktivieren oder abschalten.
 
-Vorlagen können eine wartende Person und eine relative Nachfragefrist in Tagen enthalten.
+Neue Projekte sind überall sichtbar und werden bei Dashboard und Erinnerungen berücksichtigt. Die bisherige Ausnahme für „Anpassungen Planer“ wird automatisch übernommen: nur Projektansicht, nicht im Dashboard, Erinnerungen aktiv. Danach ist die Einstellung unabhängig vom Namen und frei änderbar. Beim Umbenennen bleibt sie erhalten.
 
-## Projekte
+## Wochen- und Monatskalender
 
-Im Hauptreiter **Projekte** ein Projekt auswählen. Alternativ **Alle Projekte** oder **Kein Projekt** wählen. Die Projektansicht zeigt die zugehörigen Aufgaben als Status- oder Prioritätenboard, einen Fortschrittsbalken sowie offene und erledigte Aufgaben. Erledigte Aufgaben im Archiv zählen beim Projektfortschritt weiter mit; sie können im ausklappbaren Archivbereich des Projekts gelesen und wieder geöffnet werden.
+Der Hauptreiter **Kalender** ersetzt **Heute**. **Woche** zeigt Montag bis Sonntag, **Monat** einen vollständigen Monatskalender mit angrenzenden Tagen. Mit den Pfeilen den Zeitraum wechseln, mit **Heute** zurückspringen oder das Datum direkt wählen. Auf schmalen Flächen lässt sich das Raster horizontal scrollen.
 
-- **+ Projekt** erstellt ein Projekt mit Namen und optionaler Beschreibung. Doppelte Namen sind nicht erlaubt.
-- **Projekt bearbeiten** benennt es um oder ändert die Beschreibung.
-- Im Aufgabendialog ein Projekt auswählen oder **Kein Projekt** verwenden. Eine Zuordnung ist nie Pflicht. Bei Bedarf direkt im Dialog ein Projekt anlegen; die übrigen Eingaben bleiben erhalten.
-- Eine neue Aufgabe, die über **+ Aufgabe** in einem ausgewählten Projekt begonnen wird, erhält dieses Projekt als Vorschlag.
-- Vorlagen können eine Projektvorgabe enthalten. Eine explizite Projektvorgabe der Vorlage hat Vorrang. Hat sie keine, wird beim Erstellen aus der Projektansicht das dort ausgewählte Projekt vorgeschlagen und übernommen.
-- **Projekt entfernen** erfordert eine Bestätigung. Aufgaben werden nicht gelöscht; sie wechseln zu Kein Projekt. Vorlagen und künftige Serienaufgaben verlieren nur die Projektzuordnung.
+Einträge zeigen offene Aufgabentermine, offene Unteraufgabentermine und Nachfragen bei Waiting. Die Terminart steht am Eintrag; dieselbe Aufgabe kann mehrere Termine haben. Done, Archiv, Papierkorb und Projekte mit „Nur in Projektansicht anzeigen“ erscheinen nicht im allgemeinen Kalender.
 
-Bereits vorhandene Aufgaben aus älteren Versionen beginnen ohne Projekt. Die Projektzuordnung bleibt beim Archivieren und Wiederöffnen erhalten.
+Ein Klick öffnet den Bearbeitungsdialog. Beim Ziehen auf einen anderen Tag wird nur der jeweilige Termin geändert: Hauptfälligkeit, Unteraufgabentermin oder Nachfragedatum. Alle anderen Termine bleiben erhalten. Alternativ lassen sich Termine im Dialog ändern.
 
-## Wiederkehrende Aufgaben
+Unter dem Kalender bleiben **Überfällig** und **Ohne Termin** unabhängig vom gewählten Zeitraum zugänglich. Suche und Status-/Prioritäts-/Projektfilter gelten für Kalender und Zusatzlisten gemeinsam. Erledigte Unteraufgaben erzeugen keine offenen Termine.
 
-Im Aufgabendialog **Wiederholung** auf täglich, wöchentlich oder monatlich setzen. **Alle …** bestimmt das Intervall, beispielsweise alle 2 Wochen. Eine wiederkehrende Aufgabe braucht ein Fälligkeitsdatum; beim Aktivieren wird ohne vorhandenes Datum zunächst heute vorgeschlagen. Die erste Aufgabe wird beim Speichern angelegt. Nachfolgende Aufgaben entstehen automatisch an ihren jeweiligen Fälligkeitstagen, unabhängig davon, ob die vorige bereits erledigt ist.
+## Waiting und Erinnerungen
 
-Monatliche Wiederholungen behalten ihren ursprünglichen Monatstag. Eine Serie vom 31. Januar fällt im Februar auf den letzten Tag und im März wieder auf den 31. Wochen- und Tagesintervalle arbeiten mit Kalendertagen. Vorlagen können bereits eine Wiederholung vorgeben; die Serie beginnt erst, wenn daraus eine Aufgabe erstellt wird.
+Waiting unterstützt eine Person oder ein Team und ein Nachfragedatum. Die Angaben bleiben bei Statuswechseln erhalten; Nachfragen werden nur bei Waiting als offene Termine behandelt.
 
-Jede Folgeaufgabe erhält eigene IDs, einen leeren Arbeitsverlauf und wieder offene Unteraufgaben. Projekt, Priorität und die Vorgaben werden übernommen. Unteraufgabentermine und Nachfragen behalten ihren relativen Abstand zur jeweiligen Hauptfälligkeit. Eine Folgeaufgabe startet nie in Done.
+Unter **Kalender → Erinnerungen** Hinweise aktivieren oder abschalten und 0, 1, 3 oder 7 Tage Vorlauf wählen. Standardmäßig sind sie mit einem Tag Vorlauf aktiv. Aufgaben, Unteraufgaben und Nachfragen sowie die Projekteinstellung werden berücksichtigt. Automatische Hinweise erscheinen pro Fälligkeit höchstens einmal am Kalendertag, auch nach Neustarts. **Jetzt prüfen** darf erneut erinnern.
 
-Wenn Obsidian geschlossen war, werden verpasste Serientermine beim nächsten Laden nachgeholt. Pro automatischem Durchlauf werden höchstens 100 Termine verarbeitet; größere Rückstände folgen in weiteren minütlichen Durchläufen. Serien-ID und Termindatum verhindern doppelte Vorkommen. Die Speicherung von Folgeaufgaben und nächstem Serientermin erfolgt gemeinsam; bei Schreibfehlern wird beides zurückgenommen.
+Die Prüfung läuft beim Laden beziehungsweise Öffnen und minütlich, solange das Plugin geladen ist. Bei geschlossenem Obsidian oder deaktiviertem Plugin gibt es keine Hintergrund- oder Systembenachrichtigungen. Erinnerungen ausgeblendeter Projekte können unabhängig aktiv bleiben; diese Aufgaben findest du in der Projektansicht.
 
-Im Bearbeitungsdialog einer Serienaufgabe gelten Änderungen an Vorgaben und Wiederholung für künftige Aufgaben der Serie, nicht rückwirkend für bereits angelegte Aufgaben. Änderungen direkt auf einer Karte betreffen die jeweilige Aufgabe. Eine Änderung nur des Datums einer vorhandenen Aufgabe verschiebt nicht automatisch den übrigen Kalender der Serie. **Keine Wiederholung** pausiert die Serie.
+## Vorlagen und Serien
 
-Unter **Heute → Wiederholungen** lassen sich alle Serien auch dann noch pausieren, fortsetzen oder auf einen neuen nächsten Termin setzen, wenn die ursprüngliche Aufgabe bereits im Archiv liegt. Beim Fortsetzen wird die bewusst pausierte Zeit übersprungen; normale Offline-Zeiten einer aktiven Serie werden weiterhin nachgeholt. Bestehende Aufgaben werden durch das Pausieren nicht gelöscht.
+**+ Vorlage** neben **+ Aufgabe** öffnet die Vorlagenbearbeitung. Vorlagen enthalten einen Namen, optionalen Aufgabentitel, Beschreibung, Startstatus, Priorität, optionales Projekt, Unteraufgaben, relative Termine und Wiederholungsregeln. Unteraufgaben direkt eingeben; Enter ergänzt eine Zeile, ohne die Vorlage vorzeitig zu speichern.
 
-## Aufgaben und Unteraufgaben
+Unter **+ Aufgabe → Aufgabe nach Vorlage erstellen** eine Vorlage wählen. Es entsteht eine unabhängige Aufgabe, die sofort im Bearbeitungsdialog geöffnet wird. Alle Werte bleiben anpassbar. Abbrechen im anschließend geöffneten Dialog behält die bereits erstellte Aufgabe; bei Bedarf lässt sie sich löschen. Vorlagen können unter **Vorlagenverwaltung** umbenannt, bearbeitet und gelöscht werden. Erstellte Aufgaben bleiben davon unberührt.
 
-- **+ Aufgabe** öffnet einen Obsidian-Dialog für Titel, Priorität, Status, optionales Projekt, Fälligkeitsdatum, Wiederholung, Beschreibung und Unteraufgaben.
-- **Bearbeiten** ändert diese Angaben später. Über **Beschreibung bearbeiten** direkt auf jeder Karte lässt sich eine Beschreibung außerdem jederzeit ergänzen, ändern oder leeren; mit **Beschreibung speichern** übernehmen. Das funktioniert im Statusboard und in der Prioritätenübersicht identisch.
-- Kategorien in dieser Reihenfolge: **ToDo**, **In Progress**, **Waiting**, **Done**. Innerhalb jeder Statusspalte stehen Aufgaben nach Priorität: **immediately → high → mid → low**. Bei gleicher Priorität kommt das frühere Fälligkeitsdatum zuerst; Aufgaben ohne Datum folgen danach.
-- Zum Verschieben den Kartentitel ziehen oder die Status-Auswahl verwenden. Die Status-Auswahl funktioniert auch ohne Maus.
-- Innerhalb einer Karte neue Unteraufgaben eingeben und mit **+** oder Enter hinzufügen. Häkchen speichern den Fortschritt, **×** entfernt eine Unteraufgabe.
-- Der übergeordnete Status wird bewusst manuell gesetzt. Erledigte Unteraufgaben setzen die Hauptaufgabe nicht automatisch auf Done.
-- Unten in jeder Karte steht **Was wurde gemacht?**. Einträge mit **Eintrag speichern** ablegen; sie bleiben mit Datum und Uhrzeit im Arbeitsverlauf erhalten.
-- Noch nicht gespeicherte Texte für Unteraufgaben und Arbeitsschritte bleiben beim Wechsel zwischen den Ansichten innerhalb derselben geöffneten Planner-Ansicht erhalten. Vor dem Schließen oder Neustart speichern.
+Serien sind täglich, wöchentlich oder monatlich mit Intervallen von 1 bis 365 möglich und benötigen einen Haupttermin. Neue Vorkommen erhalten eigene IDs, offene Unteraufgaben und einen leeren Arbeitsverlauf. Relative Termine werden übernommen. Monatliche Serien berücksichtigen kurze Monate und behalten den ursprünglichen Monatstag für spätere Monate.
 
-## Aufgabenvorlagen
+Dialogänderungen einer Serienaufgabe aktualisieren die Vorgaben künftiger Vorkommen. Das Verschieben eines einzelnen Kalendereintrags ändert nur dieses Vorkommen und verschiebt nicht den Serienkalender. Unter **Kalender → Wiederholungen** lassen sich Serien auch nach Archivierung oder Löschung ihrer Ursprungsaufgabe verwalten. Pausieren stoppt die Erzeugung; Fortsetzen überspringt die pausierte Zeit. **Keine Wiederholung** im Aufgabendialog pausiert die zugehörige Serie.
 
-### Vorlage erstellen
+Versäumte aktive Vorkommen werden nachgeholt, mit höchstens 100 Schritten pro Wartungslauf. Aufgaben und Serienfortschritt werden gemeinsam gespeichert; fehlgeschlagene Vorgänge können erneut versucht werden.
 
-Oben neben **+ Aufgabe** steht **+ Vorlage**. Der Knopf öffnet einen taskähnlichen Editor mit:
+## Suche, Archiv und Daten
 
-- einem eindeutigen **Namen der Vorlage** und einem optionalen Aufgabentitel;
-- Priorität, Startstatus (ToDo, In Progress, Waiting), Projekt, Wiederholung und Beschreibung;
-- Unteraufgaben, die für neue Aufgaben jeweils offen beginnen;
-- einer optionalen relativen Fälligkeit in Kalendertagen nach Erstellung: 0 = heute, 2 = zwei Tage später. Leer bedeutet ohne Fälligkeit; möglich sind 0 bis 3650 Tage.
+Suchtext und Filter nach Status, Priorität, Termin und Projekt kombinieren. Gesucht wird in Titel, Beschreibung, Unteraufgaben, Arbeitsverlauf, wartender Person und Projektname. Mehrere Wörter müssen alle vorkommen. Terminfilter berücksichtigen Haupttermine, offene Unteraufgaben und aktive Nachfragen. **Filter zurücksetzen** entfernt die Einschränkungen.
 
-Unter **Unteraufgaben** steht direkt eine Eingabezeile bereit. Den Titel der ersten vorgegebenen Unteraufgabe eingeben. **Enter** ergänzt die nächste Zeile; alternativ **+ Unteraufgabe** verwenden. Bereits eingegebene Titel können direkt geändert und über **×** entfernt werden. Eine vorhandene leere Zeile wird weiterverwendet, statt weitere leere Zeilen anzulegen.
+Done-Aufgaben wandern nach 24 verstrichenen Stunden ins **Archiv**, mit Unteraufgaben und Verlauf. **Wieder öffnen** setzt sie auf ToDo. Der Papierkorb ist getrennt; gelöschte Aufgaben werden nicht automatisch archiviert. Historische Done-Aufgaben ohne Abschlussdatum erhalten beim ersten Laden einen geschätzten Abschlusszeitpunkt und werden nicht rückwirkend in Abschlussstatistiken eingerechnet.
 
-Enter in einem Eingabefeld speichert das Formular nicht versehentlich. Erst **Vorlage speichern** legt die Vorlage mit allen ausgefüllten Unteraufgaben ab. Leere Zeilen werden nicht gespeichert. Beim erneuten Bearbeiten erscheinen die gespeicherten Unteraufgaben wieder als editierbare Eingabezeilen. Neue Aufgaben aus dieser Vorlage erhalten sämtliche vorgegebenen Unteraufgaben als eigene, offene Kopien.
+Alle persönlichen Daten liegen lokal in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Persönliche Aufgaben gehören nicht ins öffentliche Repository. Vor einem Downgrade diese Datei sichern: Ältere Versionen berücksichtigen Papierkorb und Projekteinstellungen nicht.
 
-Alles eingeben und anschließend **Vorlage speichern** wählen. Dadurch entsteht eine Vorlage, noch keine Aufgabe. Auf den einzelnen Aufgabenkarten gibt es keinen Vorlagenknopf.
+## Release 1.8.0 erstellen
 
-### Aufgabe nach Vorlage erstellen
+Auf GitHub ein Release mit Tag **1.8.0**, Ziel **main** und Titel **Tagesplaner 1.8.0** erstellen. Diese drei Dateien einzeln als Assets anhängen:
 
-1. Oben **+ Aufgabe** öffnen.
-2. Unten neben **Aufgabe erstellen** auf **Aufgabe nach Vorlage erstellen** klicken.
-3. In der durchsuchbaren Auswahl den gewünschten Vorlagennamen anklicken. Das erstellt die Aufgabe mit den gespeicherten Vorgaben und öffnet genau diese Aufgabe sofort im Bearbeitungsdialog. Dort kannst du die übernommenen Werte anpassen und mit Änderungen speichern übernehmen.
+- `main.js`
+- `manifest.json`
+- `styles.css`
 
-Hat die Vorlage keinen Aufgabentitel, wird ihr Vorlagenname als Titel verwendet. Die relative Fälligkeit wird am Tag der Erstellung in ein konkretes Datum umgerechnet. Angefangene Eingaben im normalen Aufgabendialog werden nicht mit den Vorlagenwerten vermischt. Abbrechen in der Auswahl kehrt zum unveränderten Entwurf zurück.
-
-Die Aufgabe ist beim Öffnen des Bearbeitungsdialogs bereits angelegt. Abbrechen verwirft nur die ungespeicherten Anpassungen; die erstellte Aufgabe bleibt bestehen. Nach der Erstellung bleiben Titel, Priorität, Beschreibung, Fälligkeit und Unteraufgaben über die üblichen Bearbeitungsmöglichkeiten anpassbar. Jede Aufgabe ist eine unabhängige Kopie mit eigenen IDs, ohne Arbeitsverlauf oder erledigte Häkchen aus anderen Aufgaben. Änderungen an der Aufgabe ändern die Vorlage nicht.
-
-### Benennen und verwalten
-
-Im Reiter **Vorlagenverwaltung** werden alle Vorlagen unter ihrem Namen angezeigt. **Umbenennen** öffnet den Editor mit dem Feld **Name der Vorlage**. **Bearbeiten** passt auch die übrigen Vorgaben an. **Löschen** entfernt die Vorlage nach einer Bestätigung. Bereits erstellte Aufgaben bleiben bei Änderungen und beim Löschen der Vorlage unverändert. Doppelte Namen sind nicht erlaubt.
-
-Vorlagen werden lokal zusammen mit den Aufgaben in data.json gespeichert. Bestehende Aufgaben und Vorlagen bleiben beim Update erhalten.
-
-## Aufgaben: Status und Prioritäten
-
-Unter dem gemeinsamen Hauptreiter **Aufgaben** stehen die zwei zusammengefassten Unterreiter **Status** und **Prioritäten**. Sie wechseln zwischen dem Statusboard und dem Prioritätenboard; Dashboard, Vorlagenverwaltung und Archiv bleiben eigenständige Hauptreiter. Die Prioritäten heißen **low**, **mid**, **high**, **immediately**, mit dezenten Farbtönen Grün, Blau, Bernstein und Rosé.
-
-Eine Aufgabe besitzt einen Status und eine Priorität. Beide Übersichten zeigen dieselbe gespeicherte Aufgabe, keine unabhängigen Kopien. Änderungen an Titel, Beschreibung, Fälligkeit, Status, Priorität, Unteraufgaben und Arbeitsverlauf erscheinen in beiden Übersichten.
-
-- Im Erstell-/Bearbeitungsdialog und im Prioritätsfeld auf jeder Karte die Priorität auswählen.
-- Alternativ den Kartentitel in eine Prioritätsspalte ziehen. Das ändert nur die Priorität; Status und vorhandener Archivtimer bleiben erhalten.
-- Das Ziehen in eine Statusspalte ändert nur den Status; die Priorität bleibt erhalten.
-- Die farbigen Tags und die Position in der Prioritätenübersicht stimmen immer mit der gespeicherten Priorität überein.
-- Neue Aufgaben und bestehende Aufgaben ohne Priorität beginnen mit **mid**.
-- Im Statusboard erscheinen alle nicht archivierten Aufgaben. Die Prioritätenübersicht zeigt nur Aufgaben in ToDo, In Progress oder Waiting. Beim Wechsel zu Done verschwindet eine Aufgabe sofort aus der Prioritätenübersicht, bleibt aber bis zur Archivierung in der Done-Spalte. Beim Zurückverschieben aus Done erscheint sie wieder in ihrer bisherigen Prioritätsspalte. Auch das Wiederherstellen aus dem Archiv bringt sie mit derselben Priorität zurück.
-- Textentwürfe für Beschreibungen, Unteraufgaben und Arbeitsschritte werden innerhalb der geöffneten Ansicht zwischen beiden Darstellungen synchronisiert. Erst Speichern legt sie dauerhaft ab. Scrollpositionen bleiben bei Änderungen erhalten.
-
-## Symbole und Gestaltung
-
-Die Statuskategorien haben eindeutige, farbige Symbole neben ihrer Beschriftung:
-
-- **ToDo**: leeres Kästchen.
-- **In Progress**: Baustellenabsperrung.
-- **Waiting**: Uhr.
-- **Done**: Kästchen mit Haken.
-
-Bei den Prioritäten stehen Pfeile für die Dringlichkeit: **low ↓**, **mid →**, **high ↑**, **immediately ⇈**. Die Symbole sind kräftiger eingefärbt als die dezenten Spaltenhintergründe. Jede Aufgabenkarte hat einen dezenten Rahmen in der Farbe ihrer aktuellen Status- beziehungsweise Prioritätsspalte. Beim Darüberfahren mit der Maus wird der Rahmen reinweiß (#ffffff) und erhält einen leichten weißen Schein. Tastaturfokus innerhalb einer Karte hebt den Rahmen weiterhin in der jeweiligen Highlightfarbe hervor. Sie erscheinen in Spaltenüberschriften, auf Karten, in der Vorlagenauswahl und im Dashboard; Auswahlfelder verwenden ebenfalls passende Zeichen. Alle Beschriftungen bleiben zusätzlich sichtbar. Die Symbole werden lokal als SVG dargestellt, ohne externe Bilder zu laden.
-
-Aufwandseingabe, Stundenanzeigen, Wochenkapazität und die daraus berechnete Auslastung sind in dieser Version aus der Oberfläche entfernt. Das Dashboard konzentriert sich auf Aufgaben, Prioritäten, Fälligkeiten, Unteraufgaben und Abschlüsse.
-
-Die frühere Kategorie „Anpassungen Planner“ wurde aus Status und Prioritäten entfernt. Beim Laden werden entsprechende Statuswerte zu **ToDo** und Prioritäten zu **low**. Das gilt auch für Vorlagen und Serienaufgaben; Inhalte, Projekte und Termine bleiben erhalten.
-
-## Archiv
-
-Aufgaben wechseln **24 Stunden nach dem Setzen auf Done** automatisch ins Archiv. Das Plugin prüft jede Minute, beim Laden und beim Öffnen der Ansicht. War Obsidian geschlossen, wird die Archivierung beim nächsten Start nachgeholt.
-
-Das Archiv ist nach Titel, Beschreibung, Unteraufgaben und Arbeitsverlauf durchsuchbar. Es werden keine Aufgaben durch die automatische Archivierung gelöscht. **Wieder öffnen** verschiebt eine Aufgabe nach ToDo; Unteraufgaben und Arbeitsverlauf bleiben erhalten. Bei erneutem Abschluss beginnen die 24 Stunden von vorn.
-
-## Dashboard
-
-- Offene Aufgaben, Aufgaben in Bearbeitung, heutige Fälligkeiten und überfällige Aufgaben.
-- Erledigte Aufgaben in den letzten 7 beziehungsweise 30 Kalendertagen, einschließlich heute und einschließlich Archiv.
-- Aufgaben in Waiting sowie erledigte Unteraufgaben im Verhältnis zur Gesamtzahl.
-- Verteilung auf die Kategorien und Abschlussdiagramm der letzten 7 Tage.
-- Bevorstehende Fälligkeiten, zuletzt abgeschlossene Aufgaben und letzte dokumentierte Arbeitsschritte.
-- Verteilung der offenen Aufgaben auf die fünf Prioritäten.
-
-Erneut geöffnete Aufgaben zählen bis zu ihrem nächsten Abschluss nicht als erledigt. Die Statistik verwendet den letzten Abschluss der aktuell fertigen Aufgaben und zählt dieselbe Aufgabe nicht mehrfach.
-
-## Bestehende Daten
-
-Vorhandene Aufgaben und Vorlagen aus früheren Versionen werden automatisch übernommen. Fehlende Prioritäten werden auf mid gesetzt. Die bisherigen Kategorien werden zugeordnet: Offen → ToDo, In Bearbeitung → In Progress, Warten auf Person und Delayed → Waiting, Fertig → Done. Vorhandene Abschlussdaten und Archivtimer bleiben dabei erhalten. Titel, Status, Fälligkeitsdatum und Beschreibung bleiben erhalten. Neue Felder werden ergänzt.
-
-Alte Aufgaben im Status Done besitzen noch kein gespeichertes Abschlussdatum. Für sie beginnt der Archivtimer beim ersten Laden von Version 1.7.2. Sie werden als vor dem Update erledigt gekennzeichnet und nicht rückwirkend in 7-/30-Tage-Statistiken eingerechnet.
-
-Alle Daten liegen lokal in `<Vault>/.obsidian/plugins/tagesplaner/data.json`; das Archiv ist Teil dieser Datei. Persönliche Aufgaben gehören nicht ins öffentliche GitHub-Repository. Vor einem späteren Downgrade auf eine ältere Plugin-Version die Datei sichern: Ältere Versionen kennen die neuen Kategorien beziehungsweise das neue Datenformat nicht.
-
-## Release 1.7.2 erstellen
-
-Repository: https://github.com/Janosch3000/Daily-Planner
-
-1. Ein neues Release mit neuem Tag **1.7.2**, Ziel **main**, Titel **Tagesplaner 1.7.2** erstellen.
-2. Die aktuellen Dateien **main.js**, **manifest.json** und **styles.css** aus dieser Version als drei einzelne Assets anhängen.
-3. Die Notizen aus `CHANGELOG.md` verwenden und das Release veröffentlichen. Nicht als Pre-release markieren, wenn BRAT es regulär als neueste Version beziehen soll.
-
-Die Dateien liegen direkt im Repository-Stammverzeichnis. `versions.json` dokumentiert die erforderliche Obsidian-Version und bleibt ebenfalls im Stammverzeichnis. Für die Installation über BRAT reicht das automatisch erzeugte Source-code-ZIP allein nicht; die drei einzelnen Release-Assets müssen vorhanden sein.
-
-Die Plugin-ID `tagesplaner` bleibt unverändert, damit BRAT vorhandene Installationen aktualisiert.
-
-## Grenzen dieser Version
-
-Die Full-Calendar-Anbindung, das automatische Verschieben alter Fälligkeiten auf den nächsten Tag und eine Zeiterfassung sind nicht Bestandteil von 1.7.2. Überfällige Aufgaben bleiben in Heute sichtbar; wiederkehrende Aufgaben werden als neue Vorkommen erstellt. Das Archiv arbeitet mit abgeschlossenen Aufgaben und läuft, während das Plugin in Obsidian geladen ist.
+Ein ZIP allein und automatisch erzeugte Quellcodearchive reichen für BRAT nicht aus. `versions.json` bleibt im Repository. Ein zusätzlicher Build ist nicht nötig; `main.js` ist die direkt ladbare CommonJS-Datei ohne zusätzliche Laufzeitabhängigkeiten.

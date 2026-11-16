@@ -1,9 +1,9 @@
 {
   "id": "tagesplaner",
   "name": "Tagesplaner",
-  "version": "1.7.2",
+  "version": "1.8.0",
   "minAppVersion": "1.4.0",
-  "description": "Projekt- und Aufgabenplanung mit Heute-Ansicht, Suche, Serienaufgaben, Erinnerungen, Unteraufgabenterminen und Vorlagen.",
+  "description": "Aufgabenplanung mit Projekten, Wochen- und Monatskalender, Papierkorb, kompakten Karten, Serien und Vorlagen.",
   "author": "Janosch",
   "isDesktopOnly": false
 }
