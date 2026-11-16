@@ -1267,8 +1267,25 @@ class PlannerView extends ItemView {
           await this.editTask(task.id, current => { const child = current.subtasks.find(s => s.id === item.id); if (!child) throw new Error('Subtask no longer exists.'); child.done = check.checked; });
         };
         if (item.due) row.createSpan({ text: shortDate(item.due), cls: 'tp-badge' + (!archived && !item.done && item.due < dayKey() ? ' tp-overdue' : '') });
+        if (!archived) {
+          const remove = button(row,'🗑',()=>this.saveDraft(task.id,'remove-subtask-'+item.id,current=>{
+            const index=current.subtasks.findIndex(child=>child.id===item.id);if(index<0)throw new Error('Subtask no longer exists.');current.subtasks.splice(index,1);
+          }),'tp-icon-button tp-delete-subtask');
+          remove.setAttribute('aria-label','Delete subtask: '+item.title);remove.title='Delete subtask';this.registerDraftControl(task.id+':remove-subtask-'+item.id,remove);
+        }
       }
     } else sub.createDiv({ text: 'No subtasks.', cls: 'tp-muted' });
+    if (!archived) {
+      const key=task.id+':subtask',form=sub.createEl('form',{cls:'tp-card-subtask-form'});
+      const input=form.createEl('input',{type:'text',attr:{placeholder:'New subtask…','aria-label':'New subtask for '+task.title}});this.bindDraft(input,key);
+      const add=form.createEl('button',{text:'+',type:'submit',cls:'tp-add-subtask'});add.setAttribute('aria-label','Add subtask to '+task.title);add.title='Add subtask';this.registerDraftControl(key,add);
+      form.onsubmit=async e=>{
+        e.preventDefault();const title=input.value.trim();if(!title||this.pendingDrafts.has(key))return false;
+        this.drafts.set(key,input.value);
+        const ok=await this.saveDraft(task.id,'subtask',current=>current.subtasks.push({id:uid(),title,done:false,due:''}));
+        if(ok)for(const control of this.draftInputs.get(key)||[]){control.focus();break;}return ok;
+      };
+    }
     if (expanded) {
       const details = card.createDiv('tp-card-details'); details.setAttribute('id', 'tp-details-' + task.id);
       if (task.status === 'Waiting') details.createDiv({ text: 'Waiting for: ' + (task.waitingFor || 'Pending response') + (task.followUpDate ? ' · Follow up ' + shortDate(task.followUpDate) : ''), cls: 'tp-muted' });

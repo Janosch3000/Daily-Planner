@@ -1,6 +1,6 @@
 # Daily Planner for Obsidian
 
-Version **1.13.0** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
+Version **1.13.1** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
 
 ## Install or update with BRAT
 
@@ -24,7 +24,7 @@ Pausing or choosing No recurrence on an existing recurring task pauses its serie
 
 ## Cards and subtasks
 
-Collapsed cards show the title, small priority/status/project labels, due date and optional time, a two-line description preview and all subtasks. Check or uncheck a subtask directly on the collapsed card. Changes are saved immediately and reflected in both Status and Priorities, project views, statistics and calendar entries. Archived subtasks are read-only.
+Collapsed cards show the title, small priority/status/project labels, due date and optional time, a two-line description preview and all subtasks. Check or uncheck a subtask directly on the collapsed card. Changes are saved immediately and reflected in both Status and Priorities, project views, statistics and calendar entries. Add a subtask directly in the card’s **New subtask…** field, then press **+** or Enter. Remove any subtask with its trash icon, including completed subtasks. These controls remain available when the card is collapsed and work in regular, recurring and project views. Draft text survives board changes and failed saves; repeated submissions do not create duplicates. Archived subtasks are read-only.
 
 **Show More** expands the full description, activity history and available creation/completion/archive information. Waiting details appear there as well. **Show Less** collapses the card again. Expansion is preserved while switching between task boards and during updates in the same view; it is not a saved preference across restarts.
 
@@ -138,11 +138,11 @@ All plugin-owned interface text, commands, dialogs, reminders and errors are Eng
 
 Search matches task titles, descriptions, subtasks, activity, waiting people and project names. Multiple words must all match. Combine status, priority, date and project filters. **Reset filters** clears them.
 
-Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.13.0 uses data schema 3 for shared weekly tasks. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
+Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.13.1 uses data schema 3 for shared weekly tasks. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
 
-## Create release 1.13.0
+## Create release 1.13.1
 
-Create a GitHub release with tag **1.13.0**, target **main**, title **Daily Planner 1.13.0**. Attach these files individually:
+Create a GitHub release with tag **1.13.1**, target **main**, title **Daily Planner 1.13.1**. Attach these files individually:
 
 - `main.js`
 - `manifest.json`

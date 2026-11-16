@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.13.1
+
+- Add subtasks directly on collapsed or expanded task cards with a compact title field and + button; support Enter to save.
+- Delete individual subtasks with an accessible trash button without opening Edit.
+- Preserve inline drafts across view changes and save failures; prevent duplicate submissions. Retain archive read-only behavior and shared weekly task updates.
+
+Release assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.13.1**.
+
+
 ## 1.13.0
 
 - Add a separate Recurring tasks category with its own Status and Priorities boards. Exclude series-linked tasks, including paused routines, from ordinary task boards.

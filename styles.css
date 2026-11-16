@@ -345,3 +345,9 @@
 
 .tp-project-recurring { border-top: 1px solid var(--background-modifier-border); margin: 20px 0; padding-top: 16px; }
 .tp-project-recurring .tp-list-grid { margin-top: 14px; }
+
+.tp-card-subtask-form { display: flex; align-items: center; gap: 5px; margin-top: 8px; }
+.tp-card-subtask-form input { flex: 1; width: 0; min-width: 0; height: 28px; padding: 3px 7px; font-size: 11px; }
+.tp-card-subtask-form .tp-add-subtask { flex: 0 0 28px; width: 28px; height: 28px; padding: 0; margin: 0; font-size: 18px; line-height: 1; }
+.tp-card-compact .tp-delete-subtask { flex: 0 0 24px; font-size: 12px; opacity: .65; }
+.tp-card-compact .tp-delete-subtask:hover,.tp-card-compact .tp-delete-subtask:focus-visible { opacity: 1; }
