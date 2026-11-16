@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.12.2
+
+- Add a consistent thin white hover outline to buttons, tabs, calendar events and resize handles, draggable headings, fields, selectors, checkbox labels and expandable sections.
+- Provide the same feedback for keyboard focus; exclude disabled controls and scope styling to Daily Planner and its dialogs.
+- Use inset outlines without changing layout, hit areas or exact calendar tile heights.
+
+Release assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.12.2**.
+
+
 ## 1.12.1
 
 - Size timed calendar blocks exactly to their real start/end range. Remove the artificial minimum height and eight-pixel duration gap.

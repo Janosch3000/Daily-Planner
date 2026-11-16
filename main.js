@@ -432,7 +432,7 @@ class TaskModal extends Modal {
     this.isTemplate = options.mode === 'template'; this.saving = false; this.subtaskRows = []; this.subtaskElements = new Map();
   }
   onOpen() {
-    this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.addClass('tp-controls'); this.contentEl.setAttribute('lang', 'en-GB');
     this.contentEl.empty(); this.contentEl.addClass('tp-modal');
     const savedTemplate = this.isTemplate ? this.plugin.data.templates.find(t => t.id === this.options.templateId) : null;
     const task = this.isTemplate ? savedTemplate || this.options.seedTask : this.plugin.data.tasks.find(t => t.id === this.taskId);
@@ -702,7 +702,7 @@ class TemplateModal extends TaskModal {
 class TemplatePickerModal extends Modal {
   constructor(app, plugin, taskModal = null) { super(app); this.plugin = plugin; this.taskModal = taskModal; this.creating = false; this.templateButtons = []; }
   onOpen() {
-    this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.addClass('tp-controls'); this.contentEl.setAttribute('lang', 'en-GB');
     this.contentEl.empty(); this.contentEl.addClass('tp-template-picker');
     this.contentEl.createEl('h2', { text: "Create task from template" });
     this.contentEl.createEl('p', { text: "Choose a template. The new task opens immediately for editing.", cls: 'tp-muted' });
@@ -739,7 +739,7 @@ class TemplatePickerModal extends Modal {
 class DeleteTemplateModal extends Modal {
   constructor(app, plugin, templateId) { super(app); this.plugin = plugin; this.templateId = templateId; this.saving = false; }
   onOpen() {
-    this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.addClass('tp-controls'); this.contentEl.setAttribute('lang', 'en-GB');
     this.contentEl.createEl('h2', { text: "Delete template?" });
     this.contentEl.createEl('p', { text: "The template will be removed. Tasks already created from it are kept." });
     const actions = this.contentEl.createDiv('tp-inline-actions');
@@ -755,7 +755,7 @@ class DeleteTemplateModal extends Modal {
 class DeleteTaskForeverModal extends Modal {
   constructor(app, plugin, taskId) { super(app); this.plugin = plugin; this.taskId = taskId; this.saving = false; }
   onOpen() {
-    this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.addClass('tp-controls'); this.contentEl.setAttribute('lang', 'en-GB');
     this.contentEl.createEl('h2', { text: "Permanently delete task?" });
     const task = this.plugin.data.tasks.find(t => t.id === this.taskId && t.deletedAt);
     this.contentEl.createEl('p', { text: task ? '„' + task.title + "” and all its subtasks and activity will be permanently removed. This cannot be undone." : "This task is no longer in Trash." });
@@ -772,7 +772,7 @@ class DeleteTaskForeverModal extends Modal {
 class ProjectModal extends Modal {
   constructor(app, plugin, projectId = null, onSaved = null) { super(app); this.plugin = plugin; this.projectId = projectId; this.onSaved = onSaved; this.saving = false; }
   onOpen() {
-    this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.addClass('tp-controls'); this.contentEl.setAttribute('lang', 'en-GB');
     const project = this.plugin.data.projects.find(p => p.id === this.projectId);
     this.contentEl.createEl('h2', { text: project ? "Edit project" : "New project" });
     const form = this.contentEl.createEl('form');
@@ -805,7 +805,7 @@ class ProjectModal extends Modal {
 class DeleteProjectModal extends Modal {
   constructor(app, plugin, projectId, onDeleted = null) { super(app); this.plugin = plugin; this.projectId = projectId; this.onDeleted = onDeleted; this.saving = false; }
   onOpen() {
-    this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.addClass('tp-controls'); this.contentEl.setAttribute('lang', 'en-GB');
     this.contentEl.createEl('h2', { text: "Remove project?" });
     this.contentEl.createEl('p', { text: "Tasks are kept and assigned to No project. Templates and future recurring tasks also keep their contents and lose only the project assignment." });
     const actions = this.contentEl.createDiv('tp-inline-actions'); this.removeButton = button(actions, "Remove project", () => this.confirm(), 'mod-warning'); button(actions, "Cancel", () => this.close());
@@ -825,7 +825,7 @@ class DeleteProjectModal extends Modal {
 class ReminderSettingsModal extends Modal {
   constructor(app, plugin) { super(app); this.plugin = plugin; this.saving = false; }
   onOpen() {
-    this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.addClass('tp-controls'); this.contentEl.setAttribute('lang', 'en-GB');
     this.contentEl.createEl('h2', { text: "Due date reminders" });
     const label = this.contentEl.createEl('label', { cls: 'tp-reminder-toggle' }); this.enabledInput = label.createEl('input', { type: 'checkbox' }); this.enabledInput.checked = this.plugin.data.reminderSettings.enabled; label.createSpan({ text: "Show reminders in Obsidian" });
     const lead = this.contentEl.createEl('label', { text: "Advance notice", cls: 'tp-field' }); this.leadInput = lead.createEl('select');
@@ -844,7 +844,7 @@ class ReminderSettingsModal extends Modal {
 }
 class SeriesManagerModal extends Modal {
   constructor(app,plugin){super(app);this.plugin=plugin;this.busy=false;}
-  onOpen(){this.contentEl.addClass('tp-modal');this.contentEl.setAttribute('lang','en-GB');this.contentEl.createEl('h2',{text:'Manage recurrences'});this.contentEl.createEl('p',{text:'Weekly repeats use one continuously open task. Pick its weekday below; every calendar entry shares the same task, subtasks and activity. Daily and monthly recurrences still create separate tasks.',cls:'tp-help'});this.list=this.contentEl.createDiv('tp-series-list');this.renderList();button(this.contentEl,'Close',()=>this.close());}
+  onOpen(){this.contentEl.addClass('tp-modal');this.contentEl.addClass('tp-controls');this.contentEl.setAttribute('lang','en-GB');this.contentEl.createEl('h2',{text:'Manage recurrences'});this.contentEl.createEl('p',{text:'Weekly repeats use one continuously open task. Pick its weekday below; every calendar entry shares the same task, subtasks and activity. Daily and monthly recurrences still create separate tasks.',cls:'tp-help'});this.list=this.contentEl.createDiv('tp-series-list');this.renderList();button(this.contentEl,'Close',()=>this.close());}
   renderList(){
     this.list.empty();if(!this.plugin.data.recurrences.length)this.list.createDiv({text:'No recurring tasks yet. Choose a recurrence in the task dialog.',cls:'tp-empty'});
     for(const series of this.plugin.data.recurrences){

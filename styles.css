@@ -335,3 +335,10 @@
 .tp-scheduled-event .tp-resize-handle { height: 4px !important; min-height: 0; border-radius: 0; }
 .tp-scheduled-event .tp-resize-handle::after { height: 2px; margin: 0 auto; opacity: 0; }
 .tp-scheduled-event:hover .tp-resize-handle::after,.tp-scheduled-event .tp-resize-handle:focus::after { opacity: .8; }
+
+/* Shared interaction feedback: inset outlines never change layout or tile geometry. */
+:is(.tp-root, .tp-controls, .tp-modal, .tp-template-picker) :is(button, a[href], input:not([type=hidden]), select, textarea, summary, [role=button], [role=checkbox], [draggable=true], [tabindex]:not([tabindex='-1']), label:has(> input[type=checkbox]:enabled)):not(:disabled):not([aria-disabled=true]):not([inert]):not(:has(> input[type=checkbox]:disabled)):is(:hover, :focus-visible) {
+  outline: 1px solid #fff !important;
+  outline-offset: -1px !important;
+  border-color: #fff !important;
+}
