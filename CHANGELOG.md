@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.15.0
+
+- Remove the visible plugin title and tagline; let Home use the full available tool-content width.
+- Add a larger Home button and adjacent Tools toggle inside tools. Move tool selection into a collapsible left sidebar, with an overlay on narrow panels.
+- Return to Home with mouse Back (button 3) or Alt+Left within the planner, without modifying host history. Clean up event listeners on view close.
+- Keep Home free of navigation and creation controls, while retaining its overview and upcoming-task preview.
+
+Release assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.15.0**.
+
+
 ## 1.14.1
 
 - Remove navigation, Home and task/template creation shortcuts from Home; retain them inside tools.

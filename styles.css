@@ -411,3 +411,24 @@
 @container tagesplaner (max-width: 1050px) { .tp-home-layout { grid-template-columns: minmax(320px,1fr) minmax(210px,.6fr); grid-template-areas: 'tools upcoming' 'summary upcoming'; }.tp-home-stat-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }.tp-home-mini-chart { max-width: 220px; } }
 @container tagesplaner (max-width: 700px) { .tp-home-layout { grid-template-columns: minmax(0,1fr); grid-template-areas: 'tools' 'summary' 'upcoming'; }.tp-home-stat-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @container tagesplaner (max-width: 450px) { .tp-home-tools .tp-home-grid,.tp-home-tools .tp-home-settings { grid-template-columns: minmax(0,1fr); } }
+
+/* Full-width Home and tool-only navigation. */
+.tp-home-root .tp-home { max-width: none; width: 100%; margin: 0; }
+.tp-home-root .tp-home-intro { padding-top: 4px; }
+.tp-root .tp-home-button { height: 54px; min-width: 112px; padding: 10px 17px; gap: 10px; border-radius: 12px; font-size: 15px; font-weight: 650; }
+.tp-root .tp-home-button .tp-symbol { width: 26px; height: 26px; }
+.tp-root .tp-home-button>span:last-child { display: inline; }
+.tp-tool-header { flex-shrink: 0; margin-bottom: 18px; }
+.tp-tool-header .tp-head-identity { gap: 10px; }
+.tp-root .tp-sidebar-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 54px; padding: 10px 15px; border: 1px solid var(--background-modifier-border); border-radius: 12px; background: var(--background-secondary); color: var(--text-normal); font-size: 13px; box-shadow: none; }
+.tp-sidebar-toggle .tp-symbol { width: 21px; height: 21px; }
+.tp-tool-workspace { display: flex; gap: 18px; flex: 1; min-height: 0; min-width: 0; position: relative; }
+.tp-tool-content { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.tp-tool-content .tp-task-navigation { margin-top: 0; flex-shrink: 0; }
+.tp-tool-sidebar.tp-tabs { display: flex; flex-direction: column; align-self: stretch; flex: 0 0 205px; min-width: 0; overflow: auto; padding: 13px 10px; margin: 0; border: 1px solid var(--background-modifier-border); border-radius: 13px; background: var(--background-secondary); gap: 5px; }
+.tp-tool-sidebar[hidden] { display: none !important; }
+.tp-sidebar-heading { padding: 6px 10px 13px; color: var(--text-faint); font-size: 10px; letter-spacing: .15em; font-weight: 700; }
+.tp-tool-sidebar.tp-tabs .tp-tab { text-align: left; width: 100%; height: auto; min-height: 38px; padding: 9px 11px; white-space: normal; }
+.tp-tool-sidebar.tp-tabs .tp-tab.is-active { background: var(--background-primary); }
+@container tagesplaner (max-width: 700px) { .tp-tool-sidebar.tp-tabs { position: absolute; top: 0; bottom: 0; left: 0; width: min(245px,90%); z-index: 40; box-shadow: 6px 0 25px #00000028; }.tp-tool-workspace { gap: 0; } }
+@container tagesplaner (max-width: 480px) { .tp-tool-header { flex-wrap: wrap; }.tp-tool-header .tp-head-actions { width: auto; }.tp-root .tp-home-button { min-width: 98px; padding: 9px 12px; } }
