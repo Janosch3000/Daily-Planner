@@ -18,6 +18,8 @@ const copy = value => JSON.parse(JSON.stringify(value));
 const uid = () => Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 11);
 const stamp = value => typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
 const SYMBOLS = {
+  gear: [['path',{d:'M10 3h4l1 3 3 1 3 3v4l-3 1-1 3-3 3h-4l-1-3-3-1-3-3v-4l3-1 1-3z'}],['circle',{cx:12,cy:12,r:3}]],
+  palette: [['circle',{cx:12,cy:12,r:9}],['circle',{cx:8,cy:8,r:1}],['circle',{cx:15,cy:7,r:1}],['circle',{cx:17,cy:13,r:1}],['path',{d:'M7 15h4v4'}]],
   menu: [['path',{d:'M4 6h16M4 12h16M4 18h16'}]],
   home: [['path',{d:'M3 10l9-7 9 7M5 9v12h14V9M9 21v-8h6v8'}]],
   tasks: [['rect',{x:4,y:3,width:16,height:18,rx:2}],['path',{d:'M8 8l1 1 2-2M13 8h3M8 14l1 1 2-2M13 14h3'}]],
@@ -189,9 +191,9 @@ function taskRange(task) {
   const s = normaliseSchedule(task), startDate = s.startDate || task.due, timed = !!validTime(task.dueTime);
   return { startDate, startTime: s.startTime, endDate: task.due, endTime: validTime(task.dueTime), timed, start: wallValue(startDate, s.startTime), end: wallValue(task.due, task.dueTime) + (timed ? 0 : 1440) };
 }
-function resizeRange(task, edge, delta) {
+function resizeRange(task, edge, delta, step=15) {
   const range = taskRange(task); if (!range?.timed || !['start', 'end'].includes(edge) || !Number.isFinite(delta)) throw new Error('This timed event cannot be resized.');
-  const change = Math.round(delta / 15) * 15, start = edge === 'start' ? Math.min(range.start + change, range.end - 15) : range.start, end = edge === 'end' ? Math.max(range.end + change, range.start + 15) : range.end;
+  const change = Math.round(delta / step) * step, start = edge === 'start' ? Math.min(range.start + change, range.end - step) : range.start, end = edge === 'end' ? Math.max(range.end + change, range.start + step) : range.end;
   const a = wallParts(start), b = wallParts(end); if (!validDate(a.date) || !validDate(b.date)) throw new Error('The resulting date is out of range.');
   return { startDate: a.date, startTime: a.time, due: b.date, dueTime: b.time };
 }
@@ -339,9 +341,9 @@ function projectOnlyTask(data, task) {
   const project = data.projects.find(p => p.id === task.projectId);
   return !!project?.onlyInProjects;
 }
-function calendarRange(date, mode = 'week') {
+function calendarRange(date, mode = 'week', weekStart=0) {
   const anchor = validDate(date) || dayKey(), first = mode === 'month' ? anchor.slice(0, 7) + '-01' : anchor;
-  const weekday = (new Date(first + 'T12:00:00').getDay() + 6) % 7, start = shiftDate(first, -weekday);
+  const weekday = (new Date(first + 'T12:00:00').getDay() + 6 - Number(weekStart) + 7) % 7, start = shiftDate(first, -weekday);
   const last = mode === 'month' ? new Date(Number(anchor.slice(0,4)), Number(anchor.slice(5,7)), 0).getDate() : 7;
   return { start, days: mode === 'month' ? Math.ceil((weekday + last) / 7) * 7 : 7 };
 }
@@ -361,8 +363,57 @@ function templateFields(source = {}) {
     subtasks: Array.isArray(source.subtasks) ? source.subtasks.map(s => ({ title: String(s.title || '').trim(), dueInDays: offsetDays(s.dueInDays) })).filter(s => s.title) : []
   };
 }
+const HOME_TOOLS=['board','recurring','calendar','projects','dashboard','templates','archive','trash','settings','recurrence-settings','reminders'];
+// [key, label, kind, default, min/options, max, step]
+const SETTINGS_SECTIONS={
+  home:{name:'Home',icon:'home',fields:[['homeDashboard','Show overview','boolean',true],['homePreview','Show upcoming tasks','boolean',true],['previewCount','Preview task count','number',6,1,20],['previewDays','Preview horizon (days)','number',60,1,365],['homeColumns','Tool columns','select','auto',['auto','1','2','3','4']]]},
+  tasks:{name:'Tasks',icon:'tasks',fields:[['defaultPriority','Default priority','select','mid',['low','mid','high','immediately']],['defaultStatus','Default status','select','ToDo',['ToDo','In Progress','Waiting']],['defaultProject','Default project','project',''],['compactCards','Compact cards','boolean',true],['showSubtasks','Show subtasks on collapsed cards','boolean',true]]},
+  calendar:{name:'Calendar',icon:'calendar',fields:[['calendarView','Default calendar view','select','week',['week','month']],['weekStart','Week starts on','select','0',[['0','Monday'],['6','Sunday'],['5','Saturday']]],['showWeekends','Show weekends','boolean',true],['startHour','First visible hour','number',0,0,23],['endHour','Last visible hour','number',24,1,24],['gridMinutes','Time grid / resize step (minutes)','select','15',['5','10','15','30','60']],['defaultDuration','Default appointment duration (minutes)','number',60,5,480,5],['hourHeight','Hour height (pixels)','number',72,48,160,4]]},
+  recurrence:{name:'Recurrence',icon:'repeat',fields:[['defaultFrequency','Default recurrence','select','none',['none','daily','weekly','monthly']],['defaultWeekday','Default weekly weekday','select','today',[['today','Today'],...WEEKDAYS.map((day,i)=>[String(i),day])]],['defaultInterval','Default recurrence interval','number',1,1,365]]},
+  reminders:{name:'Reminders',icon:'bell',fields:[['remindTasks','Task reminders','boolean',true],['remindSubtasks','Subtask reminders','boolean',true],['remindWaiting','Waiting follow-up reminders','boolean',true]]},
+  archive:{name:'Archive & Trash',icon:'archive',fields:[['autoArchive','Automatically archive Done tasks','boolean',true],['archiveHours','Hours after Done before archiving','number',24,0,8760],['archiveCleanup','Automatically delete old archived tasks','boolean',true],['archiveMonths','Archive retention (calendar months)','number',2,1,120],['trashCleanup','Automatically empty old Trash entries','boolean',false],['trashDays','Trash retention (days)','number',30,1,3650]]},
+  appearance:{name:'Appearance',icon:'palette',fields:[['theme','Colour theme','select','inherit',['inherit','light','dark']],['density','Spacing preset','select','comfortable',['compact','comfortable','spacious']],['fontFamily','Font family','select','inherit',['inherit','system','serif','mono']],['fontSize','Interface font size','number',15,11,22],['titleSize','Task title size','number',14,11,26],['descriptionSize','Description size','number',12,10,20],['lineHeight','Text line height','number',1.5,1.1,2,0.1],['cardPadding','Card padding','number',13,6,30],['cardGap','Card spacing','number',13,4,30],['cardRadius','Card corner radius','number',11,0,28],['borderWidth','Card border width','number',1,0,3],['laneWidth','Minimum board column width','number',260,200,500,10],['laneGap','Board column spacing','number',14,4,32],['tileHeight','Home tile minimum height','number',178,130,300,1],['tileRadius','Home tile corner radius','number',15,0,30],['iconSize','Home icon size','number',39,26,64],['buttonHeight','Button minimum height','number',28,24,48],['controlRadius','Input / button corner radius','number',6,0,20],['previewFontSize','Upcoming task title size','number',12,10,20],['colorStrength','Background colour strength (%)','number',50,0,100,5],['shadowStrength','Card shadow strength (%)','number',25,0,100,5],['hoverOutline','White outline on hover','boolean',true],['hoverOpacity','Hover outline brightness (%)','number',100,10,100,5],['animations','Enable animations','boolean',true],['showDescription','Show card descriptions','boolean',true],['showProjectTags','Show project tags','boolean',true],['showDateTags','Show date tags','boolean',true],['showStatusTags','Show status tags','boolean',true],['showPriorityTags','Show priority tags','boolean',true],['accentColor','Accent colour','color','#85a9d9'],['statusOpen','ToDo colour','color','#91a6c1'],['statusProgress','In Progress colour','color','#c5aa7c'],['statusWaiting','Waiting colour','color','#ad9ac8'],['statusDone','Done colour','color','#8ab49e'],['priorityLow','Low priority colour','color','#86b2a5'],['priorityMid','Mid priority colour','color','#8eaad0'],['priorityHigh','High priority colour','color','#c3aa80'],['priorityImmediately','Immediately priority colour','color','#c59ba6']]},
+  navigation:{name:'Navigation',icon:'menu',fields:[['mouseBack','Enable mouse Back and Alt+Left','boolean',true],['sidebarDefault','Open sidebar when entering tools','boolean',false]]},
+  projects:{name:'New projects',icon:'folder',fields:[['projectOnly','Show only in project view by default','boolean',false],['projectDashboard','Include in dashboard by default','boolean',true],['projectReminders','Enable project reminders by default','boolean',true]]},
+  data:{name:'Data & backup',icon:'archive',fields:[['backupBeforeImport','Save a vault backup before importing','boolean',true]]}
+};
+function normaliseSettings(source={}) {
+  const raw=source&&typeof source==='object'&&!Array.isArray(source)?source:{},result={};
+  for(const group of Object.values(SETTINGS_SECTIONS))for(const [key,label,type,fallback,min,max,step] of group.fields){
+    const value=raw[key];
+    if(type==='boolean')result[key]=typeof value==='boolean'?value:fallback;
+    else if(type==='number'){const n=Number(value);result[key]=value!==''&&value!=null&&Number.isFinite(n)?Math.max(min,Math.min(max,Math.round(n/(step||1))*(step||1))):fallback;}
+    else if(type==='select')result[key]=min.some(option=>String(Array.isArray(option)?option[0]:option)===String(value))?String(value):fallback;
+    else if(type==='color')result[key]=/^#[0-9a-f]{6}$/i.test(value)?value:fallback;
+    else result[key]=typeof value==='string'?value:fallback;
+  }
+  if(result.endHour<=result.startHour)result.endHour=result.startHour+1;
+  result.homeOrder=Array.isArray(raw.homeOrder)?[...new Set(raw.homeOrder.filter(id=>HOME_TOOLS.includes(id))),...HOME_TOOLS.filter(id=>!raw.homeOrder.includes(id))]:[...HOME_TOOLS];
+  result.homeHidden=Array.isArray(raw.homeHidden)?[...new Set(raw.homeHidden.filter(id=>HOME_TOOLS.includes(id)&&id!=='settings'))]:[];
+  return result;
+}
+function importablePlannerData(raw) { if(!Array.isArray(raw)&&(!raw||typeof raw!=='object'||!Array.isArray(raw.tasks)))throw new Error('A planner backup must contain a tasks array.');return normalize(raw); }
+function plannerSettings(data) { return normaliseSettings(data?.settings); }
+function applyPlannerAppearance(root, settings) {
+  const s=normaliseSettings(settings),set=(key,value)=>{if(root.style.setProperty)root.style.setProperty(key,String(value));else root.style[key]=String(value);};
+  for(const [attr,value] of Object.entries({theme:s.theme,density:s.density,hover:s.hoverOutline,animations:s.animations,description:s.showDescription,projects:s.showProjectTags,dates:s.showDateTags,status:s.showStatusTags,priority:s.showPriorityTags}))root.setAttribute('data-tp-'+attr,String(value));
+  const family={inherit:'inherit',system:'system-ui, sans-serif',serif:'Georgia, serif',mono:'var(--font-monospace, monospace)'}[s.fontFamily];set('--tp-font-family',family);
+  for(const [key,value] of Object.entries({'font-size':s.fontSize+'px','title-size':s.titleSize+'px','description-size':s.descriptionSize+'px','line-height':s.lineHeight,'card-padding':s.cardPadding+'px','card-gap':s.cardGap+'px','card-radius':s.cardRadius+'px','border-width':s.borderWidth+'px','lane-width':s.laneWidth+'px','lane-gap':s.laneGap+'px','tile-height':s.tileHeight+'px','tile-radius':s.tileRadius+'px','icon-size':s.iconSize+'px','button-height':s.buttonHeight+'px','control-radius':s.controlRadius+'px','preview-font':s.previewFontSize+'px','color-wash':s.colorStrength/5+'%','shadow-opacity':s.shadowStrength/500,'hover-color':'rgba(255,255,255,'+s.hoverOpacity/100+')','accent':s.accentColor,'status-open':s.statusOpen,'status-progress':s.statusProgress,'status-waiting':s.statusWaiting,'status-done':s.statusDone,'priority-low':s.priorityLow,'priority-mid':s.priorityMid,'priority-high':s.priorityHigh,'priority-immediately':s.priorityImmediately,'hour-height':s.hourHeight+'px'}))set('--tp-'+key,value);
+  set('--tp-home-columns',s.homeColumns==='auto'?'repeat(2,minmax(0,1fr))':'repeat('+s.homeColumns+',minmax(0,1fr))');
+}
+function removeTasksPermanently(data,tasks) {
+  const ids=new Set(tasks.map(task=>task.id));
+  for(const task of tasks)if(task.recurrenceId&&task.occurrenceDate){const key=task.recurrenceId+':'+task.occurrenceDate;if(!data.deletedOccurrences.includes(key))data.deletedOccurrences.push(key);}
+  data.tasks=data.tasks.filter(task=>!ids.has(task.id));data.recurrences=data.recurrences.filter(series=>!(series.mode==='continuous-weekly'&&ids.has(series.taskId)));
+}
+class SettingsConfirmModal extends Modal {
+  constructor(app,plugin,title,message,action,label='Confirm'){super(app);this.plugin=plugin;this.heading=title;this.message=message;this.action=action;this.label=label;this.busy=false;}
+  onOpen(){this.contentEl.addClass('tp-controls');applyPlannerAppearance(this.contentEl,this.plugin.data.settings);applyPlannerAppearance(this.contentEl,this.plugin.data.settings);this.contentEl.createEl('h2',{text:this.heading});this.contentEl.createEl('p',{text:this.message});const actions=this.contentEl.createDiv('tp-inline-actions');this.confirmButton=button(actions,this.label,async()=>{if(this.busy)return;this.busy=true;this.confirmButton.disabled=true;const ok=await this.action();if(ok)this.close();else{this.busy=false;this.confirmButton.disabled=false;}},'mod-cta');button(actions,'Cancel',()=>this.close());}
+  onClose(){this.contentEl.empty();}
+}
+
 function normalize(raw, now = Date.now()) {
-  if (raw && !Array.isArray(raw) && raw.schemaVersion > 3) throw new Error("This data requires a newer Daily Planner version.");
+  if (raw && !Array.isArray(raw) && raw.schemaVersion > 4) throw new Error("This data requires a newer Daily Planner version.");
   const source = Array.isArray(raw) ? { tasks: raw } : raw || {};
   if (source.tasks != null && !Array.isArray(source.tasks)) throw new Error("Invalid saved task format.");
   if (source.templates != null && !Array.isArray(source.templates)) throw new Error("Invalid saved template format.");
@@ -403,10 +454,11 @@ function normalize(raw, now = Date.now()) {
   });
   const reminders = source.reminderSettings || {};
   const data = {
-    ...source, schemaVersion: 3, tasks, templates, projects, recurrences, deletedOccurrences: Array.isArray(source.deletedOccurrences) ? source.deletedOccurrences.filter(k => typeof k === 'string') : [], settings: { ...source.settings },
-    reminderSettings: { enabled: reminders.enabled !== false, leadDays: [0, 1, 3, 7].includes(Number(reminders.leadDays)) ? Number(reminders.leadDays) : 1 },
+    ...source, schemaVersion: 4, tasks, templates, projects, recurrences, deletedOccurrences: Array.isArray(source.deletedOccurrences) ? source.deletedOccurrences.filter(k => typeof k === 'string') : [], settings: normaliseSettings(source.settings),
+    reminderSettings: { enabled: reminders.enabled !== false, leadDays: reminders.leadDays!=null&&Number.isFinite(Number(reminders.leadDays))?Math.max(0,Math.min(30,Math.round(Number(reminders.leadDays)))):1 },
     reminderState: { day: validDate(source.reminderState?.day), seen: Array.isArray(source.reminderState?.seen) ? source.reminderState.seen.filter(k => typeof k === 'string') : [] }
   };
+  if(data.settings.defaultProject&&!projectIds.has(data.settings.defaultProject))data.settings.defaultProject='';
   syncWeeklyData(data,now);return data;
 }
 function setStatus(task, status, now = Date.now()) {
@@ -416,25 +468,21 @@ function setStatus(task, status, now = Date.now()) {
   task.status = status; task.archivedAt = null; task.updatedAt = now;
 }
 function archiveDue(data, now = Date.now()) {
+  const settings=plannerSettings(data);if(!settings.autoArchive)return false;
   let changed = false;
   for (const task of data.tasks) {
-    if (!task.deletedAt && !task.weeklyRecurrence?.enabled && task.status === 'Done' && !task.archivedAt && task.completedAt && now - task.completedAt >= DAY) { task.archivedAt = now; changed = true; }
+    if (!task.deletedAt && !task.weeklyRecurrence?.enabled && task.status === 'Done' && !task.archivedAt && task.completedAt && now - task.completedAt >= settings.archiveHours*3600000) { task.archivedAt = now; changed = true; }
   }
   return changed;
 }
-function archiveDeleteAt(archivedAt) {
+function archiveDeleteAt(archivedAt,months=2) {
   if(!Number.isFinite(archivedAt)||archivedAt<=0)return Infinity;
-  const date=new Date(archivedAt),day=date.getDate();date.setDate(1);date.setMonth(date.getMonth()+2);
+  const date=new Date(archivedAt),day=date.getDate();date.setDate(1);date.setMonth(date.getMonth()+months);
   const last=new Date(date.getFullYear(),date.getMonth()+1,0).getDate();date.setDate(Math.min(day,last));return date.getTime();
 }
 function purgeExpiredArchive(data, now = Date.now()) {
-  const expired=data.tasks.filter(task=>!task.deletedAt&&task.archivedAt&&now>=archiveDeleteAt(task.archivedAt));
-  if(!expired.length)return false;
-  const ids=new Set(expired.map(task=>task.id));
-  for(const task of expired)if(task.recurrenceId&&task.occurrenceDate){const key=task.recurrenceId+':'+task.occurrenceDate;if(!data.deletedOccurrences.includes(key))data.deletedOccurrences.push(key);}
-  data.tasks=data.tasks.filter(task=>!ids.has(task.id));
-  data.recurrences=data.recurrences.filter(series=>!(series.mode==='continuous-weekly'&&ids.has(series.taskId)));
-  return true;
+  const s=plannerSettings(data),expired=data.tasks.filter(task=>task.deletedAt?s.trashCleanup&&now-task.deletedAt>=s.trashDays*DAY:s.archiveCleanup&&task.archivedAt&&now>=archiveDeleteAt(task.archivedAt,s.archiveMonths));
+  if(!expired.length)return false;removeTasksPermanently(data,expired);return true;
 }
 function metrics(data, now = Date.now()) {
   const today = dayKey(now);
@@ -468,7 +516,7 @@ class TaskModal extends Modal {
     this.isTemplate = options.mode === 'template'; this.saving = false; this.subtaskRows = []; this.subtaskElements = new Map();
   }
   onOpen() {
-    this.contentEl.addClass('tp-controls'); this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.addClass('tp-controls');applyPlannerAppearance(this.contentEl,this.plugin.data.settings); this.contentEl.setAttribute('lang', 'en-GB');
     this.contentEl.empty(); this.contentEl.addClass('tp-modal');
     const savedTemplate = this.isTemplate ? this.plugin.data.templates.find(t => t.id === this.options.templateId) : null;
     const task = this.isTemplate ? savedTemplate || this.options.seedTask : this.plugin.data.tasks.find(t => t.id === this.taskId);
@@ -485,13 +533,13 @@ class TaskModal extends Modal {
     }
     this.titleInput = field(this.isTemplate ? "Default task title · optional" : "Task", 'input', 'text', task?.title); this.titleInput.required = !this.isTemplate;
     this.priorityInput = field("Priority", 'select', null, '');
-    PRIORITIES.forEach(p => this.priorityInput.createEl('option', { text: p.glyph + ' ' + p.name, value: p.name })); this.priorityInput.value = task?.priority || 'mid';
+    PRIORITIES.forEach(p => this.priorityInput.createEl('option', { text: p.glyph + ' ' + p.name, value: p.name })); this.priorityInput.value = task?.priority || plannerSettings(this.plugin.data).defaultPriority;
     this.statusInput = field(this.taskId ? 'Status' : "Initial status", 'select', null, '');
     const statusOptions = this.taskId && !this.isTemplate && !task?.weeklyRecurrence?.enabled ? COLS : COLS.filter(c => c.name !== 'Done');
     statusOptions.forEach(c => this.statusInput.createEl('option', { text: c.glyph + ' ' + c.name, value: c.name }));
-    this.statusInput.value = statusOptions.some(c => c.name === task?.status) ? task.status : 'ToDo';
+    this.statusInput.value = statusOptions.some(c => c.name === task?.status) ? task.status : plannerSettings(this.plugin.data).defaultStatus;
     this.projectInput = field("Project · optional", 'select', null, '');
-    this.refreshProjects(task?.projectId || this.options.defaultProjectId || '');
+    this.refreshProjects(task ? (task.projectId||'') : (this.options.defaultProjectId || plannerSettings(this.plugin.data).defaultProject || ''));
     button(this.projectInput.parentElement, "+ Create project", () => new ProjectModal(this.app, this.plugin, null, id => this.refreshProjects(id)).open(), 'tp-small-button');
     const schedule = this.isTemplate ? task || {} : normaliseSchedule(task || {});
     if (this.isTemplate) {
@@ -506,10 +554,10 @@ class TaskModal extends Modal {
     form.createDiv({text:'Set a start and end. Leave both times empty for an all-day task. The end remains the deadline for reminders. Local time.',cls:'tp-help'});
     const setDate = (which,date) => { const dateInput=which==='start'?this.startDateInput:this.dueInput,offsetInput=which==='start'?this.startOffsetInput:this.offsetInput;if(dateInput)dateInput.value=date;else offsetInput.value=String(daysBetween(dayKey(),date)); };
     const readDate = which => { const dateInput=which==='start'?this.startDateInput:this.dueInput,offsetInput=which==='start'?this.startOffsetInput:this.offsetInput;return dateInput?dateInput.value:(offsetInput.value===''?'':shiftDate(dayKey(),Number(offsetInput.value))); };
-    this.dueTimeInput.onchange=()=>{if(!validTime(this.dueTimeInput.value))return;const end=readDate('end')||dayKey();setDate('end',end);if(!readDate('start')&&!this.startTimeInput.value){const start=wallParts(wallValue(end,this.dueTimeInput.value)-60);setDate('start',start.date);this.startTimeInput.value=start.time;}};
-    this.startTimeInput.onchange=()=>{if(!validTime(this.startTimeInput.value))return;const start=readDate('start')||dayKey();setDate('start',start);if(!readDate('end')||!this.dueTimeInput.value){const end=wallParts(wallValue(start,this.startTimeInput.value)+60);setDate('end',end.date);this.dueTimeInput.value=end.time;}};
+    this.dueTimeInput.onchange=()=>{if(!validTime(this.dueTimeInput.value))return;const end=readDate('end')||dayKey();setDate('end',end);if(!readDate('start')&&!this.startTimeInput.value){const start=wallParts(wallValue(end,this.dueTimeInput.value)-plannerSettings(this.plugin.data).defaultDuration);setDate('start',start.date);this.startTimeInput.value=start.time;}};
+    this.startTimeInput.onchange=()=>{if(!validTime(this.startTimeInput.value))return;const start=readDate('start')||dayKey();setDate('start',start);if(!readDate('end')||!this.dueTimeInput.value){const end=wallParts(wallValue(start,this.startTimeInput.value)+plannerSettings(this.plugin.data).defaultDuration);setDate('end',end.date);this.dueTimeInput.value=end.time;}};
     const series = this.plugin.data.recurrences.find(s => s.id === task?.recurrenceId);
-    const rule = repeatRule(this.isTemplate ? task?.repeat : (series?.enabled ? series : !task && this.options.defaultRepeat ? {frequency:this.options.defaultRepeat,interval:1} : {}));
+    const rule = repeatRule(this.isTemplate ? task?.repeat : (series?.enabled ? series : !task ? {frequency:this.options.defaultRepeat||plannerSettings(this.plugin.data).defaultFrequency,interval:plannerSettings(this.plugin.data).defaultInterval,weekday:plannerSettings(this.plugin.data).defaultWeekday==='today'?null:Number(plannerSettings(this.plugin.data).defaultWeekday)} : {}));
     this.originalRule=copy(rule);this.originalDue=task?.due||'';
     if(!this.isTemplate)this.weeklyFirstInput=field('First weekly occurrence · optional','input','date',series?.frequency==='weekly'?(task?.startDate||series.anchorDate||''):'');
     this.repeatInput = field("Recurrence", 'select', null, '');
@@ -523,7 +571,7 @@ class TaskModal extends Modal {
       if(this.weeklyFirstInput){const weekly=this.repeatInput.value==='weekly';this.weeklyFirstInput.parentElement.hidden=!weekly;this.startDateInput.parentElement.hidden=weekly;this.dueInput.parentElement.hidden=weekly;}
       if (enabled && this.dueInput && !this.dueInput.value && this.repeatInput.value!=='weekly') this.dueInput.value = dayKey();
       if (enabled && this.offsetInput && this.offsetInput.value === '') this.offsetInput.value = '0';
-    }; this.repeatIntervalInput.disabled = rule.frequency === 'none';this.weekdayInput.parentElement.hidden=rule.frequency!=='weekly';if(this.weeklyFirstInput){const weekly=rule.frequency==='weekly';this.weeklyFirstInput.parentElement.hidden=!weekly;this.startDateInput.parentElement.hidden=weekly;this.dueInput.parentElement.hidden=weekly;}if(!task && this.options.defaultRepeat)this.repeatInput.onchange();
+    }; this.repeatIntervalInput.disabled = rule.frequency === 'none';this.weekdayInput.parentElement.hidden=rule.frequency!=='weekly';if(this.weeklyFirstInput){const weekly=rule.frequency==='weekly';this.weeklyFirstInput.parentElement.hidden=!weekly;this.startDateInput.parentElement.hidden=weekly;this.dueInput.parentElement.hidden=weekly;}if(!task&&rule.frequency!=='none')this.repeatInput.onchange();
     this.waitingSection = form.createDiv('tp-waiting-fields');
     const waitingLabel = this.waitingSection.createEl('label', { cls: 'tp-field', text: "Waiting for · Person or team" });
     this.waitingForInput = waitingLabel.createEl('input', { type: 'text', attr: { placeholder: "e.g. Anna or the IT team" } }); this.waitingForInput.value = task?.waitingFor || '';
@@ -748,7 +796,7 @@ class TemplateModal extends TaskModal {
 class TemplatePickerModal extends Modal {
   constructor(app, plugin, taskModal = null) { super(app); this.plugin = plugin; this.taskModal = taskModal; this.creating = false; this.templateButtons = []; }
   onOpen() {
-    this.contentEl.addClass('tp-controls'); this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.addClass('tp-controls');applyPlannerAppearance(this.contentEl,this.plugin.data.settings); this.contentEl.setAttribute('lang', 'en-GB');
     this.contentEl.empty(); this.contentEl.addClass('tp-template-picker');
     this.contentEl.createEl('h2', { text: "Create task from template" });
     this.contentEl.createEl('p', { text: "Choose a template. The new task opens immediately for editing.", cls: 'tp-muted' });
@@ -785,7 +833,7 @@ class TemplatePickerModal extends Modal {
 class DeleteTemplateModal extends Modal {
   constructor(app, plugin, templateId) { super(app); this.plugin = plugin; this.templateId = templateId; this.saving = false; }
   onOpen() {
-    this.contentEl.addClass('tp-controls'); this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.addClass('tp-controls');applyPlannerAppearance(this.contentEl,this.plugin.data.settings); this.contentEl.setAttribute('lang', 'en-GB');
     this.contentEl.createEl('h2', { text: "Delete template?" });
     this.contentEl.createEl('p', { text: "The template will be removed. Tasks already created from it are kept." });
     const actions = this.contentEl.createDiv('tp-inline-actions');
@@ -801,7 +849,7 @@ class DeleteTemplateModal extends Modal {
 class DeleteTaskForeverModal extends Modal {
   constructor(app, plugin, taskId) { super(app); this.plugin = plugin; this.taskId = taskId; this.saving = false; }
   onOpen() {
-    this.contentEl.addClass('tp-controls'); this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.addClass('tp-controls');applyPlannerAppearance(this.contentEl,this.plugin.data.settings); this.contentEl.setAttribute('lang', 'en-GB');
     this.contentEl.createEl('h2', { text: "Permanently delete task?" });
     const task = this.plugin.data.tasks.find(t => t.id === this.taskId && t.deletedAt);
     this.contentEl.createEl('p', { text: task ? '„' + task.title + "” and all its subtasks and activity will be permanently removed. This cannot be undone." : "This task is no longer in Trash." });
@@ -818,7 +866,7 @@ class DeleteTaskForeverModal extends Modal {
 class ProjectModal extends Modal {
   constructor(app, plugin, projectId = null, onSaved = null) { super(app); this.plugin = plugin; this.projectId = projectId; this.onSaved = onSaved; this.saving = false; }
   onOpen() {
-    this.contentEl.addClass('tp-controls'); this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.addClass('tp-controls');applyPlannerAppearance(this.contentEl,this.plugin.data.settings); this.contentEl.setAttribute('lang', 'en-GB');
     const project = this.plugin.data.projects.find(p => p.id === this.projectId);
     this.contentEl.createEl('h2', { text: project ? "Edit project" : "New project" });
     const form = this.contentEl.createEl('form');
@@ -826,9 +874,9 @@ class ProjectModal extends Modal {
     const noteLabel = form.createEl('label', { text: "Description · optional", cls: 'tp-field' }); this.noteInput = noteLabel.createEl('textarea'); this.noteInput.value = project?.note || '';
     const visibility = form.createDiv('tp-project-visibility'); visibility.createEl('h3', { text: "Visibility" });
     const toggle = (text, checked) => { const label = visibility.createEl('label', { cls: 'tp-reminder-toggle' }); const input = label.createEl('input', { type: 'checkbox' }); input.checked = checked; label.createSpan({ text }); return input; };
-    this.onlyInput = toggle("Show only in project view", !!project?.onlyInProjects);
-    this.dashboardInput = toggle("Include in dashboard", project?.includeInDashboard !== false);
-    this.remindersInput = toggle("Enable reminders for this project", project?.remindersEnabled !== false);
+    this.onlyInput = toggle("Show only in project view", project?!!project.onlyInProjects:plannerSettings(this.plugin.data).projectOnly);
+    this.dashboardInput = toggle("Include in dashboard", project?project.includeInDashboard!==false:plannerSettings(this.plugin.data).projectDashboard);
+    this.remindersInput = toggle("Enable reminders for this project", project?project.remindersEnabled!==false:plannerSettings(this.plugin.data).projectReminders);
     visibility.createDiv({ text: "Hidden projects are excluded from task boards, Calendar and the general archive. Dashboard and reminders can be configured independently. Trash shows all deleted tasks.", cls: 'tp-help' });
     const actions = form.createDiv('tp-inline-actions'); this.saveButton = actions.createEl('button', { text: "Save project", cls: 'mod-cta', type: 'submit' }); button(actions, "Cancel", () => this.close());
     form.onsubmit = e => { e.preventDefault(); void this.submit(); }; this.nameInput.focus();
@@ -851,7 +899,7 @@ class ProjectModal extends Modal {
 class DeleteProjectModal extends Modal {
   constructor(app, plugin, projectId, onDeleted = null) { super(app); this.plugin = plugin; this.projectId = projectId; this.onDeleted = onDeleted; this.saving = false; }
   onOpen() {
-    this.contentEl.addClass('tp-controls'); this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.addClass('tp-controls');applyPlannerAppearance(this.contentEl,this.plugin.data.settings); this.contentEl.setAttribute('lang', 'en-GB');
     this.contentEl.createEl('h2', { text: "Remove project?" });
     this.contentEl.createEl('p', { text: "Tasks are kept and assigned to No project. Templates and future recurring tasks also keep their contents and lose only the project assignment." });
     const actions = this.contentEl.createDiv('tp-inline-actions'); this.removeButton = button(actions, "Remove project", () => this.confirm(), 'mod-warning'); button(actions, "Cancel", () => this.close());
@@ -871,7 +919,7 @@ class DeleteProjectModal extends Modal {
 class ReminderSettingsModal extends Modal {
   constructor(app, plugin) { super(app); this.plugin = plugin; this.saving = false; }
   onOpen() {
-    this.contentEl.addClass('tp-controls'); this.contentEl.setAttribute('lang', 'en-GB');
+    this.contentEl.addClass('tp-controls');applyPlannerAppearance(this.contentEl,this.plugin.data.settings); this.contentEl.setAttribute('lang', 'en-GB');
     this.contentEl.createEl('h2', { text: "Due date reminders" });
     const label = this.contentEl.createEl('label', { cls: 'tp-reminder-toggle' }); this.enabledInput = label.createEl('input', { type: 'checkbox' }); this.enabledInput.checked = this.plugin.data.reminderSettings.enabled; label.createSpan({ text: "Show reminders in Obsidian" });
     const lead = this.contentEl.createEl('label', { text: "Advance notice", cls: 'tp-field' }); this.leadInput = lead.createEl('select');
@@ -890,7 +938,7 @@ class ReminderSettingsModal extends Modal {
 }
 class SeriesManagerModal extends Modal {
   constructor(app,plugin){super(app);this.plugin=plugin;this.busy=false;}
-  onOpen(){this.contentEl.addClass('tp-modal');this.contentEl.addClass('tp-controls');this.contentEl.setAttribute('lang','en-GB');this.contentEl.createEl('h2',{text:'Manage recurrences'});this.contentEl.createEl('p',{text:'Weekly repeats use one continuously open task. Pick its weekday below; every calendar entry shares the same task, subtasks and activity. Daily and monthly recurrences still create separate tasks.',cls:'tp-help'});this.list=this.contentEl.createDiv('tp-series-list');this.renderList();button(this.contentEl,'Close',()=>this.close());}
+  onOpen(){this.contentEl.addClass('tp-modal');this.contentEl.addClass('tp-controls');applyPlannerAppearance(this.contentEl,this.plugin.data.settings);this.contentEl.setAttribute('lang','en-GB');this.contentEl.createEl('h2',{text:'Manage recurrences'});this.contentEl.createEl('p',{text:'Weekly repeats use one continuously open task. Pick its weekday below; every calendar entry shares the same task, subtasks and activity. Daily and monthly recurrences still create separate tasks.',cls:'tp-help'});this.list=this.contentEl.createDiv('tp-series-list');this.renderList();button(this.contentEl,'Close',()=>this.close());}
   renderList(){
     this.list.empty();if(!this.plugin.data.recurrences.length)this.list.createDiv({text:'No recurring tasks yet. Choose a recurrence in the task dialog.',cls:'tp-empty'});
     for(const series of this.plugin.data.recurrences){
@@ -918,12 +966,14 @@ function isRecurringTask(data, task) { return !!task.recurrenceId && data.recurr
 
 class PlannerView extends ItemView {
   constructor(leaf, plugin) {
-    super(leaf); this.plugin = plugin; this.sidebarOpen = false; this.sidebarId='tp-tools-'+uid(); this.tab = 'home'; this.taskBoard = 'status'; this.recurringBoard = 'status'; this.drafts = new Map();
+    super(leaf); this.plugin = plugin; this.sidebarOpen = plannerSettings(plugin.data).sidebarDefault; this.sidebarId='tp-tools-'+uid(); this.tab = 'home'; this.taskBoard = 'status'; this.recurringBoard = 'status'; this.drafts = new Map();
     this.draftInputs = new Map(); this.draftControls = new Map(); this.pendingDrafts = new Set();
     this.expanded = new Set(); this.archiveSearch = ''; this.scrollPositions = new Map();
     this.filters = { query: '', status: '', priority: '', due: 'all', project: 'all' };
-    this.selectedProject = 'all'; this.projectBoard = 'status'; this.calendarMode = 'week'; this.calendarDate = dayKey();
+    this.selectedProject = 'all'; this.projectBoard = 'status'; this.calendarMode = plannerSettings(plugin.data).calendarView; this.calendarDate = dayKey();
   }
+  get calendarPixels() { return plannerSettings(this.plugin.data).hourHeight/60; }
+  get calendarStep() { return Number(plannerSettings(this.plugin.data).gridMinutes); }
   getViewType() { return VIEW; }
   getDisplayText() { return "Daily Planner"; }
   getIcon() { return 'layout-dashboard'; }
@@ -931,6 +981,7 @@ class PlannerView extends ItemView {
   async onClose() { this.drafts.clear();this.unbindBackNavigation(); }
   goHome() { this.sidebarOpen=false;this.tab='home';this.render(); }
   handleBackNavigation(event) {
+    if(!plannerSettings(this.plugin.data).mouseBack)return false;
     const keyboard=event.type==='keydown'&&event.altKey&&!event.ctrlKey&&!event.metaKey&&event.key==='ArrowLeft';
     if(!keyboard&&event.button!==3)return false;
     const pending=Date.now()<(this.backMouseUntil||0);
@@ -960,7 +1011,7 @@ class PlannerView extends ItemView {
       this.scrollPositions.set(this.renderedTab, { top: previousBody.scrollTop, boards });
     }
     root.empty(); root.addClass('tp-root');root.removeClass('tp-home-root');if(this.tab==='home')root.addClass('tp-home-root'); root.setAttribute('lang', 'en-GB');
-    this.bindBackNavigation(root);
+    applyPlannerAppearance(root,this.plugin.data.settings);this.bindBackNavigation(root);
     let content=root;
     if(this.tab!=='home'){
       const head=root.createDiv('tp-head tp-tool-header'),identity=head.createDiv('tp-head-identity');
@@ -969,13 +1020,13 @@ class PlannerView extends ItemView {
       const canCreateTask=['board','recurring','calendar','today','projects'].includes(this.tab);
       if(canCreateTask||this.tab==='templates'){
         const headActions=head.createDiv('tp-head-actions');
-        if(canCreateTask)button(headActions,this.tab==='recurring'?'+ Recurring task':'+ Task',()=>new TaskModal(this.app,this.plugin,null,{defaultRepeat:this.tab==='recurring'?'weekly':null,defaultProjectId:this.tab==='projects'&&this.plugin.data.projects.some(project=>project.id===this.selectedProject)?this.selectedProject:null}).open(),'mod-cta');
+        if(canCreateTask)button(headActions,this.tab==='recurring'?'+ Recurring task':'+ Task',()=>new TaskModal(this.app,this.plugin,null,{defaultRepeat:this.tab==='recurring'?(plannerSettings(this.plugin.data).defaultFrequency==='none'?'weekly':plannerSettings(this.plugin.data).defaultFrequency):null,defaultProjectId:this.tab==='projects'&&this.plugin.data.projects.some(project=>project.id===this.selectedProject)?this.selectedProject:null}).open(),'mod-cta');
         if(this.tab==='templates')button(headActions,'+ Template',()=>new TemplateModal(this.app,this.plugin).open(),'mod-cta');
       }
       const workspace=root.createDiv('tp-tool-workspace'),sidebar=workspace.createDiv('tp-tabs tp-tool-sidebar');sidebar.hidden=!this.sidebarOpen;sidebar.setAttribute('id',this.sidebarId);sidebar.setAttribute('aria-label','Planner views');sidebar.createDiv({text:'TOOLS',cls:'tp-sidebar-heading'});
       const archiveCount=this.plugin.data.tasks.filter(task=>!task.deletedAt&&!projectOnlyTask(this.plugin.data,task)&&task.archivedAt).length;
-      for(const [id,label] of [['board','Tasks'],['recurring','Recurring tasks'],['calendar','Calendar'],['projects','Projects'],['dashboard','Dashboard'],['templates','Templates'],['archive','Archive · '+archiveCount],['trash','Trash · '+this.plugin.data.tasks.filter(task=>task.deletedAt).length]]){
-        const item=button(sidebar,label,()=>{this.sidebarOpen=false;this.tab=id;this.render();},this.tab===id?'tp-tab is-active':'tp-tab');item.setAttribute('aria-pressed',String(this.tab===id));
+      for(const [id,label] of [['board','Tasks'],['recurring','Recurring tasks'],['calendar','Calendar'],['projects','Projects'],['dashboard','Dashboard'],['templates','Templates'],['archive','Archive · '+archiveCount],['trash','Trash · '+this.plugin.data.tasks.filter(task=>task.deletedAt).length],['settings','Settings']]){
+        const item=button(sidebar,label,()=>{this.sidebarOpen=plannerSettings(this.plugin.data).sidebarDefault;this.tab=id;if(id==='calendar')this.calendarMode=plannerSettings(this.plugin.data).calendarView;this.render();},this.tab===id?'tp-tab is-active':'tp-tab');item.setAttribute('aria-pressed',String(this.tab===id));
       }
       content=workspace.createDiv('tp-tool-content');
     }else this.sidebarOpen=false;
@@ -989,7 +1040,7 @@ class PlannerView extends ItemView {
       }
     }
     const body = content.createDiv('tp-body');
-    if (this.tab === 'home') this.renderHome(body); else if (this.tab === 'dashboard') this.renderDashboard(body); else if (this.tab === 'archive') this.renderArchive(body); else if (this.tab === 'templates') this.renderTemplates(body); else if (this.tab === 'calendar' || this.tab === 'today') this.renderCalendar(body); else if (this.tab === 'trash') this.renderTrash(body); else if (this.tab === 'projects') this.renderProjects(body); else this.renderBoard(body);
+    if(this.tab==='settings')this.renderSettings(body);else if (this.tab === 'home') this.renderHome(body); else if (this.tab === 'dashboard') this.renderDashboard(body); else if (this.tab === 'archive') this.renderArchive(body); else if (this.tab === 'templates') this.renderTemplates(body); else if (this.tab === 'calendar' || this.tab === 'today') this.renderCalendar(body); else if (this.tab === 'trash') this.renderTrash(body); else if (this.tab === 'projects') this.renderProjects(body); else this.renderBoard(body);
     const viewKey = this.tab === 'recurring' ? 'recurring:' + this.recurringBoard : this.tab === 'board' ? 'board:' + this.taskBoard : this.tab === 'projects' ? 'projects:' + this.selectedProject + ':' + this.projectBoard : this.tab;
     const position = this.scrollPositions.get(viewKey);
     if (position) {
@@ -998,12 +1049,65 @@ class PlannerView extends ItemView {
     }
     this.renderedTab = viewKey;
   }
+  openSettings(section='appearance') { this.tab='settings';this.settingsSection=section;this.render(); }
+  renderSettings(parent) {
+    if(!this.settingsDraft){this.settingsDraft=copy(plannerSettings(this.plugin.data));this.reminderDraft=copy(this.plugin.data.reminderSettings);}
+    const section=SETTINGS_SECTIONS[this.settingsSection]?this.settingsSection:'appearance',page=parent.createDiv('tp-settings');
+    const heading=page.createDiv('tp-settings-heading');heading.createEl('h2',{text:'Settings'});heading.createDiv({text:'Personalise your workspace. Changes take effect when you save.',cls:'tp-muted'});
+    const search=page.createEl('input',{type:'search',attr:{'aria-label':'Search settings',placeholder:'Search settings…'}});
+    const layout=page.createDiv('tp-settings-layout'),nav=layout.createDiv('tp-settings-nav'),main=layout.createDiv('tp-settings-main');nav.setAttribute('aria-label','Settings sections');
+    for(const [key,group] of Object.entries(SETTINGS_SECTIONS)){const item=button(nav,'',()=>{this.settingsSection=key;this.render();},'tp-settings-tab'+(section===key?' is-active':''));addSymbol(item,{key:group.icon,icon:group.icon});item.createSpan({text:group.name});item.setAttribute('aria-label',group.name+' settings');item.setAttribute('aria-pressed',String(section===key));}
+    const fields=main.createDiv('tp-settings-fields');this.settingsControls=new Map();
+    const paint=()=>{fields.empty();this.settingsControls.clear();const q=search.value.trim().toLowerCase();
+      for(const [key,group] of Object.entries(SETTINGS_SECTIONS)){
+        if(!q&&key!==section)continue;const descriptors=group.fields.filter(field=>!q||(group.name+' '+field[1]).toLowerCase().includes(q));if(q&&!descriptors.length&&!(key==='reminders'&&('enable reminders advance notice'.includes(q)))&&!(key==='data'&&('export import backup reset'.includes(q))))continue;
+        fields.createEl('h3',{text:group.name});const grid=fields.createDiv('tp-settings-field-grid');
+        for(const [name,label,type,fallback,min,max,step] of descriptors){
+          const row=grid.createEl('label',{cls:'tp-setting-field'});row.createSpan({text:label});let input;
+          if(type==='select'||type==='project'){input=row.createEl('select');const options=type==='project'?[['','No project'],...this.plugin.data.projects.map(project=>[project.id,project.name])]:min.map(option=>Array.isArray(option)?option:[option,option]);for(const [value,text] of options)input.createEl('option',{text,value});input.value=this.settingsDraft[name];}
+          else {input=row.createEl('input',{type:type==='boolean'?'checkbox':type==='number'?'number':type==='color'?'color':'text'});if(type==='boolean')input.checked=this.settingsDraft[name];else input.value=String(this.settingsDraft[name]);if(type==='number'){input.min=String(min);input.max=String(max);input.step=String(step||1);}}
+          input.setAttribute('aria-label',label);input.setAttribute('data-setting',name);this.settingsControls.set(name,input);
+          input.oninput=input.onchange=()=>{this.settingsDraft[name]=type==='boolean'?input.checked:type==='number'?Number(input.value):input.value;if(this.appearancePreview)applyPlannerAppearance(this.appearancePreview,this.settingsDraft);};
+        }
+        if(key==='home'&&!q)this.renderHomeOrder(fields);
+        if(key==='reminders'){
+          const enabled=fields.createEl('label',{cls:'tp-setting-field',text:'Enable reminders'}),toggle=enabled.createEl('input',{type:'checkbox'});toggle.checked=this.reminderDraft.enabled;toggle.onchange=()=>this.reminderDraft.enabled=toggle.checked;toggle.setAttribute('aria-label','Enable reminders');
+          const lead=fields.createEl('label',{cls:'tp-setting-field',text:'Advance notice (days)'}),input=lead.createEl('input',{type:'number'});input.min='0';input.max='30';input.step='1';input.value=String(this.reminderDraft.leadDays);input.setAttribute('aria-label','Advance notice (days)');input.onchange=()=>this.reminderDraft.leadDays=Math.max(0,Math.min(30,Math.round(Number(input.value)||0)));fields.createDiv({text:'Obsidian must be running. Project-specific reminder options still apply.',cls:'tp-help'});
+        }
+        if(key==='calendar'&&!q)fields.createDiv({text:'Visible hours apply to Week. Appointments outside them remain available in Month and Edit.',cls:'tp-help'});
+        if(key==='appearance'&&!q){
+          fields.createEl('h4',{text:'Live appearance preview'});this.appearancePreview=fields.createDiv('tp-controls tp-appearance-preview');applyPlannerAppearance(this.appearancePreview,this.settingsDraft);const card=this.appearancePreview.createDiv('tp-card tp-card-compact tp-priority-mid');card.createEl('h4',{text:'Prepare the weekly review',cls:'tp-title'});const meta=card.createDiv('tp-meta');priorityBadge(meta,'mid');statusBadge(meta,'In Progress');meta.createSpan({text:'Example project',cls:'tp-badge tp-project-badge'});card.createDiv({text:'A preview of your fonts, spacing, colours and card shape.',cls:'tp-description'});card.createDiv({text:'☐ Gather open items',cls:'tp-muted'});
+        }
+        if(key==='data')this.renderDataSettings(fields);
+        if(!q){button(fields,'Reset this section',()=>{for(const [name,label,type,fallback] of group.fields)this.settingsDraft[name]=fallback;if(key==='home'){this.settingsDraft.homeOrder=[...HOME_TOOLS];this.settingsDraft.homeHidden=[];}if(key==='reminders')this.reminderDraft={enabled:true,leadDays:1};this.render();},'tp-small-button');}
+      }
+      if(!fields.children.length)fields.createDiv({text:'No matching settings.',cls:'tp-empty'});
+    };search.oninput=paint;paint();
+    const actions=page.createDiv('tp-settings-actions');button(actions,'Discard changes',()=>{this.settingsDraft=null;this.reminderDraft=null;this.render();});
+    const save=button(actions,'Save settings',async()=>{if(this.settingsSaving)return;for(const input of this.settingsControls.values())if(!input.checkValidity()){input.reportValidity();return;}this.settingsSaving=true;save.disabled=true;const settings=normaliseSettings(this.settingsDraft),reminders={enabled:!!this.reminderDraft.enabled,leadDays:Math.max(0,Math.min(30,Math.round(Number(this.reminderDraft.leadDays)||0)))};
+      const ok=await this.plugin.mutate(data=>{data.settings=settings;data.reminderSettings=reminders;});this.settingsSaving=false;if(ok){this.settingsDraft=null;this.reminderDraft=null;new Notice('Settings saved.');}this.render();
+    },'mod-cta');save.disabled=!!this.settingsSaving;
+  }
+  renderHomeOrder(parent) {
+    parent.createEl('h4',{text:'Home tools · order and visibility'});parent.createDiv({text:'Settings always remains available.',cls:'tp-help'});
+    const list=parent.createDiv('tp-home-order');
+    this.settingsDraft.homeOrder.forEach((id,index)=>{const row=list.createDiv('tp-home-order-row'),check=row.createEl('input',{type:'checkbox'});check.checked=!this.settingsDraft.homeHidden.includes(id);check.disabled=id==='settings';check.setAttribute('aria-label','Show '+id+' on Home');check.onchange=()=>{this.settingsDraft.homeHidden=this.settingsDraft.homeHidden.filter(value=>value!==id);if(!check.checked&&id!=='settings')this.settingsDraft.homeHidden.push(id);};row.createSpan({text:{board:'Tasks',recurring:'Recurring tasks',calendar:'Calendar',projects:'Projects',dashboard:'Dashboard',templates:'Templates',archive:'Archive',trash:'Trash',settings:'Settings','recurrence-settings':'Recurrence settings',reminders:'Reminders'}[id]});for(const [label,delta] of [['↑',-1],['↓',1]]){const b=button(row,label,()=>{const target=index+delta;if(target<0||target>=this.settingsDraft.homeOrder.length)return;const values=this.settingsDraft.homeOrder;[values[index],values[target]]=[values[target],values[index]];this.render();});b.disabled=index+delta<0||index+delta>=this.settingsDraft.homeOrder.length;b.setAttribute('aria-label',(delta<0?'Move up ':'Move down ')+id);}});
+  }
+  renderDataSettings(parent) {
+    parent.createDiv({text:'Export contains all tasks, templates, projects and settings. Import replaces the current plugin data after you review it.',cls:'tp-help'});
+    const actions=parent.createDiv('tp-inline-actions');button(actions,'Export all data',()=>this.plugin.exportData());button(actions,'Create vault backup',async()=>{try{const path=await this.plugin.writeBackup(this.plugin.data);new Notice('Backup saved: '+path);}catch(error){new Notice('Backup failed: '+error.message);}});
+    const file=parent.createEl('input',{type:'file',attr:{accept:'.json,application/json','aria-label':'Choose JSON backup'}});const input=parent.createEl('textarea',{attr:{'aria-label':'JSON data to import',placeholder:'Choose a JSON backup or paste its content here…'}});input.rows=6;input.value=this.importText||'';input.oninput=()=>this.importText=input.value;
+    file.onchange=async()=>{const selected=file.files?.[0];if(!selected)return;if(selected.size>20*1024*1024){new Notice('Choose a JSON backup smaller than 20 MB.');return;}try{input.value=await selected.text();this.importText=input.value;}catch(error){new Notice('Could not read the backup: '+error.message);}};
+    button(parent,'Review import',()=>{try{const raw=JSON.parse(input.value,(key,value)=>['__proto__','constructor','prototype'].includes(key)?undefined:value),data=importablePlannerData(raw);new SettingsConfirmModal(this.app,this.plugin,'Replace plugin data?',data.tasks.length+' tasks, '+data.projects.length+' projects and '+data.templates.length+' templates will replace the current data. '+(plannerSettings(this.plugin.data).backupBeforeImport?'A vault backup must succeed first.':'Automatic backup is disabled.'),async()=>{const ok=await this.plugin.importData(data);if(ok){this.settingsDraft=null;this.reminderDraft=null;this.importText='';this.render();}return ok;},'Import and replace data').open();}catch(error){new Notice('Invalid backup: '+error.message);}},'mod-warning');
+    parent.createEl('h4',{text:'Reset settings only'});parent.createDiv({text:'Tasks, projects, templates and history are preserved.',cls:'tp-help'});button(parent,'Reset all settings',()=>new SettingsConfirmModal(this.app,this.plugin,'Reset settings?','Only preferences and reminder options will be reset. Your tasks and other content stay intact.',async()=>{const ok=await this.plugin.mutate(data=>{data.settings=normaliseSettings();data.reminderSettings={enabled:true,leadDays:1};});if(ok){this.settingsDraft=null;this.reminderDraft=null;this.render();}return ok;},'Reset settings').open());
+  }
+
   renderHome(parent) {
-    const page=parent.createDiv('tp-home');
+    const s=plannerSettings(this.plugin.data),page=parent.createDiv('tp-home');
     const intro=page.createDiv('tp-home-intro');intro.createSpan({text:'YOUR WORKSPACE',cls:'tp-home-eyebrow'});intro.createEl('h3',{text:'What would you like to work on?'});intro.createDiv({text:'Your plans, projects and routines. Everything in one place.',cls:'tp-home-subtitle'});
     const layout=page.createDiv('tp-home-layout'),summary=layout.createDiv('tp-home-summary'),center=layout.createDiv('tp-home-tools'),upcoming=layout.createDiv('tp-home-upcoming');
     summary.setAttribute('aria-label','Workspace overview');upcoming.setAttribute('aria-label','Upcoming tasks');
-    this.renderHomeOverview(summary);this.renderHomeUpcoming(upcoming);
+    summary.hidden=!s.homeDashboard;upcoming.hidden=!s.homePreview;layout.setAttribute('data-summary',String(s.homeDashboard));layout.setAttribute('data-preview',String(s.homePreview));if(s.homeDashboard)this.renderHomeOverview(summary);if(s.homePreview)this.renderHomeUpcoming(upcoming);
     const tasks=this.plugin.data.tasks.filter(task=>!task.deletedAt&&!task.archivedAt&&task.status!=='Done'&&!projectOnlyTask(this.plugin.data,task));
     const archive=this.plugin.data.tasks.filter(task=>!task.deletedAt&&task.archivedAt&&!projectOnlyTask(this.plugin.data,task)).length;
     const count=(n,one,many=one+'s')=>n+' '+(n===1?one:many);
@@ -1014,7 +1118,10 @@ class PlannerView extends ItemView {
       {id:'projects',name:'Projects',icon:'folder',tone:'amber',description:'Focus on a project and the work that belongs to it.',detail:count(this.plugin.data.projects.length,'project')},
       {id:'dashboard',name:'Dashboard',icon:'chart',tone:'rose',description:'See progress, completed work and what needs attention.',detail:'Progress & activity'},
       {id:'templates',name:'Templates',icon:'template',tone:'blue',description:'Build reusable tasks with ready-made subtasks.',detail:count(this.plugin.data.templates.length,'template')},
-      {id:'archive',name:'Archive',icon:'archive',tone:'green',description:'Review finished work. Entries are kept for two months.',detail:count(archive,'archived task')},
+      {id:'archive',name:'Archive',icon:'archive',tone:'green',description:plannerSettings(this.plugin.data).archiveCleanup?'Review finished work. Retention: '+plannerSettings(this.plugin.data).archiveMonths+' months.':'Review finished work. Automatic deletion is disabled.',detail:count(archive,'archived task')},
+      {id:'recurrence-settings',name:'Recurrence settings',icon:'repeat',tone:'purple',description:'Choose weekdays, adjust intervals and pause routines.',detail:'Manage repetition',action:()=>new SeriesManagerModal(this.app,this.plugin).open()},
+      {id:'reminders',name:'Reminders',icon:'bell',tone:'amber',description:'Choose when to be notified about upcoming work.',detail:'Central reminder settings',action:()=>this.openSettings('reminders')},
+      {id:'settings',name:'Settings',icon:'gear',tone:'purple',description:'Personalise appearance, defaults, calendar and data.',detail:'Your preferences'},
       {id:'trash',name:'Trash',icon:'trash',tone:'rose',description:'Restore accidentally deleted tasks or remove them forever.',detail:count(this.plugin.data.tasks.filter(task=>task.deletedAt).length,'deleted task')}
     ];
     const grid=center.createDiv('tp-home-grid');grid.setAttribute('aria-label','Planner tools');
@@ -1022,10 +1129,7 @@ class PlannerView extends ItemView {
       const top=item.createSpan({cls:'tp-tool-top'});addSymbol(top,{key:tool.icon,icon:tool.icon});top.createSpan({text:'↗',cls:'tp-tool-arrow',attr:{'aria-hidden':'true'}});
       item.createSpan({text:tool.name,cls:'tp-tool-name'});item.createSpan({text:tool.description,cls:'tp-tool-description'});item.createSpan({text:tool.detail,cls:'tp-tool-detail'});
     };
-    for(const tool of tools)tile(grid,tool,()=>{this.tab=tool.id;this.render();});
-    center.createEl('h4',{text:'Tools & settings',cls:'tp-home-settings-title'});const settings=center.createDiv('tp-home-settings');
-    tile(settings,{id:'recurrence-settings',name:'Recurrence settings',icon:'repeat',tone:'purple',description:'Choose weekdays, adjust intervals and pause routines.',detail:'Manage repetition'},()=>new SeriesManagerModal(this.app,this.plugin).open());
-    tile(settings,{id:'reminders',name:'Reminders',icon:'bell',tone:'amber',description:'Choose when to be notified about upcoming work.',detail:this.plugin.data.reminderSettings.enabled?'Reminders enabled':'Reminders disabled'},()=>new ReminderSettingsModal(this.app,this.plugin).open());
+    for(const id of s.homeOrder){const tool=tools.find(item=>item.id===id);if(!tool||s.homeHidden.includes(id))continue;tile(grid,tool,tool.action||(()=>{this.sidebarOpen=s.sidebarDefault;this.tab=tool.id;if(tool.id==='calendar')this.calendarMode=s.calendarView;this.render();}));}
   }
   renderHomeOverview(parent) {
     const data={...this.plugin.data,tasks:this.plugin.data.tasks.filter(task=>!projectOnlyTask(this.plugin.data,task)&&this.plugin.data.projects.find(project=>project.id===task.projectId)?.includeInDashboard!==false)},m=metrics(data);
@@ -1041,11 +1145,11 @@ class PlannerView extends ItemView {
     button(parent,'Open dashboard →',()=>{this.tab='dashboard';this.render();},'tp-home-side-link');
   }
   renderHomeUpcoming(parent) {
-    const now=Date.now(),today=dayKey(now),last=shiftDate(today,60),heading=parent.createDiv('tp-home-side-heading');addSymbol(heading,{key:'calendar',icon:'calendar'});heading.createEl('h4',{text:'Next up'});
-    parent.createDiv({text:'Upcoming tasks · next 60 days',cls:'tp-home-side-subtitle'});
+    const now=Date.now(),today=dayKey(now),last=shiftDate(today,plannerSettings(this.plugin.data).previewDays),heading=parent.createDiv('tp-home-side-heading');addSymbol(heading,{key:'calendar',icon:'calendar'});heading.createEl('h4',{text:'Next up'});
+    parent.createDiv({text:'Upcoming tasks · next '+plannerSettings(this.plugin.data).previewDays+' days',cls:'tp-home-side-subtitle'});
     const entries=attentionEntries(this.plugin.data,today,last).filter(entry=>entry.kind==='task'&&!projectOnlyTask(this.plugin.data,entry.task)).map(entry=>({...entry,range:taskRange(entry.task)})).filter(entry=>entry.range&&entry.range.endDate>=today&&entry.range.startDate<=last&&(!entry.range.timed||entry.range.end>=wallValue(today,new Date(now).toTimeString().slice(0,5)))).sort((a,b)=>a.range.start-b.range.start||a.range.end-b.range.end||a.task.title.localeCompare(b.task.title));
     const list=parent.createDiv('tp-home-preview-list'),seen=new Set();let shown=0;
-    for(const entry of entries){if(seen.has(entry.task.id))continue;seen.add(entry.task.id);if(shown++>=6)break;
+    for(const entry of entries){if(seen.has(entry.task.id))continue;seen.add(entry.task.id);if(shown++>=plannerSettings(this.plugin.data).previewCount)break;
       const task=calendarSourceTask(entry),item=button(list,'',()=>{this.tab=isRecurringTask(this.plugin.data,task)?'recurring':'board';this.render();new TaskModal(this.app,this.plugin,task.id).open();},'tp-home-preview tp-priority-'+(PRIORITIES.find(priority=>priority.name===task.priority)?.key||'mid'));item.setAttribute('data-preview-task',task.id);item.setAttribute('aria-label','Open task: '+task.title);
       item.createSpan({text:entry.task.title,cls:'tp-home-preview-title'});const date=entry.range.startDate===today?'Today':new Date(entry.range.startDate+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'});item.createSpan({text:date+' · '+(entry.range.timed?entry.range.startTime+' – '+entry.range.endTime:'All day'),cls:'tp-home-preview-date'});
       item.createSpan({text:task.priority+' · '+projectName(this.plugin.data,task.projectId)+(task.weeklyRecurrence?' · ↻ Weekly':''),cls:'tp-home-preview-meta'});
@@ -1092,10 +1196,10 @@ class PlannerView extends ItemView {
   }
   renderCalendar(parent) {
     const head = parent.createDiv('tp-page-heading'), title = head.createDiv(); title.createEl('h3', { text: "Week and calendar view" });
-    title.createDiv({ text: this.calendarMode === 'week' ? 'Drag to move · Pull a time-block edge to resize (15 min)' : 'Drag to move · Drag date handles to extend a range · Click to edit times', cls: 'tp-muted' });
+    title.createDiv({ text: this.calendarMode === 'week' ? 'Drag to move · Pull a time-block edge to resize ('+this.calendarStep+' min)' : 'Drag to move · Drag date handles to extend a range · Click to edit times', cls: 'tp-muted' });
     const actions = head.createDiv('tp-inline-actions');
     button(actions, "Recurrences", () => new SeriesManagerModal(this.app, this.plugin).open());
-    button(actions, "Reminders", () => new ReminderSettingsModal(this.app, this.plugin).open());
+    button(actions, "Reminders", () => this.openSettings('reminders'));
     button(actions, "Check now", () => this.plugin.checkReminders(Date.now(), true));
     const nav = parent.createDiv('tp-calendar-toolbar');
     for (const [mode, label] of [['week', "Week"], ['month', "Month"]]) {
@@ -1108,7 +1212,7 @@ class PlannerView extends ItemView {
     jump.onchange = () => { if (validDate(jump.value)) { this.calendarDate = jump.value; this.render(); } };
     const filters = parent.createDiv(), target = parent.createDiv();
     const draw = () => {
-      target.empty(); const range = calendarRange(this.calendarDate, this.calendarMode);
+      target.empty(); const range = calendarRange(this.calendarDate, this.calendarMode,plannerSettings(this.plugin.data).weekStart);
       const allowed = new Set(this.plugin.data.tasks.filter(t => !t.deletedAt && !projectOnlyTask(this.plugin.data, t) && taskMatches(t, { ...this.filters, due: 'all' }, this.plugin.data)).map(t => t.id));
       const entries = attentionEntries(this.plugin.data,range.start,shiftDate(range.start,range.days-1)).filter(e => allowed.has(e.task.id));
       const label = this.calendarMode === 'month' ? new Date(this.calendarDate + 'T12:00:00').toLocaleDateString("en-GB", { month: 'long', year: 'numeric' }) : shortDate(range.start) + ' – ' + shortDate(shiftDate(range.start, 6));
@@ -1116,9 +1220,9 @@ class PlannerView extends ItemView {
       const workspace=target.createDiv('tp-calendar-workspace'),calendarHost=workspace.createDiv('tp-calendar-main'),sidebar=workspace.createDiv('tp-calendar-sidebar');
       if(this.calendarMode==='week') this.renderWeekTimeline(calendarHost,entries,range.start); else {
       const scroll = calendarHost.createDiv('tp-calendar-scroll'), grid = scroll.createDiv('tp-calendar-grid tp-calendar-' + this.calendarMode); grid.setAttribute('aria-label', label);
-      for (const weekday of ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]) grid.createDiv({ text: weekday, cls: 'tp-calendar-weekday' });
+      grid.style.gridTemplateColumns="repeat("+(plannerSettings(this.plugin.data).showWeekends?7:5)+",minmax(150px,1fr))";for (const weekday of Array.from({length:7},(_,i)=>(i+Number(plannerSettings(this.plugin.data).weekStart))%7).filter(day=>plannerSettings(this.plugin.data).showWeekends||day<5).map(day=>["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][day])) grid.createDiv({ text: weekday, cls: 'tp-calendar-weekday' });
       for (let i = 0; i < range.days; i++) {
-        const date = shiftDate(range.start, i), day = grid.createDiv('tp-calendar-day' + (date === dayKey() ? ' is-today' : '') + (date.slice(0, 7) !== this.calendarDate.slice(0, 7) && this.calendarMode === 'month' ? ' is-other-month' : ''));
+        const date = shiftDate(range.start, i);if(!plannerSettings(this.plugin.data).showWeekends&&weekdayOf(date)>4)continue;const day = grid.createDiv('tp-calendar-day' + (date === dayKey() ? ' is-today' : '') + (date.slice(0, 7) !== this.calendarDate.slice(0, 7) && this.calendarMode === 'month' ? ' is-other-month' : ''));
         day.setAttribute('data-calendar-date', date); day.createDiv({ text: new Date(date + 'T12:00:00').toLocaleDateString("en-GB", { day: 'numeric', month: 'short' }), cls: 'tp-calendar-day-label' });
         this.calendarDrop(day,date);
         for (const entry of calendarEntriesForDate(entries,date).sort((a,b)=>Number(a.timed)-Number(b.timed)||(a.startMinute||0)-(b.startMinute||0)||compareCalendarEntries(a,b))) this.renderCalendarEvent(day, entry);
@@ -1157,13 +1261,13 @@ class PlannerView extends ItemView {
         const resize = e.dataTransfer?.getData('application/x-tagesplaner-range-edge');
         if (resize) { const payload = JSON.parse(resize); void this.plugin.setScheduleEdgeDate(payload.id, payload.edge, date, payload.expected, payload.occurrenceStart); return; }
         const value = JSON.parse(e.dataTransfer?.getData('application/x-tagesplaner-date') || 'null'); if (!value) return;
-        if (timed && value.kind === 'task') { const box = day.getBoundingClientRect(), minute = Math.max(0, Math.min(1425, Math.round((e.clientY - box.top) / CALENDAR_PX_PER_MINUTE / 15) * 15)); void this.plugin.moveTimedTask(value.id, date, minute); }
+        if (timed && value.kind === 'task') { const box = day.getBoundingClientRect(), minute = Math.max(0, Math.min(1440-this.calendarStep,Number(day.getAttribute('data-time-origin')||0)+Math.round((e.clientY - box.top) / this.calendarPixels / this.calendarStep) * this.calendarStep)); void this.plugin.moveTimedTask(value.id, date, minute); }
         else void this.plugin.reschedule(value.id, value.kind, value.subtaskId, date);
       } catch { new Notice('Could not move this event.'); }
     };
   }
   renderWeekTimeline(parent, entries, start) {
-    const days = Array.from({length:7},(_,i) => shiftDate(start,i)), events = days.map(date => calendarEntriesForDate(entries,date)), layouts = events.map(items => layoutTimedEvents(items.filter(e => e.timed)));
+    const s=plannerSettings(this.plugin.data),origin=s.startHour*60,span=(s.endHour-s.startHour)*60,days = Array.from({length:7},(_,i) => shiftDate(start,i)).filter(date=>s.showWeekends||weekdayOf(date)<5), events = days.map(date => calendarEntriesForDate(entries,date)), layouts = events.map(items => layoutTimedEvents(items.filter(e => e.timed)));
     const widths = layouts.map(items => Math.max(210, Math.max(1,...items.map(e=>e.columns)) * 175));
     const scroller = parent.createDiv('tp-agenda-scroll'); scroller.setAttribute('aria-label','Weekly schedule');
     const grid = scroller.createDiv('tp-agenda-grid'); grid.style.gridTemplateColumns = '58px ' + widths.map(w=>'minmax('+w+'px,1fr)').join(' ');
@@ -1171,16 +1275,16 @@ class PlannerView extends ItemView {
     grid.createDiv({text:'Local time',cls:'tp-agenda-heading tp-agenda-corner'});
     for(const date of days) { const heading=grid.createDiv('tp-agenda-heading'+(date===dayKey()?' is-today':''));heading.createDiv({text:new Date(date+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short'}),cls:'tp-agenda-weekday'});heading.createDiv({text:shortDate(date),cls:'tp-agenda-date'}); }
     grid.createDiv({text:'All day',cls:'tp-agenda-all-label'});
-    for(let i=0;i<7;i++){const day=grid.createDiv('tp-agenda-all-day');day.setAttribute('data-all-day-date',days[i]);this.calendarDrop(day,days[i]);for(const entry of events[i].filter(e=>!e.timed))this.renderCalendarEvent(day,entry);}
-    const hours = grid.createDiv('tp-agenda-hours');hours.style.height = (1440*CALENDAR_PX_PER_MINUTE)+'px';
-    for(let h=0;h<24;h++){const label=hours.createDiv({text:String(h).padStart(2,'0')+':00',cls:'tp-agenda-hour'});label.style.top=(h*60*CALENDAR_PX_PER_MINUTE)+'px';}
-    for(let i=0;i<7;i++){
-      const day=grid.createDiv('tp-agenda-day'+(days[i]===dayKey()?' is-today':''));day.setAttribute('data-calendar-date',days[i]);day.style.height=(1440*CALENDAR_PX_PER_MINUTE)+'px';this.calendarDrop(day,days[i],true);
-      for(const entry of layouts[i]) this.renderTimedEvent(day,entry);
+    for(let i=0;i<days.length;i++){const day=grid.createDiv('tp-agenda-all-day');day.setAttribute('data-all-day-date',days[i]);this.calendarDrop(day,days[i]);for(const entry of events[i].filter(e=>!e.timed))this.renderCalendarEvent(day,entry);}
+    const hours = grid.createDiv('tp-agenda-hours');hours.style.height = (span*this.calendarPixels)+'px';
+    for(let h=s.startHour;h<s.endHour;h++){const label=hours.createDiv({text:String(h).padStart(2,'0')+':00',cls:'tp-agenda-hour'});label.style.top=((h*60-origin)*this.calendarPixels)+'px';}
+    for(let i=0;i<days.length;i++){
+      const day=grid.createDiv('tp-agenda-day'+(days[i]===dayKey()?' is-today':''));day.setAttribute('data-calendar-date',days[i]);day.style.height=(span*this.calendarPixels)+'px';day.setAttribute('data-time-origin',String(origin));day.style.overflow='hidden';day.style.backgroundSize='100% '+s.hourHeight+'px,100% '+(s.hourHeight*this.calendarStep/60)+'px';this.calendarDrop(day,days[i],true);
+      for(const entry of layouts[i].filter(entry=>entry.endMinute>origin&&entry.startMinute<s.endHour*60)) this.renderTimedEvent(day,entry);
     }
     const saved = this.calendarTimelineScroll;
     const firstStart = layouts.flat().length ? Math.floor(Math.min(...layouts.flat().map(e=>e.startMinute))/60)*60 : 7*60;
-    scroller.scrollTop = saved == null ? firstStart*CALENDAR_PX_PER_MINUTE : saved;
+    scroller.scrollTop = saved == null ? Math.max(0,firstStart-origin)*this.calendarPixels : saved;
     scroller.onscroll = () => { this.calendarTimelineScroll = scroller.scrollTop; };
   }
   eventText(item, entry, label, compact = false) {
@@ -1215,27 +1319,27 @@ class PlannerView extends ItemView {
       if(target.closest('[data-unscheduled-dropzone]')){await this.plugin.clearCalendarDate(entry.task.id,entry.kind,entry.subtaskId);return;}
       const day=target.closest('[data-calendar-date], [data-all-day-date]');if(!day)return;
       const date=day.getAttribute('data-calendar-date')||day.getAttribute('data-all-day-date');
-      if(day.classList.contains('tp-agenda-day')&&entry.kind==='task'){const box=day.getBoundingClientRect(),minute=Math.max(0,Math.min(1425,Math.round((e.clientY-box.top)/CALENDAR_PX_PER_MINUTE/15)*15));await this.plugin.moveTimedTask(entry.task.id,date,minute);}
+      if(day.classList.contains('tp-agenda-day')&&entry.kind==='task'){const box=day.getBoundingClientRect(),minute=Math.max(0,Math.min(1440-this.calendarStep,Number(day.getAttribute('data-time-origin')||0)+Math.round((e.clientY-box.top)/this.calendarPixels/this.calendarStep)*this.calendarStep));await this.plugin.moveTimedTask(entry.task.id,date,minute);}
       else await this.plugin.reschedule(entry.task.id,entry.kind,entry.subtaskId,date);
     };
     item.onpointercancel=()=>{drag=null;clean();};item.onlostpointercapture=()=>{if(drag){drag=null;clean();}};
   }
   renderTimedEvent(parent, entry) {
     const box=parent.createDiv('tp-scheduled-event tp-priority-'+(PRIORITIES.find(p=>p.name===entry.task.priority)?.key||'mid'));box.setAttribute('data-schedule-id',entry.task.id);
-    const paint=(start,end)=>{box.style.top=(start*CALENDAR_PX_PER_MINUTE)+'px';box.style.height=((end-start)*CALENDAR_PX_PER_MINUTE)+'px';if(end-start<30)box.addClass('is-short');else box.removeClass('is-short');};paint(entry.startMinute,entry.endMinute);
+    const paint=(start,end)=>{box.style.top=((start-Number(parent.getAttribute('data-time-origin')||0))*this.calendarPixels)+'px';box.style.height=((end-start)*this.calendarPixels)+'px';if(end-start<30)box.addClass('is-short');else box.removeClass('is-short');};paint(entry.startMinute,entry.endMinute);
     box.style.left='calc('+100*entry.column/entry.columns+'% + 5px)';box.style.width='calc('+100/entry.columns+'% - 10px)';
     const item=button(box,'',()=>{if(Date.now()<(this.suppressCalendarClickUntil||0))return;new TaskModal(this.app,this.plugin,entry.task.id).open();},'tp-calendar-event tp-timed-event'+(taskOverdue(entry.task)?' is-overdue':''));
     const range=entry.range,label=(entry.continuesBefore?'← '+shortDate(range.startDate)+' ':'')+(entry.continuesBefore?'00:00':range.startTime)+' – '+(entry.continuesAfter?'24:00 → '+shortDate(range.endDate):range.endTime);
     this.eventText(item,entry,label,true);
     for(const edge of ['start','end'].filter(edge=>edge==='start'?!entry.continuesBefore:!entry.continuesAfter)){
-      const handle=button(box,'',()=>{},'tp-resize-handle tp-resize-'+edge);handle.setAttribute('aria-label','Resize '+edge+' of '+entry.task.title);handle.title='Drag to resize '+edge+' · 15-minute steps. Arrow keys adjust by 15 minutes.';handle.draggable=false;
+      const handle=button(box,'',()=>{},'tp-resize-handle tp-resize-'+edge);handle.setAttribute('aria-label','Resize '+edge+' of '+entry.task.title);handle.title='Drag to resize '+edge+' · '+this.calendarStep+'-minute steps. Arrow keys adjust by '+this.calendarStep+' minutes.';handle.draggable=false;
       let drag=null;
       const cancel=()=>{if(!drag)return;drag=null;box.removeClass('is-resizing');paint(entry.startMinute,entry.endMinute);const time=item.querySelector('.tp-calendar-event-time');if(time)time.textContent=label;item.title=entry.task.title+'\n'+label;};
       handle.onpointerdown=e=>{if(e.button!=null&&e.button!==0)return;e.preventDefault();e.stopPropagation();drag={y:e.clientY,delta:0,expected:scheduleKey(calendarSourceTask(entry)),id:e.pointerId};try{handle.setPointerCapture?.(e.pointerId);}catch{cancel();return;}box.addClass('is-resizing');};
-      handle.onpointermove=e=>{if(!drag)return;e.preventDefault();drag.delta=Math.round((e.clientY-drag.y)/CALENDAR_PX_PER_MINUTE/15)*15;const updated=resizeRange(entry.task,edge,drag.delta),current=calendarEntriesForDate([{...entry,task:{...entry.task,...updated}}],entry.date)[0];if(current)paint(current.startMinute,current.endMinute);const time=item.querySelector('.tp-calendar-event-time');if(time)time.textContent=updated.startTime+' – '+updated.dueTime;item.title=updated.startDate+' '+updated.startTime+' – '+updated.due+' '+updated.dueTime;};
+      handle.onpointermove=e=>{if(!drag)return;e.preventDefault();drag.delta=Math.round((e.clientY-drag.y)/this.calendarPixels/this.calendarStep)*this.calendarStep;const updated=resizeRange(entry.task,edge,drag.delta,this.calendarStep),current=calendarEntriesForDate([{...entry,task:{...entry.task,...updated}}],entry.date)[0];if(current)paint(current.startMinute,current.endMinute);const time=item.querySelector('.tp-calendar-event-time');if(time)time.textContent=updated.startTime+' – '+updated.dueTime;item.title=updated.startDate+' '+updated.startTime+' – '+updated.due+' '+updated.dueTime;};
       handle.onpointerup=async e=>{if(!drag)return;e.preventDefault();e.stopPropagation();const change=drag;drag=null;box.removeClass('is-resizing');try{handle.releasePointerCapture?.(change.id);}catch{}this.suppressCalendarClickUntil=Date.now()+300;if(change.delta)await this.plugin.resizeTask(entry.task.id,edge,change.delta,change.expected);else paint(entry.startMinute,entry.endMinute);};
       handle.onpointercancel=cancel;handle.onlostpointercapture=cancel;
-      handle.onkeydown=e=>{if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();void this.plugin.resizeTask(entry.task.id,edge,e.key==='ArrowUp'?-15:15,scheduleKey(calendarSourceTask(entry)));}};
+      handle.onkeydown=e=>{if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();void this.plugin.resizeTask(entry.task.id,edge,e.key==='ArrowUp'?-this.calendarStep:this.calendarStep,scheduleKey(calendarSourceTask(entry)));}};
     }
   }
   renderCalendarEvent(parent, entry, showDate = false) {
@@ -1323,7 +1427,7 @@ class PlannerView extends ItemView {
       const lane = board.createDiv('tp-lane ' + (field === 'priority' ? 'tp-priority-' : 'tp-') + col.key);
       lane.setAttribute('data-value', col.name);
       const head = lane.createDiv('tp-lane-head'); symbolLabel(head.createEl('h3'), col); head.createSpan({ text: String(tasks.length), cls: 'tp-count' });
-      if (field === 'status' && col.key === 'done') lane.createDiv({ text: "Automatically archived after 24 hours", cls: 'tp-lane-hint' });
+      if (field === 'status' && col.key === 'done') lane.createDiv({ text: plannerSettings(this.plugin.data).autoArchive?'Automatically archived after '+plannerSettings(this.plugin.data).archiveHours+' hours':'Automatic archiving disabled', cls: 'tp-lane-hint' });
       lane.ondragover = e => { if (e.dataTransfer?.types.includes('application/x-tagesplaner')) { e.preventDefault(); lane.addClass('tp-over'); } };
       lane.ondragleave = e => { if (!lane.contains(e.relatedTarget)) lane.removeClass('tp-over'); };
       lane.ondrop = e => {
@@ -1372,7 +1476,7 @@ class PlannerView extends ItemView {
     });
   }
   renderCard(parent, task, archived) {
-    const expanded = this.expanded.has(task.id), card = parent.createDiv('tp-card tp-card-compact' + (expanded ? ' is-expanded' : ' is-collapsed'));
+    const expanded = this.expanded.has(task.id), card = parent.createDiv('tp-card'+(plannerSettings(this.plugin.data).compactCards?' tp-card-compact':'') + (expanded ? ' is-expanded' : ' is-collapsed'));
     card.setAttribute('data-task-id', task.id);
     const title = card.createDiv('tp-card-head'); title.createEl('h4', { text: task.title, cls: 'tp-title' });
     if (!archived) {
@@ -1385,7 +1489,7 @@ class PlannerView extends ItemView {
     const series = this.plugin.data.recurrences.find(s => s.id === task.recurrenceId);
     if (series) meta.createSpan({ text: series.enabled ? (series.mode==='continuous-weekly'?'↻ '+WEEKDAYS[series.weekday]:'↻ Recurring') : '↻ Paused', cls: 'tp-badge' });
     const description = card.createDiv('tp-description-section'); description.createDiv({ text: task.note || 'No description yet.', cls: 'tp-description' });
-    const sub = card.createDiv('tp-compact-subtasks');
+    const sub = card.createDiv('tp-compact-subtasks');sub.hidden=!expanded&&!plannerSettings(this.plugin.data).showSubtasks;
     if (task.subtasks.length) {
       sub.createDiv({ text: 'Subtasks · ' + task.subtasks.filter(s => s.done).length + '/' + task.subtasks.length, cls: 'tp-section-title' });
       for (const item of task.subtasks) {
@@ -1421,7 +1525,7 @@ class PlannerView extends ItemView {
       if (task.status === 'Waiting') details.createDiv({ text: 'Waiting for: ' + (task.waitingFor || 'Pending response') + (task.followUpDate ? ' · Follow up ' + shortDate(task.followUpDate) : ''), cls: 'tp-muted' });
       if (task.createdAt) details.createDiv({ text: 'Created ' + timeText(task.createdAt), cls: 'tp-muted' });
       if (task.completedAt) details.createDiv({ text: task.completionDateEstimated ? 'Completed before the update' : 'Completed ' + timeText(task.completedAt), cls: 'tp-muted' });
-      if (archived) { details.createDiv({ text: 'Archived ' + timeText(task.archivedAt), cls: 'tp-muted' }); details.createDiv({text:'Permanently deleted after '+timeText(archiveDeleteAt(task.archivedAt)),cls:'tp-muted'}); }
+      if (archived) { details.createDiv({ text: 'Archived ' + timeText(task.archivedAt), cls: 'tp-muted' }); details.createDiv({text:(plannerSettings(this.plugin.data).archiveCleanup?'Permanently deleted after ':'Automatic deletion disabled · previously archived ')+timeText(plannerSettings(this.plugin.data).archiveCleanup?archiveDeleteAt(task.archivedAt,plannerSettings(this.plugin.data).archiveMonths):task.archivedAt),cls:'tp-muted'}); }
       details.createDiv({ text: 'Activity history', cls: 'tp-section-title' });
       if (!task.worklog.length) details.createDiv({ text: 'No activity recorded yet.', cls: 'tp-muted' });
       for (const entry of [...task.worklog].reverse()) { const row = details.createDiv('tp-log-entry'); row.createDiv({ text: entry.text, cls: 'tp-log-text' }); row.createEl('time', { text: timeText(entry.at), cls: 'tp-muted' }); }
@@ -1435,7 +1539,7 @@ class PlannerView extends ItemView {
   }
   renderArchive(parent) {
     const tools = parent.createDiv('tp-archive-tools'); tools.createEl('h3', { text: "Your archive" });
-    tools.createDiv({ text: "Archived tasks are permanently deleted two calendar months after archiving, including their subtasks and activity. Cleanup runs while the plugin is open, or on the next start.", cls: 'tp-muted' });
+    tools.createDiv({ text: "Archive and Trash retention are configured in Settings → Archive & Trash. Cleanup runs while the plugin is open, or on the next start.", cls: 'tp-muted' });
     const input = tools.createEl('input', { type: 'search', attr: { placeholder: "Search archive …", 'aria-label': "Search archive" } }); input.value = this.archiveSearch;
     const grid = parent.createDiv('tp-archive-grid');
     const draw = () => {
@@ -1506,12 +1610,32 @@ module.exports = class TagesplanerPlugin extends Plugin {
     this.addCommand({ id: 'calendar', name: "Open week and calendar view", callback: () => this.activate('calendar') });
     this.addCommand({ id: 'trash', name: "Open Trash", callback: () => this.activate('trash') });
     this.addCommand({ id: 'projects', name: "Open project view", callback: () => this.activate('projects') });
+    this.addCommand({id:'settings',name:'Open settings',callback:()=>this.activate('settings')});
     this.addCommand({ id: 'reminders', name: "Check reminders now", callback: () => this.checkReminders(Date.now(), true) });
     await this.runMaintenance(); await this.checkReminders(); this.lastDay = dayKey();
     this.registerInterval(window.setInterval(() => {
       void this.tick();
     }, 60000));
   }
+  async writeBackup(data) {
+    const snapshot=copy(data),adapter=this.app.vault?.adapter;if(!adapter)throw new Error('Vault storage is unavailable.');
+    const folder=(this.app.vault.configDir||'.obsidian')+'/plugins/'+(this.manifest?.id||'tagesplaner')+'/backups';
+    if(!await adapter.exists(folder))await adapter.mkdir(folder);
+    const path=folder+'/daily-planner-'+new Date().toISOString().replace(/[:.]/g,'-')+'-'+uid()+'.json';await adapter.write(path,JSON.stringify(snapshot,null,2));return path;
+  }
+  exportData() {
+    const json=JSON.stringify(this.data,null,2);
+    if(typeof document!=='undefined'&&typeof Blob!=='undefined'&&typeof URL?.createObjectURL==='function'){
+      const url=URL.createObjectURL(new Blob([json],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download='daily-planner-'+dayKey()+'.json';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }
+    return json;
+  }
+  importData(raw) {
+    const operation=this.queue.then(async()=>{
+      const before=copy(this.data);try{const incoming=importablePlannerData(raw);if(plannerSettings(before).backupBeforeImport)await this.writeBackup(before);await this.saveData(copy(incoming));this.data=incoming;this.refreshViews();new Notice('Backup imported.');return true;}catch(error){this.data=before;new Notice('Import cancelled: '+error.message);return false;}
+    });this.queue=operation.catch(error=>console.error(error));return operation;
+  }
+
   refreshViews() { this.app.workspace.getLeavesOfType(VIEW).forEach(leaf => leaf.view.render()); }
   mutate(change) {
     const operation = this.queue.then(async () => {
@@ -1547,7 +1671,8 @@ module.exports = class TagesplanerPlugin extends Plugin {
       if (!this.data.reminderSettings.enabled) { if (force) new Notice("Due date reminders are disabled."); return false; }
       const today = dayKey(now), lastDate = shiftDate(today, this.data.reminderSettings.leadDays);
       const seen = new Set(this.data.reminderState.day === today ? this.data.reminderState.seen : []);
-      const eligible = attentionEntries(this.data,today,lastDate).filter(e => e.date <= lastDate && (!e.time || this.data.reminderSettings.leadDays > 0 || entryOverdue(e, now)) && this.data.projects.find(p => p.id === e.task.projectId)?.remindersEnabled !== false);
+      const reminderOptions=plannerSettings(this.data);
+      const eligible = attentionEntries(this.data,today,lastDate).filter(e => (e.kind==='task'?reminderOptions.remindTasks:e.kind==='subtask'?reminderOptions.remindSubtasks:reminderOptions.remindWaiting) && e.date <= lastDate && (!e.time || this.data.reminderSettings.leadDays > 0 || entryOverdue(e, now)) && this.data.projects.find(p => p.id === e.task.projectId)?.remindersEnabled !== false);
       const fresh = force ? eligible : eligible.filter(e => !seen.has(reminderKey(e, now)));
       if (!fresh.length) { if (force) new Notice("No upcoming or overdue items."); return false; }
       const before = copy(this.data.reminderState); fresh.forEach(e => seen.add(reminderKey(e, now)));
@@ -1597,13 +1722,13 @@ module.exports = class TagesplanerPlugin extends Plugin {
     });
   }
   resizeTask(id, edge, delta, expected = null) {
-    return this.mutate(data=>{const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done')throw new Error('This event is no longer editable.');if(expected&&scheduleKey(task)!==expected)throw new Error('This schedule has changed. Please try again.');const previous=taskRange(task);Object.assign(task,resizeRange(task,edge,delta),{updatedAt:Date.now()});syncChangedWeeklyRange(data,task,previous);});
+    return this.mutate(data=>{const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done')throw new Error('This event is no longer editable.');if(expected&&scheduleKey(task)!==expected)throw new Error('This schedule has changed. Please try again.');const previous=taskRange(task);Object.assign(task,resizeRange(task,edge,delta,Number(plannerSettings(data).gridMinutes)),{updatedAt:Date.now()});syncChangedWeeklyRange(data,task,previous);});
   }
   setScheduleEdgeDate(id, edge, date, expected = null, occurrenceStart = null) {
     return this.mutate(data=>{const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done'||!validDate(date)||!['start','end'].includes(edge))throw new Error('This event cannot be resized.');if(expected&&scheduleKey(task)!==expected)throw new Error('This schedule has changed.');const range=taskRange(task);if(!range)throw new Error('An end date is required.');if(task.weeklyRecurrence&&validDate(occurrenceStart))date=shiftDate(date,-daysBetween(range.startDate,occurrenceStart));const next={...task,startDate:range.startDate,...(edge==='start'?{startDate:date}:{due:date})};Object.assign(task,resolveSchedule(next),edge==='start'?{startDate:date}:{due:date},{updatedAt:Date.now()});syncChangedWeeklyRange(data,task,range);});
   }
   moveTimedTask(id,date,minute) {
-    return this.mutate(data=>{const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done'||!validDate(date)||!Number.isInteger(minute)||minute<0||minute>1425)throw new Error('This event cannot be moved.');const range=taskRange(task),start=wallValue(date)+minute,end=start+(range?.timed?range.end-range.start:60),a=wallParts(start),b=wallParts(end);Object.assign(task,{startDate:a.date,startTime:a.time,due:b.date,dueTime:b.time,updatedAt:Date.now()});syncChangedWeeklyRange(data,task,range);});
+    return this.mutate(data=>{const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done'||!validDate(date)||!Number.isInteger(minute)||minute<0||minute>1439)throw new Error('This event cannot be moved.');const range=taskRange(task),start=wallValue(date)+minute,end=start+(range?.timed?range.end-range.start:plannerSettings(data).defaultDuration),a=wallParts(start),b=wallParts(end);Object.assign(task,{startDate:a.date,startTime:a.time,due:b.date,dueTime:b.time,updatedAt:Date.now()});syncChangedWeeklyRange(data,task,range);});
   }
   changeStatus(id, status) { if(status==='Done'&&this.data.tasks.find(t=>t.id===id)?.weeklyRecurrence?.enabled){new Notice('Weekly tasks stay open. Pause the recurrence before completing this task.');return Promise.resolve(false);}return this.mutate(data => { const task = data.tasks.find(t => t.id === id); if (!task || task.deletedAt) throw new Error("Task not found."); setStatus(task, status); }); }
   changePriority(id, priority) {
@@ -1637,7 +1762,7 @@ module.exports = class TagesplanerPlugin extends Plugin {
   async activate(tab = 'home') {
     let leaf = this.app.workspace.getLeavesOfType(VIEW)[0];
     if (!leaf) { leaf = this.app.workspace.getLeaf(true); await leaf.setViewState({ type: VIEW, active: true }); }
-    leaf.view.tab = tab; leaf.view.render(); await this.app.workspace.revealLeaf(leaf);
+    leaf.view.tab = tab;leaf.view.sidebarOpen=plannerSettings(this.data).sidebarDefault;if(tab==='calendar')leaf.view.calendarMode=plannerSettings(this.data).calendarView; leaf.view.render(); await this.app.workspace.revealLeaf(leaf);
   }
   onunload() { this.app.workspace.detachLeavesOfType(VIEW); }
 };

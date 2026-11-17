@@ -1,6 +1,6 @@
 # Daily Planner for Obsidian
 
-Version **1.15.1** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
+Version **1.16.0** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
 
 ## Install or update with BRAT
 
@@ -8,9 +8,32 @@ In Obsidian, open **BRAT → Add Beta plugin** and enter `Janosch3000/Daily-Plan
 
 For updates, check for plugin updates in BRAT, then reload the plugin or restart Obsidian. Existing data is preserved. The plugin ID and data location remain `tagesplaner`; changing the display name does not create a second installation.
 
+## Central settings
+
+Open the **Settings** gear tile on Home, **Tools → Settings**, or the **Open settings** command. Search across categories, edit preferences, then choose **Save settings**. **Discard changes**, **Reset this section** and **Reset all settings** are separate actions. Unsaved appearance changes affect the example card only. Existing task content is not rewritten when defaults change.
+
+- **Home:** hide and reorder all tool cards, show/hide the overview and upcoming preview, choose 1–20 preview tasks and a 1–365-day horizon, and set the tile column count. Settings remains accessible even if other tiles are hidden.
+- **Tasks:** default priority, status and optional project; compact cards and collapsed subtask visibility. New-task defaults also apply to new templates; applying an existing template still uses its saved values.
+- **Calendar:** default Week/Month, week starting Monday/Sunday/Saturday, weekend visibility, first/last visible hour, 5/10/15/30/60-minute snap and resize steps, default appointment length and hour height. Visible hours crop Week only; out-of-hours entries remain in Month and Edit. Heights remain proportional to actual durations.
+- **Recurrence:** default none/daily/weekly/monthly, weekday and interval. A new recurring-task shortcut uses Weekly when the default is None. Existing rules remain unchanged.
+- **Reminders:** global enabled state, 0–30 days of advance notice and separate task, subtask and Waiting-follow-up switches. Existing enabled/lead settings migrate unchanged. Project-specific reminder permissions continue to apply.
+- **Archive & Trash:** enable/disable automatic archiving and choose hours after Done; enable/disable archive deletion and choose calendar-month retention; optionally clean Trash after a selected number of days. Defaults remain 24 hours, two calendar months, and no automatic Trash cleanup. These rules apply to existing eligible records on the next maintenance pass.
+- **Appearance:** inherited/light/dark theme; compact/comfortable/spacious spacing; inherited/system/serif/monospace font; interface, task-title, description and preview text sizes; line height; card padding, gap, radius and borders; board width and gaps; tile size and radius; icon size; button height and control rounding; background colour strength and shadows; hover outline and brightness; animations; description and metadata visibility; accent, four status colours and four priority colours. The live preview demonstrates card appearance before saving. Reduced-motion system preferences remain respected.
+- **Navigation:** mouse Back / Alt+Left and the default expanded sidebar state.
+- **New projects:** default project-only visibility, dashboard inclusion and reminder permission. Saved projects retain their own settings.
+- **Data & backup:** export all plugin data to JSON, create a vault backup, review/import JSON, choose whether a successful backup is required before import, and reset settings separately from content.
+
+### Backups and importing
+
+**Export all data** downloads a complete JSON file. Vault backups are stored under the vault's configuration folder, normally `.obsidian/plugins/tagesplaner/backups/`. They contain personal task data and should not be added to a public repository. Manual backups and exports are not automatically purged.
+
+Choose a JSON backup (up to 20 MB) or paste JSON, then **Review import**. A dialog shows task/project/template counts and requires **Import and replace data**. Import replaces the full plugin dataset. With the default backup option enabled, a backup write must succeed before replacement; a failure cancels the import. Invalid data and unsupported future versions are rejected. Settings reset never deletes tasks, projects, templates or history.
+
+Version 1.16.0 uses **data schema 4**. Earlier plugin versions refuse this format, protecting customised retention rules from being ignored by an older release. Keep a backup before updating or downgrading.
+
 ## Home page
 
-Opening Daily Planner with the ribbon or **Open Daily Planner** command opens **Home**. Large cards with coloured line icons lead to Tasks, Recurring tasks, Calendar, Projects, Dashboard, Templates, Archive and Trash. Two additional cards open recurrence settings and reminders. Cards show short descriptions and live counts where relevant.
+Opening Daily Planner with the ribbon or **Open Daily Planner** command opens **Home**. Large cards with coloured line icons lead to Tasks, Recurring tasks, Calendar, Projects, Dashboard, Templates, Archive and Trash. Cards also open Settings, recurrence management and central reminder preferences. Cards show short descriptions and live counts where relevant.
 
 Inside a tool, a large **Home** button at the top left returns here. **Tools** beside it expands a left sidebar for switching tools; selecting a tool closes it. The sidebar overlays the content on narrow panels. The plugin title and tagline are no longer rendered inside the planner. Home uses the full available content width and has no navigation header. Home itself has no Home button, sidebar toggle or task/template creation shortcuts. Within the planner content, the mouse Back button (button 3) returns from a tool to Home. Alt+Left is supported as well. The handler prevents the native Back action for the handled event sequence and is removed when the view closes; unrelated mouse buttons and Back on Home keep their normal behavior. Browser/Obsidian history is not modified. **+ Task** is available in Tasks, Calendar and Projects; **+ Recurring task** appears in Recurring tasks; **+ Template** appears only in Templates. Home, Dashboard, Archive and Trash have no task/template creation shortcuts. Creating a task from a template remains available in the task dialog. Switching through Home preserves task drafts, filters and board selections. Direct commands such as Open dashboard still open their named view. Home places a compact dashboard to the left of the tool cards and a Next up preview to their right. The dashboard shows open work, In Progress, due today, completed work in the last seven days, overdue/waiting counts and a small completion chart; project-only and dashboard-excluded tasks are omitted. Next up shows up to six distinct open tasks with scheduled ranges within the next 60 days, ordered by their start; completed, deleted, archived and project-only tasks are excluded. Weekly routines appear only once using their next occurrence. Preview clicks enter the task’s tool before opening Edit. With no upcoming tasks, a helpful empty state appears. The columns stack as the panel narrows, and tool cards adapt from two to one column and support keyboard navigation and the shared white hover/focus outline.
 
@@ -42,7 +65,7 @@ Statuses are **ToDo**, **In Progress**, **Waiting**, **Done**. Priorities are **
 
 **No due date** is a drop zone beside the calendar. It lists open, visible tasks without their own main end date. A task can be listed here even when one of its subtasks or its Waiting follow-up has a separate date. The list follows search/project/status/priority filters and excludes project-only, Done, archived and deleted tasks.
 
-- Drag a task from this list into a weekly time slot to create a one-hour range starting at the selected time, snapped to 15 minutes. Resize or edit the range afterwards.
+- Drag a task from this list into a weekly time slot to create a one-hour range starting at the selected time, snapped to the configured time grid. Resize or edit the range afterwards.
 - Drop onto the weekly all-day row or a Month day cell to assign that date without inventing clock times.
 - Drag a main task event back into No due date to clear its start date/time and end date/time. The task itself, its status, priority, project, description, subtasks and activity are kept.
 - Drag a subtask or follow-up entry into the zone to remove only that entry's date. Other dates on the parent task remain unchanged. Removing a child's date does not put an otherwise scheduled parent into the unscheduled list.
@@ -71,7 +94,7 @@ Overlapping events use separate columns. Busy days widen to retain readable even
 
 **Move:** drag a time block onto a date/time slot to move the whole range while preserving its duration. Dropping an all-day task into the time grid creates a one-hour timed range. Date-based moves, including in Month, preserve the existing times and number of days. Subtask and follow-up moves change only their own dates.
 
-**Resize timed events:** in Week, drag the small top handle to change the start or the bottom handle to change the end. Changes snap to 15-minute increments, with a minimum resized duration of 15 minutes. The time label previews the proposed range while dragging. Releasing saves it; cancelling the pointer gesture keeps the original schedule. Resize handles also support Arrow Up/Arrow Down for 15-minute changes. Edit remains available as an alternative.
+**Resize timed events:** in Week, drag the small top handle to change the start or the bottom handle to change the end. Changes snap to the configured time grid (15 minutes by default), with a minimum resized duration of one grid step. The time label previews the proposed range while dragging. Releasing saves it; cancelling the pointer gesture keeps the original schedule. Resize handles also support Arrow Up/Arrow Down for one-grid-step changes. Edit remains available as an alternative.
 
 **Resize dates:** all-day entries and Month entries have small date handles. Drag the start or end handle onto another day to extend or shorten that boundary without moving the other one. Clicking a date handle opens Edit. Timed Month entries preserve their clocks while their dates change; use Week or Edit for precise time adjustments.
 
@@ -102,17 +125,17 @@ Removing a project preserves tasks, templates and future recurrence defaults, ch
 
 Trash shows every deleted task, including hidden projects, regardless of task filters. **Restore** restores the previous values. Previously archived tasks remain archived; hidden-project tasks remain in project views. A restored Done task retains its completion time and may therefore qualify for automatic archiving.
 
-**Delete permanently** opens a confirmation. Only confirming it removes the task's contents permanently. Trash is not emptied automatically. Deleting a shared weekly task pauses its rule and removes every projected entry. Restore resumes it if it was active before deletion; permanent deletion also removes its weekly rule. Deleting one daily/monthly occurrence does not pause that series. A minimal series/date key remains after permanent deletion of a daily/monthly occurrence to prevent recreating it; it contains no task content.
+**Delete permanently** opens a confirmation. Only confirming it removes the task's contents permanently. Trash is not emptied automatically unless you enable its retention rule in Settings. Deleting a shared weekly task pauses its rule and removes every projected entry. Restore resumes it if it was active before deletion; permanent deletion also removes its weekly rule. Deleting one daily/monthly occurrence does not pause that series. A minimal series/date key remains after permanent deletion of a daily/monthly occurrence to prevent recreating it; it contains no task content.
 
-Done tasks enter **Archive** after 24 elapsed hours, with their subtasks and activity. Archived tasks are **permanently deleted two calendar months after their archivedAt timestamp**, including all task content, subtasks and activity, without passing through Trash. The same local day/time is used; if the target month lacks that day, its last day is used. This applies to existing archived tasks and project archives, regardless of filters or project visibility. Cleanup runs on startup/opening and every minute while the plugin is loaded; overdue cleanup is performed the next time Obsidian runs. Reopened tasks are no longer archived and are not deleted; archiving them again starts a new retention period. Tasks currently in Trash are excluded. Failed saves roll the cleanup back and are retried. A minimal daily/monthly recurrence ID/date tombstone prevents deleted occurrences from being regenerated, while independent series continue; a deleted weekly owner’s rule is removed. **Reopen** returns them to ToDo. Historical Done tasks without completion dates receive an estimated date when first loaded and are excluded from retrospective completion charts.
+By default, Done tasks enter **Archive** after 24 elapsed hours, with their subtasks and activity. By default, archived tasks are **permanently deleted two calendar months after their archivedAt timestamp**, including all task content, subtasks and activity, without passing through Trash. The same local day/time is used; if the target month lacks that day, its last day is used. This applies to existing archived tasks and project archives, regardless of filters or project visibility. Cleanup runs on startup/opening and every minute while the plugin is loaded; overdue cleanup is performed the next time Obsidian runs. Reopened tasks are no longer archived and are not deleted; archiving them again starts a new retention period. Tasks currently in Trash are excluded. Failed saves roll the cleanup back and are retried. A minimal daily/monthly recurrence ID/date tombstone prevents deleted occurrences from being regenerated, while independent series continue; a deleted weekly owner’s rule is removed. **Reopen** returns them to ToDo. Historical Done tasks without completion dates receive an estimated date when first loaded and are excluded from retrospective completion charts.
 
 ## Reminders and Waiting
 
 Waiting tasks support a person/team and a follow-up date. The values survive status changes, but a follow-up is an open calendar entry only while the task is Waiting.
 
-Under **Calendar → Reminders**, enable notifications and choose 0, 1, 3 or 7 days of advance notice. The default is one day. Project reminder settings are respected. With zero advance notice, a timed task waits for its due time; all-day reminders remain date-based. With advance notice, a timed task can receive an upcoming reminder and another when its due time arrives. Each phase is limited to once per calendar day and remains deduplicated after restart. **Check now** may repeat eligible reminders explicitly.
+Under **Settings → Reminders** (also reachable via Calendar → Reminders), enable notifications and choose 0–30 days of advance notice. The default is one day. Project reminder settings are respected. With zero advance notice, a timed task waits for its due time; all-day reminders remain date-based. With advance notice, a timed task can receive an upcoming reminder and another when its due time arrives. Each phase is limited to once per calendar day and remains deduplicated after restart. **Check now** may repeat eligible reminders explicitly.
 
-Checks run on loading/opening and every minute while the plugin is loaded. Obsidian must be open and the plugin enabled; there are no background system notifications. Hidden projects can retain reminders independently; open those tasks in Projects.
+Checks run on loading/opening and every minute while the plugin is loaded. Reminder types can be enabled independently in central settings. Obsidian must be open and the plugin enabled; there are no background system notifications. Hidden projects can retain reminders independently; open those tasks in Projects.
 
 ## Templates and recurring tasks
 
@@ -144,11 +167,11 @@ All plugin-owned interface text, commands, dialogs, reminders and errors are Eng
 
 Search matches task titles, descriptions, subtasks, activity, waiting people and project names. Multiple words must all match. Combine status, priority, date and project filters. **Reset filters** clears them.
 
-Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.15.1 uses data schema 3 for shared weekly tasks. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
+Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.16.0 uses data schema 4 for central preferences and retention rules. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
 
-## Create release 1.15.1
+## Create release 1.16.0
 
-Create a GitHub release with tag **1.15.1**, target **main**, title **Daily Planner 1.15.1**. Attach these files individually:
+Create a GitHub release with tag **1.16.0**, target **main**, title **Daily Planner 1.16.0**. Attach these files individually:
 
 - `main.js`
 - `manifest.json`

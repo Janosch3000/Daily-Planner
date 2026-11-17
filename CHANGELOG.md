@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.16.0
+
+- Add central searchable Settings via a Home gear tile, sidebar entry and command. Include Home, Tasks, Calendar, Recurrence, Reminders, Archive/Trash, Appearance, Navigation, new-project defaults and Data/backup sections.
+- Provide extensive scoped appearance controls, custom status/priority colours and an isolated live preview; support section/all-settings reset without removing content.
+- Apply task/project defaults, Home ordering/visibility, preview settings and sidebar/Back preferences. Existing tasks and project settings remain intact.
+- Configure week start, weekends, visible hours, time scale, snap/resize steps and default appointment duration while preserving proportional event geometry.
+- Centralise reminders with type switches and 0–30 days of advance notice. Make archival and cleanup rules configurable, retaining the existing 24-hour/two-month defaults and optional Trash cleanup.
+- Export JSON, create vault backups and review imports. Require a successful pre-import backup by default; roll back on failure. Migrate to data schema 4 to protect settings from older releases.
+
+Release assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.16.0**.
+
+
 ## 1.15.1
 
 - Show + Task only in Tasks, Calendar and Projects, and + Recurring task in Recurring tasks.
