@@ -1,6 +1,6 @@
 # Daily Planner for Obsidian
 
-Version **1.16.0** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
+Version **1.16.1** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
 
 ## Install or update with BRAT
 
@@ -29,7 +29,7 @@ Open the **Settings** gear tile on Home, **Tools → Settings**, or the **Open s
 
 Choose a JSON backup (up to 20 MB) or paste JSON, then **Review import**. A dialog shows task/project/template counts and requires **Import and replace data**. Import replaces the full plugin dataset. With the default backup option enabled, a backup write must succeed before replacement; a failure cancels the import. Invalid data and unsupported future versions are rejected. Settings reset never deletes tasks, projects, templates or history.
 
-Version 1.16.0 uses **data schema 4**. Earlier plugin versions refuse this format, protecting customised retention rules from being ignored by an older release. Keep a backup before updating or downgrading.
+Version 1.16.1 uses **data schema 4**. Earlier plugin versions refuse this format, protecting customised retention rules from being ignored by an older release. Keep a backup before updating or downgrading.
 
 ## Home page
 
@@ -54,6 +54,8 @@ Pausing or choosing No recurrence on an existing recurring task pauses its serie
 ## Cards and subtasks
 
 Collapsed cards show the title, small priority/status/project labels, due date and optional time, a two-line description preview and all subtasks. Check or uncheck a subtask directly on the collapsed card. Changes are saved immediately and reflected in both Status and Priorities, project views, statistics and calendar entries. Add a subtask directly in the card’s **New subtask…** field, then press **+** or Enter. Remove any subtask with its trash icon, including completed subtasks. These controls remain available when the card is collapsed and work in regular, recurring and project views. Draft text survives board changes and failed saves; repeated submissions do not create duplicates. Archived subtasks are read-only.
+
+**Activity history** appears directly above **Show More** on each task card. Type into **What did you work on?**, then use **Add entry** or Ctrl+Enter (Cmd+Enter on macOS). Plain Enter adds a new line. Entries are appended with a timestamp and immediately appear in other views and dashboard activity. Draft text survives view changes and failed saves; repeated submissions are blocked while saving. Existing entries are shown when expanded. Archived cards remain read-only.
 
 **Show More** expands the full description, activity history and available creation/completion/archive information. Waiting details appear there as well. **Show Less** collapses the card again. Expansion is preserved while switching between task boards and during updates in the same view; it is not a saved preference across restarts.
 
@@ -167,11 +169,11 @@ All plugin-owned interface text, commands, dialogs, reminders and errors are Eng
 
 Search matches task titles, descriptions, subtasks, activity, waiting people and project names. Multiple words must all match. Combine status, priority, date and project filters. **Reset filters** clears them.
 
-Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.16.0 uses data schema 4 for central preferences and retention rules. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
+Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.16.1 uses data schema 4 for central preferences and retention rules. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
 
-## Create release 1.16.0
+## Create release 1.16.1
 
-Create a GitHub release with tag **1.16.0**, target **main**, title **Daily Planner 1.16.0**. Attach these files individually:
+Create a GitHub release with tag **1.16.1**, target **main**, title **Daily Planner 1.16.1**. Attach these files individually:
 
 - `main.js`
 - `manifest.json`

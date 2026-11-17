@@ -1526,9 +1526,22 @@ class PlannerView extends ItemView {
       if (task.createdAt) details.createDiv({ text: 'Created ' + timeText(task.createdAt), cls: 'tp-muted' });
       if (task.completedAt) details.createDiv({ text: task.completionDateEstimated ? 'Completed before the update' : 'Completed ' + timeText(task.completedAt), cls: 'tp-muted' });
       if (archived) { details.createDiv({ text: 'Archived ' + timeText(task.archivedAt), cls: 'tp-muted' }); details.createDiv({text:(plannerSettings(this.plugin.data).archiveCleanup?'Permanently deleted after ':'Automatic deletion disabled · previously archived ')+timeText(plannerSettings(this.plugin.data).archiveCleanup?archiveDeleteAt(task.archivedAt,plannerSettings(this.plugin.data).archiveMonths):task.archivedAt),cls:'tp-muted'}); }
-      details.createDiv({ text: 'Activity history', cls: 'tp-section-title' });
-      if (!task.worklog.length) details.createDiv({ text: 'No activity recorded yet.', cls: 'tp-muted' });
-      for (const entry of [...task.worklog].reverse()) { const row = details.createDiv('tp-log-entry'); row.createDiv({ text: entry.text, cls: 'tp-log-text' }); row.createEl('time', { text: timeText(entry.at), cls: 'tp-muted' }); }
+
+    }
+    const activity=card.createDiv('tp-card-activity');activity.createDiv({text:'Activity history'+(task.worklog.length?' · '+task.worklog.length:''),cls:'tp-section-title'});
+    if(expanded){
+      if(!task.worklog.length)activity.createDiv({text:'No activity recorded yet.',cls:'tp-muted'});
+      for(const entry of [...task.worklog].reverse()){const row=activity.createDiv('tp-log-entry');row.createDiv({text:entry.text,cls:'tp-log-text'});row.createEl('time',{text:timeText(entry.at),cls:'tp-muted'});}
+    }
+    if(!archived){
+      const key=task.id+':activity',form=activity.createEl('form',{cls:'tp-card-activity-form'});
+      const input=form.createEl('textarea',{attr:{placeholder:'What did you work on?','aria-label':'New activity for '+task.title}});input.rows=2;this.bindDraft(input,key);
+      const add=form.createEl('button',{text:'Add entry',type:'submit',cls:'tp-small-button tp-add-activity'});add.setAttribute('aria-label','Add activity to '+task.title);add.title='Add activity · Ctrl+Enter';this.registerDraftControl(key,add);
+      form.onsubmit=async e=>{e.preventDefault();const text=input.value.trim();if(!text||this.pendingDrafts.has(key))return false;this.drafts.set(key,input.value);
+        const ok=await this.saveDraft(task.id,'activity',current=>current.worklog.push({id:uid(),text,at:Date.now()}));
+        if(ok)for(const control of this.draftInputs.get(key)||[]){control.focus();break;}return ok;
+      };
+      input.onkeydown=e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();return form.onsubmit(e);}};
     }
     const actions = card.createDiv('tp-card-actions');
     const more = button(actions, expanded ? 'Show Less' : 'Show More', () => { if (this.expanded.has(task.id)) this.expanded.delete(task.id); else this.expanded.add(task.id); this.render(); }, 'tp-small-button tp-show-more');

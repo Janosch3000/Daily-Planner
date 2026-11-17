@@ -476,3 +476,10 @@
 .tp-root .tp-scheduled-event .tp-timed-event { background:color-mix(in srgb,var(--tp-tone) var(--tp-color-wash,10%),var(--background-primary)); }
 .tp-controls[data-tp-description=false] .tp-card .tp-description,.tp-controls[data-tp-projects=false] .tp-card .tp-project-badge,.tp-controls[data-tp-status=false] .tp-card .tp-status-tag,.tp-controls[data-tp-priority=false] .tp-card .tp-priority-tag { display:none; }
 
+
+.tp-card-activity { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--background-modifier-border); }
+.tp-card-activity>.tp-section-title { margin: 0 0 7px; }
+.tp-card-activity-form { display: flex; flex-direction: column; gap: 5px; align-items: flex-end; }
+.tp-card-activity-form textarea { display: block; width: 100%; min-height: 54px; resize: vertical; padding: 6px 8px; font-family: inherit; font-size: var(--tp-description-size,12px); line-height: var(--tp-line-height,1.5); }
+.tp-card-activity-form .tp-add-activity { margin: 0; font-size: 11px; padding: 4px 9px; height: auto; }
+.tp-card-activity>.tp-muted { font-size: 11px; }

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.16.1
+
+- Add an Activity history entry field directly above Show More on every editable task card, including collapsed, recurring and project cards.
+- Append timestamped entries with Add entry or Ctrl/Cmd+Enter. Preserve multiline text, drafts and failed-save retries; prevent double submissions.
+- Keep expanded history and archived cards read-only while synchronising new entries across views and dashboard activity.
+
+Release assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.16.1**.
+
+
 ## 1.16.0
 
 - Add central searchable Settings via a Home gear tile, sidebar entry and command. Include Home, Tasks, Calendar, Recurrence, Reminders, Archive/Trash, Appearance, Navigation, new-project defaults and Data/backup sections.
