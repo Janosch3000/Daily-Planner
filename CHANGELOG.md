@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.18.0
+
+- Add a Quick Add Home tile and command opening a separate desktop task window, using the full task editor and preserving unsaved input during background updates.
+- Add Pin actions and a searchable pin command. Pinned task windows share live task data, inline subtasks, Activity history and editing with the planner; duplicate windows are reused.
+- Add Desktop windows settings for size, position, remembered bounds and always-on-top defaults, plus a per-window toggle. Guard native controls by renderer identity and provide the built-in Obsidian command as a fallback when native access is unavailable.
+- Retain the 1.17.0 calendar improvements listed below, including the current-time line and appointment-sized drag previews.
+- Keep plugin ID and data schema unchanged. Desktop features require the vault to remain open; mobile keeps the main planner.
+
+Validation: 71 assertions using simulated Obsidian views and native-window bridges, covering task creation, drafts, rollback, activity, shared subtasks, duplicate opens, window identity, bounds, reload and lifecycle. Real Obsidian desktop-window testing remains pending because the local process runtime could not start.
+
+Release assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.18.0**.
+
+
+## 1.17.0
+
+- Add a blue current-time line and clock label in the weekly timeline, updated every minute and aligned to configured visible hours and scale.
+- Replace floating drag miniatures with event-sized previews anchored inside target calendar cells, including title, time and overlap width.
+- Use 30-minute unscheduled drag appointments by default, configurable separately from other appointment defaults. Preserve existing timed durations.
+- Share drop geometry with preview calculations, support pointer dragging from No due date, and clear previews on cancellation. Reject stale timed drops.
+
+Release assets: `main.js`, `manifest.json`, `styles.css`. Tag: **1.17.0**.
+
+
 ## 1.16.1
 
 - Add an Activity history entry field directly above Show More on every editable task card, including collapsed, recurring and project cards.

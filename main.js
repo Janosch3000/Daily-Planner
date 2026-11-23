@@ -1,5 +1,6 @@
 const { Plugin, ItemView, Modal, Notice } = require('obsidian');
 const VIEW = 'tagesplaner-view';
+const QUICK_VIEW = 'tagesplaner-quick-add', PIN_VIEW = 'tagesplaner-pinned-task';
 const DAY = 86400000;
 const COLS = [
   { name: 'ToDo', key: 'open', icon: 'square', glyph: '☐' }, { name: 'In Progress', key: 'progress', icon: 'construction', glyph: '🚧' },
@@ -18,6 +19,8 @@ const copy = value => JSON.parse(JSON.stringify(value));
 const uid = () => Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 11);
 const stamp = value => typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
 const SYMBOLS = {
+  pin: [['path',{d:'M9 3h6l-1 5 4 4v2h-5v7l-2-3v-4H6v-2l4-4z'}]],
+  quick: [['rect',{x:3,y:3,width:18,height:18,rx:4}],['path',{d:'M12 7v10M7 12h10'}]],
   gear: [['path',{d:'M10 3h4l1 3 3 1 3 3v4l-3 1-1 3-3 3h-4l-1-3-3-1-3-3v-4l3-1 1-3z'}],['circle',{cx:12,cy:12,r:3}]],
   palette: [['circle',{cx:12,cy:12,r:9}],['circle',{cx:8,cy:8,r:1}],['circle',{cx:15,cy:7,r:1}],['circle',{cx:17,cy:13,r:1}],['path',{d:'M7 15h4v4'}]],
   menu: [['path',{d:'M4 6h16M4 12h16M4 18h16'}]],
@@ -363,12 +366,13 @@ function templateFields(source = {}) {
     subtasks: Array.isArray(source.subtasks) ? source.subtasks.map(s => ({ title: String(s.title || '').trim(), dueInDays: offsetDays(s.dueInDays) })).filter(s => s.title) : []
   };
 }
-const HOME_TOOLS=['board','recurring','calendar','projects','dashboard','templates','archive','trash','settings','recurrence-settings','reminders'];
+const HOME_TOOLS=['quick-add','board','recurring','calendar','projects','dashboard','templates','archive','trash','settings','recurrence-settings','reminders'];
 // [key, label, kind, default, min/options, max, step]
 const SETTINGS_SECTIONS={
+  desktop:{name:'Desktop windows',icon:'pin',fields:[['quickWidth','Quick Add width (pixels)','number',480,320,1600],['quickHeight','Quick Add height (pixels)','number',720,300,1600],['pinWidth','Pinned task width (pixels)','number',400,300,1600],['pinHeight','Pinned task height (pixels)','number',620,240,1600],['desktopX','Initial horizontal position (pixels)','number',100,-20000,20000],['desktopY','Initial vertical position (pixels)','number',100,-20000,20000],['rememberDesktopBounds','Remember window size and position','boolean',true],['quickOnTop','Keep Quick Add always on top','boolean',false],['pinOnTop','Keep pinned tasks always on top','boolean',true]]},
   home:{name:'Home',icon:'home',fields:[['homeDashboard','Show overview','boolean',true],['homePreview','Show upcoming tasks','boolean',true],['previewCount','Preview task count','number',6,1,20],['previewDays','Preview horizon (days)','number',60,1,365],['homeColumns','Tool columns','select','auto',['auto','1','2','3','4']]]},
   tasks:{name:'Tasks',icon:'tasks',fields:[['defaultPriority','Default priority','select','mid',['low','mid','high','immediately']],['defaultStatus','Default status','select','ToDo',['ToDo','In Progress','Waiting']],['defaultProject','Default project','project',''],['compactCards','Compact cards','boolean',true],['showSubtasks','Show subtasks on collapsed cards','boolean',true]]},
-  calendar:{name:'Calendar',icon:'calendar',fields:[['calendarView','Default calendar view','select','week',['week','month']],['weekStart','Week starts on','select','0',[['0','Monday'],['6','Sunday'],['5','Saturday']]],['showWeekends','Show weekends','boolean',true],['startHour','First visible hour','number',0,0,23],['endHour','Last visible hour','number',24,1,24],['gridMinutes','Time grid / resize step (minutes)','select','15',['5','10','15','30','60']],['defaultDuration','Default appointment duration (minutes)','number',60,5,480,5],['hourHeight','Hour height (pixels)','number',72,48,160,4]]},
+  calendar:{name:'Calendar',icon:'calendar',fields:[['calendarView','Default calendar view','select','week',['week','month']],['weekStart','Week starts on','select','0',[['0','Monday'],['6','Sunday'],['5','Saturday']]],['showWeekends','Show weekends','boolean',true],['startHour','First visible hour','number',0,0,23],['endHour','Last visible hour','number',24,1,24],['gridMinutes','Time grid / resize step (minutes)','select','15',['5','10','15','30','60']],['dragDuration','Unscheduled drag duration (minutes)','number',30,5,480,5],['defaultDuration','Default appointment duration (minutes)','number',60,5,480,5],['hourHeight','Hour height (pixels)','number',72,48,160,4]]},
   recurrence:{name:'Recurrence',icon:'repeat',fields:[['defaultFrequency','Default recurrence','select','none',['none','daily','weekly','monthly']],['defaultWeekday','Default weekly weekday','select','today',[['today','Today'],...WEEKDAYS.map((day,i)=>[String(i),day])]],['defaultInterval','Default recurrence interval','number',1,1,365]]},
   reminders:{name:'Reminders',icon:'bell',fields:[['remindTasks','Task reminders','boolean',true],['remindSubtasks','Subtask reminders','boolean',true],['remindWaiting','Waiting follow-up reminders','boolean',true]]},
   archive:{name:'Archive & Trash',icon:'archive',fields:[['autoArchive','Automatically archive Done tasks','boolean',true],['archiveHours','Hours after Done before archiving','number',24,0,8760],['archiveCleanup','Automatically delete old archived tasks','boolean',true],['archiveMonths','Archive retention (calendar months)','number',2,1,120],['trashCleanup','Automatically empty old Trash entries','boolean',false],['trashDays','Trash retention (days)','number',30,1,3650]]},
@@ -1001,6 +1005,7 @@ class PlannerView extends ItemView {
     this.backRoot=null;this.backHandler=null;this.backMouseUntil=0;
   }
   render() {
+    this.clearCalendarPreview();this.calendarAllDayHosts=null;this.calendarNowTargets=null;this.calendarNowLabel=null;
     this.draftInputs = new Map(); this.draftControls = new Map();
     if (!['all', 'none'].includes(this.filters.project) && !this.plugin.data.projects.some(p => p.id === this.filters.project)) this.filters.project = 'none';
     const root = this.contentEl || this.containerEl.children[1];
@@ -1112,6 +1117,7 @@ class PlannerView extends ItemView {
     const archive=this.plugin.data.tasks.filter(task=>!task.deletedAt&&task.archivedAt&&!projectOnlyTask(this.plugin.data,task)).length;
     const count=(n,one,many=one+'s')=>n+' '+(n===1?one:many);
     const tools=[
+      {id:'quick-add',name:'Quick Add',icon:'quick',tone:'blue',description:'Capture a task in a separate desktop window.',detail:'Desktop · assign a hotkey in Obsidian',action:()=>this.plugin.openDesktop('quick')},
       {id:'board',name:'Tasks',icon:'tasks',tone:'blue',description:'Organise everyday work by status and priority.',detail:count(tasks.filter(task=>!isRecurringTask(this.plugin.data,task)).length,'open task')},
       {id:'recurring',name:'Recurring tasks',icon:'repeat',tone:'purple',description:'Keep your daily, weekly and monthly routines together.',detail:count(tasks.filter(task=>isRecurringTask(this.plugin.data,task)).length,'open routine')},
       {id:'calendar',name:'Calendar',icon:'calendar',tone:'green',description:'Plan your week, move appointments and shape your schedule.',detail:'Week & month views'},
@@ -1214,7 +1220,7 @@ class PlannerView extends ItemView {
     const draw = () => {
       target.empty(); const range = calendarRange(this.calendarDate, this.calendarMode,plannerSettings(this.plugin.data).weekStart);
       const allowed = new Set(this.plugin.data.tasks.filter(t => !t.deletedAt && !projectOnlyTask(this.plugin.data, t) && taskMatches(t, { ...this.filters, due: 'all' }, this.plugin.data)).map(t => t.id));
-      const entries = attentionEntries(this.plugin.data,range.start,shiftDate(range.start,range.days-1)).filter(e => allowed.has(e.task.id));
+      const entries = attentionEntries(this.plugin.data,range.start,shiftDate(range.start,range.days-1)).filter(e => allowed.has(e.task.id));this.calendarVisibleEntries=entries;
       const label = this.calendarMode === 'month' ? new Date(this.calendarDate + 'T12:00:00').toLocaleDateString("en-GB", { month: 'long', year: 'numeric' }) : shortDate(range.start) + ' – ' + shortDate(shiftDate(range.start, 6));
       target.createEl('h3', { text: label, cls: 'tp-calendar-period' });
       const workspace=target.createDiv('tp-calendar-workspace'),calendarHost=workspace.createDiv('tp-calendar-main'),sidebar=workspace.createDiv('tp-calendar-sidebar');
@@ -1237,12 +1243,12 @@ class PlannerView extends ItemView {
       const none = sidebar.createDiv('tp-panel tp-unscheduled-zone'); none.createEl('h4', { text: 'No due date · ' + undated.length });
       none.setAttribute('data-unscheduled-dropzone','true');none.setAttribute('aria-label','Unscheduled tasks drop zone');
       none.createDiv({text:'Drag a task into a day or time slot. Drop an event here to remove its date.',cls:'tp-help'});
-      none.ondragover=e=>{if(e.dataTransfer?.types.includes('application/x-tagesplaner-date')){e.preventDefault();none.addClass('tp-over');e.dataTransfer.dropEffect='move';}};
+      none.ondragover=e=>{this.clearCalendarPreview();if(e.dataTransfer?.types.includes('application/x-tagesplaner-date')){e.preventDefault();none.addClass('tp-over');e.dataTransfer.dropEffect='move';}};
       none.ondragleave=e=>{if(!none.contains(e.relatedTarget))none.removeClass('tp-over');};
       none.ondrop=e=>{e.preventDefault();e.stopPropagation?.();none.removeClass('tp-over');try{const value=JSON.parse(e.dataTransfer?.getData('application/x-tagesplaner-date')||'null');if(value)void this.plugin.clearCalendarDate(value.id,value.kind,value.subtaskId);}catch{new Notice('Could not remove this date.');}};
       for (const task of undated) {
         const item=button(none,task.title,()=>new TaskModal(this.app,this.plugin,task.id).open(),'tp-calendar-undated');item.setAttribute('data-undated-task',task.id);item.draggable=true;item.title='Drag into the calendar to schedule this task, or click to edit.';
-        item.ondragstart=e=>{e.dataTransfer.setData('application/x-tagesplaner-date',JSON.stringify({id:task.id,kind:'task'}));e.dataTransfer.effectAllowed='move';};
+        item.ondragstart=e=>{this.startNativeCalendarDrag(e,{task,kind:'task'});e.dataTransfer.setData('application/x-tagesplaner-date',JSON.stringify({id:task.id,kind:'task',expected:scheduleKey(task)}));e.dataTransfer.effectAllowed='move';};item.ondragend=()=>{this.nativeCalendarDrag=null;this.clearCalendarPreview();};this.bindCalendarPointerDrag(item,{task,kind:'task'});
       }
       if (!undated.length) none.createDiv({ text: 'Drop a task here to remove its schedule.', cls: 'tp-empty' });
     };
@@ -1252,20 +1258,84 @@ class PlannerView extends ItemView {
     this.calendarDate = this.calendarMode === 'week' ? shiftDate(this.calendarDate, direction * 7) : shiftMonth(this.calendarDate, direction);
     this.render();
   }
-  calendarDrop(day, date, timed = false) {
-    day.ondragover = e => { if (e.dataTransfer?.types.some(type => ['application/x-tagesplaner-date', 'application/x-tagesplaner-range-edge'].includes(type))) { e.preventDefault(); day.addClass('tp-over'); } };
-    day.ondragleave = () => day.removeClass('tp-over');
-    day.ondrop = e => {
-      e.preventDefault(); day.removeClass('tp-over');
-      try {
-        const resize = e.dataTransfer?.getData('application/x-tagesplaner-range-edge');
-        if (resize) { const payload = JSON.parse(resize); void this.plugin.setScheduleEdgeDate(payload.id, payload.edge, date, payload.expected, payload.occurrenceStart); return; }
-        const value = JSON.parse(e.dataTransfer?.getData('application/x-tagesplaner-date') || 'null'); if (!value) return;
-        if (timed && value.kind === 'task') { const box = day.getBoundingClientRect(), minute = Math.max(0, Math.min(1440-this.calendarStep,Number(day.getAttribute('data-time-origin')||0)+Math.round((e.clientY - box.top) / this.calendarPixels / this.calendarStep) * this.calendarStep)); void this.plugin.moveTimedTask(value.id, date, minute); }
-        else void this.plugin.reschedule(value.id, value.kind, value.subtaskId, date);
-      } catch { new Notice('Could not move this event.'); }
+  clearCalendarPreview() { this.calendarPreview?.remove();this.calendarPreview=null; }
+  calendarDropPlan(day,date,entry,y,timed=null) {
+    const task=this.plugin.data.tasks.find(task=>task.id===entry.task.id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done')return null;
+    const isTimed=timed??(day.classList?.contains('tp-agenda-day')||day.getAttribute('data-time-origin')!=null);
+    if(!isTimed||entry.kind!=='task')return {date,timed:false};
+    const s=plannerSettings(this.plugin.data),range=taskRange(task),duration=range?.timed?range.end-range.start:s.dragDuration,origin=Number(day.getAttribute('data-time-origin')||0),end=s.endHour*60;
+    let minute=origin+Math.round((y-day.getBoundingClientRect().top)/this.calendarPixels/this.calendarStep)*this.calendarStep;
+    const latest=range?.timed?1440-this.calendarStep:Math.max(origin,Math.floor((end-duration)/this.calendarStep)*this.calendarStep);
+    minute=Math.max(origin,Math.min(latest,minute));const start=wallParts(wallValue(date)+minute),finish=wallParts(wallValue(date)+minute+duration);
+    return {date,timed:true,minute,duration,startDate:start.date,startTime:start.time,due:finish.date,dueTime:finish.time};
+  }
+  showCalendarPreview(day,date,entry,y,timed=null) {
+    this.clearCalendarPreview();const plan=this.calendarDropPlan(day,date,entry,y,timed);if(!plan)return null;
+    const key=PRIORITIES.find(priority=>priority.name===entry.task.priority)?.key||'mid';
+    if(plan.timed){
+      const projected={...entry.task,...plan},candidate={...entry,task:projected,date:plan.due,kind:'task',dragPreview:true};
+      const other=(this.calendarVisibleEntries||[]).filter(item=>item.kind!=='task'||item.task.id!==entry.task.id);
+      const segment=layoutTimedEvents(calendarEntriesForDate([...other,candidate],date).filter(item=>item.timed)).find(item=>item.dragPreview);if(!segment)return null;
+      const node=day.createDiv('tp-scheduled-event tp-drag-preview tp-priority-'+key),height=(segment.endMinute-segment.startMinute)*this.calendarPixels;this.calendarPreview=node;
+      node.setAttribute('aria-hidden','true');node.setAttribute('data-drag-preview-task',entry.task.id);node.style.top=((segment.startMinute-Number(day.getAttribute('data-time-origin')||0))*this.calendarPixels)+'px';node.style.height=height+'px';node.style.left='calc('+100*segment.column/segment.columns+'% + 5px)';node.style.width='calc('+100/segment.columns+'% - 10px)';
+      if(segment.endMinute-segment.startMinute<30||height<30)node.addClass('is-short');if(height<55)node.addClass('is-compact');const item=node.createDiv('tp-calendar-event tp-timed-event');item.createDiv({text:entry.task.title,cls:'tp-calendar-event-title'});item.createDiv({text:plan.startTime+' – '+plan.dueTime,cls:'tp-calendar-event-time'});
+    }else{
+      const host=this.calendarAllDayHosts?.get(date)||day,node=host.createDiv('tp-calendar-entry tp-drag-preview');this.calendarPreview=node;node.setAttribute('aria-hidden','true');const item=node.createDiv('tp-calendar-event tp-priority-'+key);item.createDiv({text:entry.task.title,cls:'tp-calendar-event-title'});const range=entry.kind==='task'?taskRange(entry.task):null;item.createDiv({text:shortDate(date)+' · '+(range?.timed?range.startTime+' – '+range.endTime:'All day'),cls:'tp-calendar-event-time'});item.createDiv({text:entry.task.priority+' · '+entry.task.status+' · '+projectName(this.plugin.data,entry.task.projectId),cls:'tp-calendar-event-detail'});
+    }
+    return plan;
+  }
+  startNativeCalendarDrag(event,entry) {
+    this.nativeCalendarDrag={...entry,expected:scheduleKey(calendarSourceTask(entry))};
+    if(event.dataTransfer?.setDragImage){const image=event.target?.ownerDocument?.createElement?.('canvas');if(image){image.width=1;image.height=1;event.dataTransfer.setDragImage(image,0,0);}}
+  }
+  calendarDrop(day,date,timed=false) {
+    day.ondragover=e=>{if(!e.dataTransfer?.types.some(type=>['application/x-tagesplaner-date','application/x-tagesplaner-range-edge'].includes(type)))return;e.preventDefault();day.addClass('tp-over');if(this.nativeCalendarDrag)this.showCalendarPreview(day,date,this.nativeCalendarDrag,e.clientY,timed);};
+    day.ondragleave=e=>{if(day.contains(e.relatedTarget))return;day.removeClass('tp-over');this.clearCalendarPreview();};
+    day.ondrop=e=>{
+      e.preventDefault();day.removeClass('tp-over');this.clearCalendarPreview();
+      try{
+        const resize=e.dataTransfer?.getData('application/x-tagesplaner-range-edge');if(resize){const payload=JSON.parse(resize);void this.plugin.setScheduleEdgeDate(payload.id,payload.edge,date,payload.expected,payload.occurrenceStart);return;}
+        const value=JSON.parse(e.dataTransfer?.getData('application/x-tagesplaner-date')||'null');if(!value)return;
+        const task=this.plugin.data.tasks.find(task=>task.id===value.id);if(!task)return;const entry=this.nativeCalendarDrag?.task.id===value.id?this.nativeCalendarDrag:{task,kind:value.kind,subtaskId:value.subtaskId};const plan=this.calendarDropPlan(day,date,entry,e.clientY,timed);this.nativeCalendarDrag=null;if(!plan)return;
+        if(plan.timed)void this.plugin.moveTimedTask(value.id,date,plan.minute,plan.duration,entry.expected||value.expected||null);else void this.plugin.reschedule(value.id,value.kind,value.subtaskId,date);
+      }catch{new Notice('Could not move this event.');}
     };
   }
+  updateCalendarNow(now=Date.now()) {
+    if(this.tab!=='calendar'||this.calendarMode!=='week'||!this.calendarNowTargets)return;
+    const date=dayKey(now),clock=new Date(now),minute=clock.getHours()*60+clock.getMinutes(),label=String(clock.getHours()).padStart(2,'0')+':'+String(clock.getMinutes()).padStart(2,'0');let todayVisible=false;
+    for(const target of this.calendarNowTargets){
+      const visible=target.date===date&&minute>=target.origin&&minute<target.end;
+      if(!visible){target.marker?.remove();target.marker=null;continue;}todayVisible=true;
+      if(!target.marker){target.marker=target.day.createDiv('tp-now-line');target.marker.setAttribute('aria-label','Current time');target.marker.setAttribute('role','img');}
+      target.marker.style.top=((minute-target.origin)*this.calendarPixels)+'px';target.marker.setAttribute('title','Current time · '+label);
+    }
+    if(!todayVisible){this.calendarNowLabel?.remove();this.calendarNowLabel=null;return;}
+    if(!this.calendarNowLabel){this.calendarNowLabel=this.calendarNowHours.createDiv('tp-now-label');this.calendarNowLabel.setAttribute('aria-hidden','true');}
+    this.calendarNowLabel.textContent=label;this.calendarNowLabel.style.top=((minute-this.calendarNowTargets[0].origin)*this.calendarPixels-8)+'px';
+  }
+  bindCalendarPointerDrag(item,entry) {
+    const open=item.onclick,doc=item.ownerDocument;let drag=null,highlight=null;
+    const clean=()=>{this.clearCalendarPreview();highlight?.removeClass('tp-over');highlight=null;item.removeClass('is-dragging');};
+    const hit=(x,y)=>doc.elementFromPoint?.(x,y);
+    item.onclick=e=>{if(Date.now()>=(this.suppressCalendarClickUntil||0))open?.(e);};
+    item.onpointerdown=e=>{if(e.button!=null&&e.button!==0)return;e.preventDefault();drag={x:e.clientX,y:e.clientY,moved:false,pointerId:e.pointerId,expected:scheduleKey(calendarSourceTask(entry))};try{item.setPointerCapture?.(e.pointerId);}catch{drag=null;}};
+    item.onpointermove=e=>{
+      if(!drag)return;if(!drag.moved&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<5)return;e.preventDefault();drag.moved=true;item.addClass('is-dragging');
+      const target=hit(e.clientX,e.clientY)?.closest('[data-unscheduled-dropzone], [data-calendar-date], [data-all-day-date]');
+      if(target!==highlight){highlight?.removeClass('tp-over');highlight=target;highlight?.addClass('tp-over');}
+      if(target&&!target.getAttribute('data-unscheduled-dropzone')){const date=target.getAttribute('data-calendar-date')||target.getAttribute('data-all-day-date');this.showCalendarPreview(target,date,entry,e.clientY);}else this.clearCalendarPreview();
+    };
+    item.onpointerup=async e=>{
+      if(!drag)return;const state=drag;drag=null;e.preventDefault();clean();try{item.releasePointerCapture?.(state.pointerId);}catch{}
+      if(!state.moved){open?.(e);this.suppressCalendarClickUntil=Date.now()+300;return;}this.suppressCalendarClickUntil=Date.now()+300;
+      const target=hit(e.clientX,e.clientY);if(!target)return;if(target.closest('[data-unscheduled-dropzone]')){await this.plugin.clearCalendarDate(entry.task.id,entry.kind,entry.subtaskId);return;}
+      const day=target.closest('[data-calendar-date], [data-all-day-date]');if(!day)return;const date=day.getAttribute('data-calendar-date')||day.getAttribute('data-all-day-date'),plan=this.calendarDropPlan(day,date,entry,e.clientY);if(!plan)return;
+      if(plan.timed)await this.plugin.moveTimedTask(entry.task.id,date,plan.minute,plan.duration,state.expected);else await this.plugin.reschedule(entry.task.id,entry.kind,entry.subtaskId,date);
+    };
+    item.onpointercancel=()=>{drag=null;clean();};item.onlostpointercapture=()=>{if(drag){drag=null;clean();}};
+  }
+
   renderWeekTimeline(parent, entries, start) {
     const s=plannerSettings(this.plugin.data),origin=s.startHour*60,span=(s.endHour-s.startHour)*60,days = Array.from({length:7},(_,i) => shiftDate(start,i)).filter(date=>s.showWeekends||weekdayOf(date)<5), events = days.map(date => calendarEntriesForDate(entries,date)), layouts = events.map(items => layoutTimedEvents(items.filter(e => e.timed)));
     const widths = layouts.map(items => Math.max(210, Math.max(1,...items.map(e=>e.columns)) * 175));
@@ -1275,16 +1345,20 @@ class PlannerView extends ItemView {
     grid.createDiv({text:'Local time',cls:'tp-agenda-heading tp-agenda-corner'});
     for(const date of days) { const heading=grid.createDiv('tp-agenda-heading'+(date===dayKey()?' is-today':''));heading.createDiv({text:new Date(date+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short'}),cls:'tp-agenda-weekday'});heading.createDiv({text:shortDate(date),cls:'tp-agenda-date'}); }
     grid.createDiv({text:'All day',cls:'tp-agenda-all-label'});
-    for(let i=0;i<days.length;i++){const day=grid.createDiv('tp-agenda-all-day');day.setAttribute('data-all-day-date',days[i]);this.calendarDrop(day,days[i]);for(const entry of events[i].filter(e=>!e.timed))this.renderCalendarEvent(day,entry);}
-    const hours = grid.createDiv('tp-agenda-hours');hours.style.height = (span*this.calendarPixels)+'px';
+    this.calendarAllDayHosts=new Map();
+    for(let i=0;i<days.length;i++){const day=grid.createDiv('tp-agenda-all-day');this.calendarAllDayHosts.set(days[i],day);day.setAttribute('data-all-day-date',days[i]);this.calendarDrop(day,days[i]);for(const entry of events[i].filter(e=>!e.timed))this.renderCalendarEvent(day,entry);}
+    this.calendarNowTargets=[];this.calendarNowLabel=null;
+    const hours = grid.createDiv('tp-agenda-hours');this.calendarNowHours=hours;hours.style.height = (span*this.calendarPixels)+'px';
     for(let h=s.startHour;h<s.endHour;h++){const label=hours.createDiv({text:String(h).padStart(2,'0')+':00',cls:'tp-agenda-hour'});label.style.top=((h*60-origin)*this.calendarPixels)+'px';}
     for(let i=0;i<days.length;i++){
-      const day=grid.createDiv('tp-agenda-day'+(days[i]===dayKey()?' is-today':''));day.setAttribute('data-calendar-date',days[i]);day.style.height=(span*this.calendarPixels)+'px';day.setAttribute('data-time-origin',String(origin));day.style.overflow='hidden';day.style.backgroundSize='100% '+s.hourHeight+'px,100% '+(s.hourHeight*this.calendarStep/60)+'px';this.calendarDrop(day,days[i],true);
+      const day=grid.createDiv('tp-agenda-day'+(days[i]===dayKey()?' is-today':''));day.setAttribute('data-calendar-date',days[i]);day.style.height=(span*this.calendarPixels)+'px';day.setAttribute('data-time-origin',String(origin));day.style.overflow='hidden';day.style.backgroundSize='100% '+s.hourHeight+'px,100% '+(s.hourHeight*this.calendarStep/60)+'px';this.calendarDrop(day,days[i],true);this.calendarNowTargets.push({day,date:days[i],origin,end:s.endHour*60,marker:null});
       for(const entry of layouts[i].filter(entry=>entry.endMinute>origin&&entry.startMinute<s.endHour*60)) this.renderTimedEvent(day,entry);
     }
+    this.updateCalendarNow();
     const saved = this.calendarTimelineScroll;
     const firstStart = layouts.flat().length ? Math.floor(Math.min(...layouts.flat().map(e=>e.startMinute))/60)*60 : 7*60;
-    scroller.scrollTop = saved == null ? Math.max(0,firstStart-origin)*this.calendarPixels : saved;
+    const current=new Date(),focus=days.includes(dayKey())?Math.max(origin,current.getHours()*60+current.getMinutes()-60):firstStart;
+    scroller.scrollTop = saved == null ? Math.max(0,focus-origin)*this.calendarPixels : saved;
     scroller.onscroll = () => { this.calendarTimelineScroll = scroller.scrollTop; };
   }
   eventText(item, entry, label, compact = false) {
@@ -1293,40 +1367,12 @@ class PlannerView extends ItemView {
     if(!compact)item.createDiv({text:entry.task.priority+' · '+entry.task.status+' · '+projectName(this.plugin.data,entry.task.projectId),cls:'tp-calendar-event-detail'});
     item.title=entry.task.title+'\n'+label+'\n'+projectName(this.plugin.data,entry.task.projectId);
     item.setAttribute('data-event-task',entry.task.id);item.setAttribute('data-event-kind',entry.kind);item.setAttribute('data-event-time',entry.task.dueTime||'');
-    item.draggable=true;item.ondragstart=e=>{e.dataTransfer.setData('application/x-tagesplaner-date',JSON.stringify({id:entry.task.id,kind:entry.kind,subtaskId:entry.subtaskId}));e.dataTransfer.effectAllowed='move';};
+    item.draggable=true;item.ondragend=()=>{this.nativeCalendarDrag=null;this.clearCalendarPreview();};item.ondragstart=e=>{this.startNativeCalendarDrag(e,entry);e.dataTransfer.setData('application/x-tagesplaner-date',JSON.stringify({id:entry.task.id,kind:entry.kind,subtaskId:entry.subtaskId}));e.dataTransfer.effectAllowed='move';};
     this.bindCalendarPointerDrag(item,entry);
-  }
-  bindCalendarPointerDrag(item,entry) {
-    const open=item.onclick,doc=item.ownerDocument;let drag=null,ghost=null,highlight=null;
-    const clean=()=>{ghost?.remove();ghost=null;highlight?.removeClass('tp-over');highlight=null;item.removeClass('is-dragging');};
-    const hit=(x,y)=>doc.elementFromPoint?.(x,y);
-    item.onclick=e=>{if(Date.now()>=(this.suppressCalendarClickUntil||0))open?.(e);};
-    item.onpointerdown=e=>{if(e.button!=null&&e.button!==0)return;e.preventDefault();drag={x:e.clientX,y:e.clientY,moved:false,pointerId:e.pointerId};try{item.setPointerCapture?.(e.pointerId);}catch{drag=null;}};
-    item.onpointermove=e=>{
-      if(!drag)return;
-      if(!drag.moved&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<5)return;
-      e.preventDefault();drag.moved=true;item.addClass('is-dragging');
-      if(!ghost&&doc.body?.createDiv)ghost=doc.body.createDiv({text:entry.task.title,cls:'tp-calendar-drag-ghost'});
-      if(ghost){ghost.style.left=(e.clientX+14)+'px';ghost.style.top=(e.clientY+14)+'px';}
-      const target=hit(e.clientX,e.clientY)?.closest('[data-unscheduled-dropzone], [data-calendar-date], [data-all-day-date]');
-      if(target!==highlight){highlight?.removeClass('tp-over');highlight=target;highlight?.addClass('tp-over');}
-    };
-    item.onpointerup=async e=>{
-      if(!drag)return;const state=drag;drag=null;e.preventDefault();clean();try{item.releasePointerCapture?.(state.pointerId);}catch{}
-      if(!state.moved){open?.(e);this.suppressCalendarClickUntil=Date.now()+300;return;}
-      this.suppressCalendarClickUntil=Date.now()+300;
-      const target=hit(e.clientX,e.clientY);if(!target)return;
-      if(target.closest('[data-unscheduled-dropzone]')){await this.plugin.clearCalendarDate(entry.task.id,entry.kind,entry.subtaskId);return;}
-      const day=target.closest('[data-calendar-date], [data-all-day-date]');if(!day)return;
-      const date=day.getAttribute('data-calendar-date')||day.getAttribute('data-all-day-date');
-      if(day.classList.contains('tp-agenda-day')&&entry.kind==='task'){const box=day.getBoundingClientRect(),minute=Math.max(0,Math.min(1440-this.calendarStep,Number(day.getAttribute('data-time-origin')||0)+Math.round((e.clientY-box.top)/this.calendarPixels/this.calendarStep)*this.calendarStep));await this.plugin.moveTimedTask(entry.task.id,date,minute);}
-      else await this.plugin.reschedule(entry.task.id,entry.kind,entry.subtaskId,date);
-    };
-    item.onpointercancel=()=>{drag=null;clean();};item.onlostpointercapture=()=>{if(drag){drag=null;clean();}};
   }
   renderTimedEvent(parent, entry) {
     const box=parent.createDiv('tp-scheduled-event tp-priority-'+(PRIORITIES.find(p=>p.name===entry.task.priority)?.key||'mid'));box.setAttribute('data-schedule-id',entry.task.id);
-    const paint=(start,end)=>{box.style.top=((start-Number(parent.getAttribute('data-time-origin')||0))*this.calendarPixels)+'px';box.style.height=((end-start)*this.calendarPixels)+'px';if(end-start<30)box.addClass('is-short');else box.removeClass('is-short');};paint(entry.startMinute,entry.endMinute);
+    const paint=(start,end)=>{box.style.top=((start-Number(parent.getAttribute('data-time-origin')||0))*this.calendarPixels)+'px';box.style.height=((end-start)*this.calendarPixels)+'px';if(end-start<30||(end-start)*this.calendarPixels<30)box.addClass('is-short');else box.removeClass('is-short');if((end-start)*this.calendarPixels<55)box.addClass('is-compact');else box.removeClass('is-compact');};paint(entry.startMinute,entry.endMinute);
     box.style.left='calc('+100*entry.column/entry.columns+'% + 5px)';box.style.width='calc('+100/entry.columns+'% - 10px)';
     const item=button(box,'',()=>{if(Date.now()<(this.suppressCalendarClickUntil||0))return;new TaskModal(this.app,this.plugin,entry.task.id).open();},'tp-calendar-event tp-timed-event'+(taskOverdue(entry.task)?' is-overdue':''));
     const range=entry.range,label=(entry.continuesBefore?'← '+shortDate(range.startDate)+' ':'')+(entry.continuesBefore?'00:00':range.startTime)+' – '+(entry.continuesAfter?'24:00 → '+shortDate(range.endDate):range.endTime);
@@ -1544,6 +1590,7 @@ class PlannerView extends ItemView {
       input.onkeydown=e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();return form.onsubmit(e);}};
     }
     const actions = card.createDiv('tp-card-actions');
+    if (!archived && this.getViewType() !== PIN_VIEW) button(actions, '📌 Pin', () => this.plugin.openDesktop('pin', task.id), 'tp-small-button tp-pin-task');
     const more = button(actions, expanded ? 'Show Less' : 'Show More', () => { if (this.expanded.has(task.id)) this.expanded.delete(task.id); else this.expanded.add(task.id); this.render(); }, 'tp-small-button tp-show-more');
     more.setAttribute('aria-expanded', String(expanded));
     if (archived) button(actions, 'Reopen', () => this.plugin.changeStatus(task.id, 'ToDo'), 'tp-small-button');
@@ -1613,10 +1660,194 @@ class PlannerView extends ItemView {
   }
 }
 
+
+function desktopBounds(value) {
+  if (!value || typeof value !== 'object') return null;
+  const {x,y,width,height}=value;
+  if (![x,y,width,height].every(Number.isFinite) || width<240 || width>4000 || height<200 || height>4000 || Math.abs(x)>50000 || Math.abs(y)>50000) return null;
+  return {x:Math.round(x),y:Math.round(y),width:Math.round(width),height:Math.round(height)};
+}
+function desktopWindow(view) { return view.contentEl?.ownerDocument?.defaultView; }
+function popoutWindow(view) {
+  const win=desktopWindow(view);
+  // Never pin or resize the main vault window when a view is docked there.
+  const main=view.app.workspace.rootSplit?.win;
+  return win && main && win !== main && view.leaf.getContainer?.()?.win === win ? win : null;
+}
+async function nativeDesktopWindow(view) {
+  const win=popoutWindow(view);if(!win)return null;
+  if(view.desktopNative&&!view.desktopNative.isDestroyed())return view.desktopNative;
+  let remote;
+  try { remote=require('@electron/remote'); } catch (_) { try {remote=require('electron').remote;}catch (_){} }
+  if(!remote?.BrowserWindow?.getAllWindows)return null;
+  // Identify the exact renderer, rather than relying on the focused window.
+  const key='__dailyPlannerWindow_'+uid().replace(/-/g,'_'),token=uid();win[key]=token;
+  let timer;
+  try {
+    const lookup=Promise.all(remote.BrowserWindow.getAllWindows().map(async native=>{
+      try {
+        if(native.isDestroyed())return null;
+        const value=await native.webContents.executeJavaScript('window['+JSON.stringify(key)+']',false);
+        return value===token?native:null;
+      }catch(_){return null;}
+    }));
+    const matches=await Promise.race([lookup,new Promise(resolve=>{timer=win.setTimeout(()=>resolve([]),2000);})]);
+    const native=matches.find(Boolean)||null;
+    if(popoutWindow(view)!==win||view.desktopClosed)return null;
+    if(native)view.desktopNative=native;return native;
+  }catch(_){return null;}finally { if(timer)win.clearTimeout(timer);delete win[key]; }
+}
+async function setDesktopOnTop(view,enabled,notify=false) {
+  const native=await nativeDesktopWindow(view);
+  if(!native || !popoutWindow(view) || view.desktopClosed) {
+    if(notify)new Notice('Automatic always-on-top is unavailable here. Focus this pop-out and use Obsidian’s “Toggle always on top” command.');
+    return false;
+  }
+  try { if(view.desktopPreviousTop===undefined)view.desktopPreviousTop=!!native.isAlwaysOnTop();native.setAlwaysOnTop(!!enabled);view.desktopTopApplied=!!enabled;view.desktopTopButton?.setAttribute('aria-pressed',String(!!enabled));return true; }
+  catch(_){if(notify)new Notice('Could not change always-on-top. Use Obsidian’s “Toggle always on top” command.');return false;}
+}
+function captureDesktopBounds(view) {
+  const win=popoutWindow(view);if(!win || win.closed)return null;
+  try {if(view.desktopNative&&!view.desktopNative.isDestroyed())return desktopBounds(view.desktopNative.getBounds());}catch(_){}
+  return desktopBounds({x:win.screenX,y:win.screenY,width:win.outerWidth,height:win.outerHeight});
+}
+function bindDesktopLayout(view,kind) {
+  if(view.desktopLayoutBound)return;view.desktopLayoutBound=true;
+  view.registerEvent(view.app.workspace.on('layout-change',()=>{
+    const win=popoutWindow(view);
+    if(view.desktopBoundWindow&&view.desktopBoundWindow!==win)stopDesktopView(view);
+    if(win&&view.desktopBoundWindow!==win)void startDesktopView(view,kind);
+  }));
+}
+async function startDesktopView(view,kind) {
+  const win=popoutWindow(view);if(!win || view.desktopBoundWindow===win)return;
+  view.desktopClosed=false;view.desktopKind=kind;view.desktopBoundWindow=win;
+  view.desktopRemember=()=>{
+    const bounds=captureDesktopBounds(view);
+    if(bounds&&!view.plugin.desktopUnloading)void view.plugin.saveDesktopBounds(kind,kind==='pin'?view.taskId:null,bounds);
+  };
+  view.desktopSchedule=()=>{
+    if(view.desktopBoundsTimer)win.clearTimeout(view.desktopBoundsTimer);
+    view.desktopBoundsTimer=win.setTimeout(view.desktopRemember,400);
+  };
+  win.addEventListener('resize',view.desktopSchedule);win.addEventListener('blur',view.desktopRemember);
+  win.addEventListener('beforeunload',view.desktopRemember);
+  await setDesktopOnTop(view,plannerSettings(view.plugin.data)[kind+'OnTop']);
+  if(view.desktopClosed||view.desktopBoundWindow!==win)return;
+  const native=view.desktopNative;
+  if(native?.on){native.on('move',view.desktopSchedule);native.on('resize',view.desktopSchedule);}
+  if(!native && plannerSettings(view.plugin.data)[kind+'OnTop'])new Notice('Window opened. To keep it on top, use Obsidian’s “Toggle always on top” command in this pop-out.');
+}
+function stopDesktopView(view) {
+  view.desktopRemember?.();view.desktopClosed=true;
+  const win=view.desktopBoundWindow;
+  if(win){
+    win.removeEventListener('resize',view.desktopSchedule);win.removeEventListener('blur',view.desktopRemember);win.removeEventListener('beforeunload',view.desktopRemember);
+    if(view.desktopBoundsTimer)win.clearTimeout(view.desktopBoundsTimer);
+  }
+  try {
+    const native=view.desktopNative;
+    if(native&&!native.isDestroyed()){
+      native.removeListener?.('move',view.desktopSchedule);native.removeListener?.('resize',view.desktopSchedule);
+      if(view.desktopPreviousTop!==undefined)native.setAlwaysOnTop(view.desktopPreviousTop);
+    }
+  }catch(_){}
+  view.desktopNative=null;view.desktopPreviousTop=undefined;view.desktopTopApplied=false;view.desktopBoundWindow=null;
+}
+function desktopHeader(view,root,title) {
+  const head=root.createDiv('tp-desktop-header');
+  const name=head.createDiv('tp-desktop-name');addSymbol(name,{key:view.getViewType()===QUICK_VIEW?'quick':'pin',icon:view.getViewType()===QUICK_VIEW?'quick':'pin'});name.createEl('h3',{text:title});
+  const tools=head.createDiv('tp-desktop-actions');
+  const top=button(tools,'Always on top',async()=>{
+    top.disabled=true;
+    try{
+      const native=await nativeDesktopWindow(view);
+      const enabled=native ? !native.isAlwaysOnTop() : true;
+      if(await setDesktopOnTop(view,enabled,true))top.setAttribute('aria-pressed',String(enabled));
+    }finally{top.disabled=false;}
+  },'tp-small-button');
+  view.desktopTopButton=top;
+  top.setAttribute('aria-pressed',String(!!view.desktopTopApplied));top.title='Keep this window above other applications';
+  button(tools,'Close',()=>view.leaf.detach(),'tp-small-button');
+}
+class QuickAddView extends ItemView {
+  constructor(leaf,plugin){super(leaf);this.plugin=plugin;}
+  getViewType(){return QUICK_VIEW;}
+  getDisplayText(){return 'Quick Add';}
+  getIcon(){return 'list-plus';}
+  async onOpen(){bindDesktopLayout(this,'quick');this.render();await startDesktopView(this,'quick');}
+  render(){
+    // This is called only on opening or after a successful save.
+    const root=this.contentEl;root.empty();root.addClass('tp-root','tp-desktop-root','tp-quick-root');root.setAttribute('lang','en-GB');applyPlannerAppearance(root,this.plugin.data.settings);
+    desktopHeader(this,root,'Quick Add');
+    const host=root.createDiv('tp-quick-form'),form=new TaskModal(this.app,this.plugin);
+    this.form=form;form.contentEl=host;
+    form.close=()=>{
+      if(form.saving){new Notice('Task created.');if(!this.desktopClosed)this.render();}
+      else this.leaf.detach();
+    };
+    form.onOpen();
+    host.querySelector('h2')?.remove();
+    if(form.fromTemplateButton)form.fromTemplateButton.onclick=()=>{
+      const picker=new TemplatePickerModal(this.app,this.plugin);
+      picker.choose=async id=>{
+        if(picker.creating)return false;picker.creating=true;picker.renderOptions();
+        const taskId=await this.plugin.createTaskFromTemplate(id);
+        if(taskId){picker.close();new TaskModal(this.app,this.plugin,taskId).open();}
+        else {picker.creating=false;picker.renderOptions();}
+        return !!taskId;
+      };
+      picker.open();
+    };
+    root.createDiv({text:'Saved directly to this vault. Obsidian must remain open.',cls:'tp-help'});
+  }
+  async onClose(){stopDesktopView(this);this.form?.onClose();this.form=null;}
+}
+class PinnedTaskView extends PlannerView {
+  constructor(leaf,plugin){super(leaf,plugin);this.taskId='';}
+  getViewType(){return PIN_VIEW;}
+  getDisplayText(){return this.plugin.data.tasks.find(t=>t.id===this.taskId)?.title||'Pinned task';}
+  getIcon(){return 'pin';}
+  getState(){return {taskId:this.taskId};}
+  async setState(state,result){this.taskId=typeof state?.taskId==='string'?state.taskId:'';await super.setState(state,result);this.render();}
+  async onOpen(){bindDesktopLayout(this,'pin');this.render();await startDesktopView(this,'pin');}
+  render(){
+    const root=this.contentEl;if(!root)return;
+    this.draftInputs=new Map();this.draftControls=new Map();
+    root.empty();root.addClass('tp-root','tp-desktop-root','tp-pinned-root');root.setAttribute('lang','en-GB');applyPlannerAppearance(root,this.plugin.data.settings);
+    desktopHeader(this,root,'Pinned task');
+    const task=this.plugin.data.tasks.find(t=>t.id===this.taskId);
+    if(!task || task.deletedAt || task.archivedAt){root.createDiv({text:task?.deletedAt?'This task is in Trash.':task?.archivedAt?'This task has been archived.':'Task unavailable. Choose a task using Pin on its card.',cls:'tp-empty'});return;}
+    const col=COLS.find(c=>c.name===task.status)||COLS[0],body=root.createDiv('tp-pinned-body tp-'+col.key);
+    this.renderCard(body,task,false);
+    const footer=root.createDiv('tp-desktop-footer');
+    button(footer,'Open planner',()=>this.plugin.activate(task.projectId&&projectOnlyTask(this.plugin.data,task)?'projects':isRecurringTask(this.plugin.data,task)?'recurring':'board'),'tp-small-button');
+    root.createDiv({text:'Changes sync with your planner. Closing this window does not delete the task.',cls:'tp-help'});
+  }
+  async onClose(){stopDesktopView(this);await super.onClose();}
+}
+class PinTaskPicker extends Modal {
+  constructor(app,plugin){super(app);this.plugin=plugin;}
+  onOpen(){
+    this.contentEl.addClass('tp-controls');this.contentEl.createEl('h2',{text:'Pin a task'});
+    const search=this.contentEl.createEl('input',{type:'search',attr:{placeholder:'Search tasks…','aria-label':'Search tasks to pin'}}),list=this.contentEl.createDiv('tp-pin-picker');
+    const render=()=>{list.empty();const tasks=this.plugin.data.tasks.filter(t=>!t.deletedAt&&!t.archivedAt&&t.title.toLowerCase().includes(search.value.toLowerCase()));
+      for(const task of tasks)button(list,task.title,async()=>{if(await this.plugin.openDesktop('pin',task.id))this.close();},'tp-template-choice');
+      if(!tasks.length)list.createDiv({text:'No matching tasks.',cls:'tp-empty'});
+    };search.oninput=render;render();search.focus();
+  }
+  onClose(){this.contentEl.empty();}
+}
+
 module.exports = class TagesplanerPlugin extends Plugin {
   async onload() {
     this.queue = Promise.resolve(); this.data = normalize(await this.loadData()); await this.saveData(copy(this.data));
+    this.desktopOpening = new Map(); this.desktopUnloading = false;
     this.registerView(VIEW, leaf => new PlannerView(leaf, this));
+    this.registerView(QUICK_VIEW, leaf => new QuickAddView(leaf, this));
+    this.registerView(PIN_VIEW, leaf => new PinnedTaskView(leaf, this));
+    this.addCommand({id:'quick-add',name:'Open Quick Add desktop window',callback:()=>this.openDesktop('quick')});
+    this.addCommand({id:'pin-task',name:'Pin a task to the desktop',callback:()=>new PinTaskPicker(this.app,this).open()});
     this.addRibbonIcon('layout-dashboard', "Open Daily Planner", () => this.activate());
     this.addCommand({ id: 'open', name: "Open Daily Planner", callback: () => this.activate() });
     this.addCommand({ id: 'dashboard', name: "Open dashboard", callback: () => this.activate('dashboard') });
@@ -1630,6 +1861,59 @@ module.exports = class TagesplanerPlugin extends Plugin {
       void this.tick();
     }, 60000));
   }
+
+  desktopOptions(kind,taskId) {
+    const settings=plannerSettings(this.data),key=kind==='quick'?'quick':'pin:'+taskId;
+    const remembered=settings.rememberDesktopBounds?desktopBounds(this.data.desktopWindows?.[key]):null;
+    const bounds=remembered||{x:settings.desktopX,y:settings.desktopY,width:settings[kind+'Width'],height:settings[kind+'Height']};
+    const result={x:bounds.x,y:bounds.y,size:{width:bounds.width,height:bounds.height}};
+    try{
+      let remote;try{remote=require('@electron/remote');}catch(_){remote=require('electron').remote;}
+      const screens=remote?.screen?.getAllDisplays?.()||[];
+      if(screens.length&&!screens.some(({workArea:r})=>r&&bounds.x+Math.min(bounds.width,100)>r.x&&bounds.x<r.x+r.width-40&&bounds.y+40>r.y&&bounds.y<r.y+r.height-40)){
+        const r=screens[0].workArea;result.x=r.x+30;result.y=r.y+30;
+      }
+    }catch(_){}
+    return result;
+  }
+  saveDesktopBounds(kind,taskId,bounds) {
+    if(this.desktopUnloading||!plannerSettings(this.data).rememberDesktopBounds||!(bounds=desktopBounds(bounds))||(kind==='pin'&&!taskId))return Promise.resolve(false);
+    const key=kind==='quick'?'quick':'pin:'+taskId;
+    if(JSON.stringify(desktopBounds(this.data.desktopWindows?.[key]))===JSON.stringify(bounds))return Promise.resolve(true);
+    return this.mutate(data=>{
+      const saved=data.desktopWindows&&typeof data.desktopWindows==='object'&&!Array.isArray(data.desktopWindows)?data.desktopWindows:{};
+      const entries=Object.entries(saved).filter(([id])=>id!==key).slice(-99);
+      data.desktopWindows=Object.fromEntries([...entries,[key,bounds]]);
+    },false);
+  }
+  async openDesktop(kind,taskId=null) {
+    if(!['quick','pin'].includes(kind))return false;
+    if(kind==='pin'&&!this.data.tasks.some(t=>t.id===taskId&&!t.deletedAt&&!t.archivedAt)){new Notice('This task cannot be pinned.');return false;}
+    const workspace=this.app.workspace;
+    if(typeof workspace.openPopoutLeaf!=='function'){new Notice('Desktop windows are available in the desktop version of Obsidian.');return false;}
+    const key=kind==='quick'?'quick':'pin:'+taskId;
+    if(this.desktopOpening.has(key))return this.desktopOpening.get(key);
+    const operation=(async()=>{
+      let leaf,created=false;
+      try{
+        const type=kind==='quick'?QUICK_VIEW:PIN_VIEW;
+        leaf=workspace.getLeavesOfType(type).find(leaf=>kind==='quick'||leaf.view.taskId===taskId);
+        if(leaf){
+          if(!popoutWindow(leaf.view))workspace.moveLeafToPopout(leaf,this.desktopOptions(kind,taskId));
+        }else{
+          leaf=workspace.openPopoutLeaf(this.desktopOptions(kind,taskId));created=true;
+          await leaf.setViewState({type,active:true,state:kind==='pin'?{taskId}:{}});
+        }
+        if(this.desktopUnloading){if(created)leaf.detach();return false;}
+        await workspace.revealLeaf(leaf);
+        await startDesktopView(leaf.view,kind);
+        desktopWindow(leaf.view)?.focus();return true;
+      }catch(error){console.error('Daily Planner: Could not open desktop window',error);if(created)leaf?.detach();new Notice('Could not open the desktop window. Please try again.');return false;}
+    })();
+    this.desktopOpening.set(key,operation);
+    try{return await operation;}finally{this.desktopOpening.delete(key);}
+  }
+
   async writeBackup(data) {
     const snapshot=copy(data),adapter=this.app.vault?.adapter;if(!adapter)throw new Error('Vault storage is unavailable.');
     const folder=(this.app.vault.configDir||'.obsidian')+'/plugins/'+(this.manifest?.id||'tagesplaner')+'/backups';
@@ -1649,13 +1933,16 @@ module.exports = class TagesplanerPlugin extends Plugin {
     });this.queue=operation.catch(error=>console.error(error));return operation;
   }
 
-  refreshViews() { this.app.workspace.getLeavesOfType(VIEW).forEach(leaf => leaf.view.render()); }
-  mutate(change) {
+  refreshViews() {
+    for (const type of [VIEW, PIN_VIEW]) this.app.workspace.getLeavesOfType(type).forEach(leaf => leaf.view.render());
+    // Quick Add owns an unsaved form: background saves must never replace it.
+  }
+  mutate(change, refresh = true) {
     const operation = this.queue.then(async () => {
       const before = copy(this.data);
       try { change(this.data); syncWeeklyData(this.data); await this.saveData(copy(this.data)); }
-      catch (error) { this.data = before; console.error("Daily Planner: Save failed", error); new Notice("Change not saved. Please try again."); this.refreshViews(); return false; }
-      this.refreshViews(); return true;
+      catch (error) { this.data = before; console.error("Daily Planner: Save failed", error); new Notice("Change not saved. Please try again."); if(refresh)this.refreshViews(); return false; }
+      if(refresh)this.refreshViews(); return true;
     });
     this.queue = operation.catch(error => { console.error("Daily Planner: Could not update view", error); }); return operation;
   }
@@ -1701,6 +1988,7 @@ module.exports = class TagesplanerPlugin extends Plugin {
   async tick(now = Date.now()) {
     await this.runMaintenance(now); await this.checkReminders(now);
     const minute = Math.floor(now / 60000), today = dayKey(now);
+    for(const leaf of this.app.workspace.getLeavesOfType(VIEW))leaf.view.updateCalendarNow?.(now);
     if (this.lastDay !== today || (this.lastMinute !== minute && this.app.workspace.getLeavesOfType(VIEW).some(leaf=>leaf.view.tab==='home')) || (this.lastMinute !== minute && this.data.tasks.some(t => !t.deletedAt && !t.archivedAt && t.status !== 'Done' && t.due === today && t.dueTime))) this.refreshViews();
     this.lastDay = today; this.lastMinute = minute;
   }
@@ -1740,8 +2028,8 @@ module.exports = class TagesplanerPlugin extends Plugin {
   setScheduleEdgeDate(id, edge, date, expected = null, occurrenceStart = null) {
     return this.mutate(data=>{const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done'||!validDate(date)||!['start','end'].includes(edge))throw new Error('This event cannot be resized.');if(expected&&scheduleKey(task)!==expected)throw new Error('This schedule has changed.');const range=taskRange(task);if(!range)throw new Error('An end date is required.');if(task.weeklyRecurrence&&validDate(occurrenceStart))date=shiftDate(date,-daysBetween(range.startDate,occurrenceStart));const next={...task,startDate:range.startDate,...(edge==='start'?{startDate:date}:{due:date})};Object.assign(task,resolveSchedule(next),edge==='start'?{startDate:date}:{due:date},{updatedAt:Date.now()});syncChangedWeeklyRange(data,task,range);});
   }
-  moveTimedTask(id,date,minute) {
-    return this.mutate(data=>{const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done'||!validDate(date)||!Number.isInteger(minute)||minute<0||minute>1439)throw new Error('This event cannot be moved.');const range=taskRange(task),start=wallValue(date)+minute,end=start+(range?.timed?range.end-range.start:plannerSettings(data).defaultDuration),a=wallParts(start),b=wallParts(end);Object.assign(task,{startDate:a.date,startTime:a.time,due:b.date,dueTime:b.time,updatedAt:Date.now()});syncChangedWeeklyRange(data,task,range);});
+  moveTimedTask(id,date,minute,duration=null,expected=null) {
+    return this.mutate(data=>{const task=data.tasks.find(t=>t.id===id);if(!task||task.deletedAt||task.archivedAt||task.status==='Done'||!validDate(date)||!Number.isInteger(minute)||minute<0||minute>1439)throw new Error('This event cannot be moved.');if(expected&&expected!==scheduleKey(task))throw new Error('This schedule has changed. Please try again.');const range=taskRange(task),start=wallValue(date)+minute,end=start+(range?.timed?range.end-range.start:(Number.isFinite(duration)&&duration>=5&&duration<=480?duration:plannerSettings(data).defaultDuration)),a=wallParts(start),b=wallParts(end);Object.assign(task,{startDate:a.date,startTime:a.time,due:b.date,dueTime:b.time,updatedAt:Date.now()});syncChangedWeeklyRange(data,task,range);});
   }
   changeStatus(id, status) { if(status==='Done'&&this.data.tasks.find(t=>t.id===id)?.weeklyRecurrence?.enabled){new Notice('Weekly tasks stay open. Pause the recurrence before completing this task.');return Promise.resolve(false);}return this.mutate(data => { const task = data.tasks.find(t => t.id === id); if (!task || task.deletedAt) throw new Error("Task not found."); setStatus(task, status); }); }
   changePriority(id, priority) {
@@ -1777,5 +2065,5 @@ module.exports = class TagesplanerPlugin extends Plugin {
     if (!leaf) { leaf = this.app.workspace.getLeaf(true); await leaf.setViewState({ type: VIEW, active: true }); }
     leaf.view.tab = tab;leaf.view.sidebarOpen=plannerSettings(this.data).sidebarDefault;if(tab==='calendar')leaf.view.calendarMode=plannerSettings(this.data).calendarView; leaf.view.render(); await this.app.workspace.revealLeaf(leaf);
   }
-  onunload() { this.app.workspace.detachLeavesOfType(VIEW); }
+  onunload() { this.desktopUnloading = true; for (const type of [QUICK_VIEW, PIN_VIEW, VIEW]) this.app.workspace.detachLeavesOfType(type); }
 };

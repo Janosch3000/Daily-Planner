@@ -1,12 +1,24 @@
 # Daily Planner for Obsidian
 
-Version **1.16.1** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
+Version **1.18.0** · Tasks and projects with continuous weekly tasks, weekday selection, start/end schedules, resizable calendar blocks, templates and Trash.
 
 ## Install or update with BRAT
 
 In Obsidian, open **BRAT → Add Beta plugin** and enter `Janosch3000/Daily-Planner`. Enable **Daily Planner** under Community plugins. Open it using the ribbon icon or the **Open Daily Planner** command.
 
 For updates, check for plugin updates in BRAT, then reload the plugin or restart Obsidian. Existing data is preserved. The plugin ID and data location remain `tagesplaner`; changing the display name does not create a second installation.
+
+## Desktop Quick Add and pinned tasks
+
+Use the **Quick Add** Home tile or **Daily Planner: Open Quick Add desktop window** command. Assign a shortcut under Obsidian **Settings → Hotkeys**. This shortcut works while Obsidian is focused; it is not a system-wide hotkey. Quick Add opens a separate window with the normal task form, including priority, project, dates, subtasks and templates. Successful creation clears the form for the next task. Background changes do not replace an unsaved form.
+
+Choose **📌 Pin** on an editable task card, or **Daily Planner: Pin a task to the desktop**. Each task has at most one pinned window. Its card supports subtask checkboxes, adding/removing subtasks, Activity history, Show More, Edit and Delete. Changes use the same vault data as the main planner. Closing a pinned window does not delete its task. Archived/deleted tasks show an unavailable message rather than remaining editable.
+
+In **Settings → Desktop windows**, set Quick Add and pinned-card dimensions, initial X/Y coordinates (including negative coordinates on a second monitor), remembered size/position and default always-on-top behaviour. Remembered bounds take precedence over initial settings; disable remembering to use the configured initial size/position again. These defaults apply when opening windows. Obsidian can restore pinned views and their task IDs with its workspace layout.
+
+Each desktop window also has an **Always on top** toggle. Automatic native control is optional: the plugin checks which Electron window owns the view before changing it, and never pins the main vault window. If the Electron bridge is unavailable in your Obsidian installation, use Obsidian’s **Toggle always on top** command in the pop-out window; the plugin shows this fallback explicitly.
+
+These are Obsidian desktop pop-outs. The vault must remain open; closing it closes its pop-outs. On mobile, the main planner continues to work and desktop-window actions show an availability notice. This does not install a separate background application or a Windows desktop widget.
 
 ## Central settings
 
@@ -29,7 +41,7 @@ Open the **Settings** gear tile on Home, **Tools → Settings**, or the **Open s
 
 Choose a JSON backup (up to 20 MB) or paste JSON, then **Review import**. A dialog shows task/project/template counts and requires **Import and replace data**. Import replaces the full plugin dataset. With the default backup option enabled, a backup write must succeed before replacement; a failure cancels the import. Invalid data and unsupported future versions are rejected. Settings reset never deletes tasks, projects, templates or history.
 
-Version 1.16.1 uses **data schema 4**. Earlier plugin versions refuse this format, protecting customised retention rules from being ignored by an older release. Keep a backup before updating or downgrading.
+Version 1.18.0 uses **data schema 4**. Earlier plugin versions refuse this format, protecting customised retention rules from being ignored by an older release. Keep a backup before updating or downgrading.
 
 ## Home page
 
@@ -67,7 +79,7 @@ Statuses are **ToDo**, **In Progress**, **Waiting**, **Done**. Priorities are **
 
 **No due date** is a drop zone beside the calendar. It lists open, visible tasks without their own main end date. A task can be listed here even when one of its subtasks or its Waiting follow-up has a separate date. The list follows search/project/status/priority filters and excludes project-only, Done, archived and deleted tasks.
 
-- Drag a task from this list into a weekly time slot to create a one-hour range starting at the selected time, snapped to the configured time grid. Resize or edit the range afterwards.
+- Drag a task from this list into a weekly time slot to create a 30-minute range by default starting at the selected time, snapped to the configured time grid. Resize or edit the range afterwards.
 - Drop onto the weekly all-day row or a Month day cell to assign that date without inventing clock times.
 - Drag a main task event back into No due date to clear its start date/time and end date/time. The task itself, its status, priority, project, description, subtasks and activity are kept.
 - Drag a subtask or follow-up entry into the zone to remove only that entry's date. Other dates on the parent task remain unchanged. Removing a child's date does not put an otherwise scheduled parent into the unscheduled list.
@@ -88,13 +100,21 @@ Existing due dates and due times become end dates/times without changing the dea
 
 Templates store relative start/end dates and both times. Recurrence defaults preserve the start's offset from the end, including negative offsets for overnight ranges. Moving or resizing any weekly calendar entry changes the shared weekly schedule, including its weekday and duration. Daily/monthly entries remain independent; editing one in its dialog updates future defaults, while moving or resizing it changes only that occurrence.
 
+## Calendar current time and drag preview
+
+Week shows a **blue current-time line** in today's column and the matching clock label on the time axis. It respects the selected hour range and hour height, updates every minute while Obsidian is running, and does not appear in other weeks or outside visible hours. The first opening of the current week scrolls near now; subsequent scrolling is retained.
+
+Dragging a task into the calendar displays its complete event preview **inside the target day/time slot**, with title and time range at the final size and overlap width. There is no floating miniature card. Unscheduled/all-day tasks start as **30-minute appointments** by default; change this under **Settings → Calendar → Unscheduled drag duration**. The separate default appointment duration still controls other new appointments. Existing timed tasks preserve their duration. Date-only drops stay all-day, and moving back to No due date still removes the schedule.
+
+The preview and saved drop share the same snap, visible-hour origin and duration. Leaving valid targets or cancelling removes the preview without changing the task. A schedule changed during dragging is rejected rather than overwritten.
+
 ## Weekly timeline and month calendar
 
 **Week** displays an hourly timeline from Monday to Sunday. All-day tasks, subtasks and follow-ups stay above the time grid. Time blocks are positioned by their starts and sized by their duration. The initial vertical position targets the first scheduled hour; subsequent scrolling is retained while the view is open.
 
 Overlapping events use separate columns. Busy days widen to retain readable event titles. Every timed block has exactly the height of its duration, with no minimum height or artificial vertical gap. A 15-minute task is one quarter of an hour tall, and consecutive tasks touch at their shared time boundary. Scroll horizontally to reach the remaining weekdays on narrow screens. Timed blocks show only their title and time range. Tasks shorter than 30 minutes use one compact line; longer blocks put the time below the title. Long titles are clipped to the available space. Click to open all details, or hover for the full title, range and project. Month and all-day entries retain their metadata.
 
-**Move:** drag a time block onto a date/time slot to move the whole range while preserving its duration. Dropping an all-day task into the time grid creates a one-hour timed range. Date-based moves, including in Month, preserve the existing times and number of days. Subtask and follow-up moves change only their own dates.
+**Move:** drag a time block onto a date/time slot to move the whole range while preserving its duration. Dropping an all-day task into the time grid uses the unscheduled drag duration (30 minutes by default). Date-based moves, including in Month, preserve the existing times and number of days. Subtask and follow-up moves change only their own dates.
 
 **Resize timed events:** in Week, drag the small top handle to change the start or the bottom handle to change the end. Changes snap to the configured time grid (15 minutes by default), with a minimum resized duration of one grid step. The time label previews the proposed range while dragging. Releasing saves it; cancelling the pointer gesture keeps the original schedule. Resize handles also support Arrow Up/Arrow Down for one-grid-step changes. Edit remains available as an alternative.
 
@@ -169,14 +189,19 @@ All plugin-owned interface text, commands, dialogs, reminders and errors are Eng
 
 Search matches task titles, descriptions, subtasks, activity, waiting people and project names. Multiple words must all match. Combine status, priority, date and project filters. **Reset filters** clears them.
 
-Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.16.1 uses data schema 4 for central preferences and retention rules. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
+Data is stored locally in `<Vault>/.obsidian/plugins/tagesplaner/data.json`. Keep personal data out of the public repository. Version 1.18.0 uses data schema 4 for central preferences and retention rules. Back up this file before updating or downgrading. Earlier releases with schema guards refuse newer data to prevent overwriting it; use a matching backup if returning to an older release.
 
-## Create release 1.16.1
+## Create release 1.18.0
 
-Create a GitHub release with tag **1.16.1**, target **main**, title **Daily Planner 1.16.1**. Attach these files individually:
+Create a GitHub release with tag **1.18.0**, target **main**, title **Daily Planner 1.18.0**. Attach these files individually:
 
 - `main.js`
 - `manifest.json`
 - `styles.css`
 
 A ZIP or the automatically generated source archives alone are not sufficient for BRAT. `versions.json` stays in the repository. No additional build is needed; `main.js` is the directly loadable CommonJS file without extra runtime dependencies.
+
+
+## Desktop feature validation
+
+Run `node tests/desktop-windows.test.cjs` for the simulated Obsidian/native-window checks. These verify logic and save handling; they do not launch Obsidian. Before publishing a release, also open Quick Add and a pinned task in desktop Obsidian, edit a subtask/activity entry, move and resize each pop-out, reopen it, and check the always-on-top toggle or the documented fallback.

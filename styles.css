@@ -483,3 +483,39 @@
 .tp-card-activity-form textarea { display: block; width: 100%; min-height: 54px; resize: vertical; padding: 6px 8px; font-family: inherit; font-size: var(--tp-description-size,12px); line-height: var(--tp-line-height,1.5); }
 .tp-card-activity-form .tp-add-activity { margin: 0; font-size: 11px; padding: 4px 9px; height: auto; }
 .tp-card-activity>.tp-muted { font-size: 11px; }
+
+/* Current-time indicator is positioned by local clock minutes, not the day heading. */
+.tp-agenda-heading.is-today { border-bottom-color:transparent; }
+.tp-agenda-heading.is-today .tp-agenda-date { color:#579dff; }
+.tp-now-line { position:absolute;left:0;right:0;height:2px;background:#579dff;z-index:9;pointer-events:none;box-shadow:0 0 5px #579dff44; }
+.tp-now-line::before { content:'';position:absolute;left:0;top:-3px;width:8px;height:8px;border-radius:50%;background:#579dff; }
+.tp-now-label { position:absolute;left:0;right:0;padding:1px 3px;text-align:center;color:#579dff;font-size:10px;line-height:14px;font-weight:700;background:var(--background-secondary);z-index:8;pointer-events:none;font-variant-numeric:tabular-nums; }
+.tp-drag-preview { pointer-events:none !important;opacity:.9;z-index:30; }
+.tp-drag-preview .tp-calendar-event { border-color:#579dff;outline:1px solid #579dff;outline-offset:-1px; }
+.tp-scheduled-event.is-compact:not(.is-short) .tp-calendar-event-title { display:block;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;font-size:11px;line-height:13px; }
+.tp-scheduled-event.is-compact:not(.is-short) .tp-calendar-event-time { font-size:9px;line-height:11px;margin-top:0; }
+.tp-calendar-undated.is-dragging { opacity:.45; }
+
+/* Desktop Quick Add and pinned task windows */
+.tp-root.tp-desktop-root { width:100%; max-width:none; height:100%; box-sizing:border-box; overflow-y:auto; padding:16px; }
+.tp-desktop-header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--background-modifier-border); }
+.tp-desktop-name { display:flex; align-items:center; gap:9px; color:var(--tp-accent,var(--text-accent)); }
+.tp-desktop-name h3 { margin:0; color:var(--text-normal); font-size:1.1em; }
+.tp-desktop-name .tp-symbol { width:24px; height:24px; }
+.tp-desktop-actions, .tp-desktop-footer { display:flex; gap:8px; flex-wrap:wrap; }
+.tp-desktop-actions button[aria-pressed="true"] { background:var(--background-modifier-hover); border-color:var(--text-accent); }
+.tp-quick-form.tp-modal { width:100%; max-width:none; padding:0; }
+.tp-quick-form .tp-field { min-width:0; }
+.tp-quick-form .tp-inline-actions { position:sticky; bottom:0; background:var(--background-primary); padding:12px 0; border-top:1px solid var(--background-modifier-border); }
+.tp-pinned-body .tp-card { margin-bottom:12px; }
+.tp-pinned-body .tp-title { font-size:1.15em; line-height:1.4; }
+.tp-pinned-body .tp-card-head { cursor:default; }
+.tp-pinned-body .tp-card-head[draggable] { cursor:grab; }
+.tp-pinned-root .tp-card { border-width:1px; }
+.tp-desktop-footer { margin:14px 0; }
+.tp-pin-picker { display:grid; gap:8px; margin-top:12px; max-height:55vh; overflow:auto; }
+@media(max-width:480px) {
+  .tp-desktop-root .tp-inline-fields { grid-template-columns:minmax(0,1fr); }
+  .tp-desktop-root .tp-inline-actions { flex-wrap:wrap; }
+  .tp-desktop-root .tp-modal-subtask { flex-wrap:wrap; }
+}

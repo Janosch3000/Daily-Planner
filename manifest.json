@@ -1,9 +1,9 @@
 {
   "id": "tagesplaner",
   "name": "Daily Planner",
-  "version": "1.16.1",
+  "version": "1.18.0",
   "minAppVersion": "1.4.0",
-  "description": "Task planning with start/end schedules, a resizable weekly calendar, projects, templates and Trash.",
+  "description": "Task planning with desktop Quick Add, pinned tasks, projects, templates and a resizable calendar.",
   "author": "Janosch",
   "isDesktopOnly": false
 }
